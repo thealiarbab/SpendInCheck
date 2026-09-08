@@ -237,3 +237,21 @@ def budget_vs_actual_menu():
     for category_name, budget_limit, actual_spent, difference in rows:
         status = "Over budget" if difference < 0 else "Under budget"
         print(f"{category_name:<15}{budget_limit:>10.2f}{actual_spent:>10.2f}{difference:>14.2f}  {status}")
+
+
+def portfolio_pnl_menu():
+    print("\n-- Report: Portfolio P&L --")
+    rows = operations.portfolio_pnl()
+    if not rows:
+        print("No investments found.")
+        return
+    total_value = 0.0
+    total_pnl = 0.0
+    print(f"{'Asset':<22}{'Type':<13}{'Buy':>10}{'Current':>10}{'Qty':>10}{'P&L':>12}")
+    for asset_name, asset_type, buy_price, current_price, quantity, pnl, current_value in rows:
+        print(f"{asset_name:<22}{asset_type:<13}{buy_price:>10.2f}{current_price:>10.2f}{quantity:>10.4f}{pnl:>12.2f}")
+        total_value += float(current_value)
+        total_pnl += float(pnl)
+    print("-" * 89)
+    print(f"Total portfolio value: {total_value:.2f}")
+    print(f"Total portfolio P&L:   {total_pnl:.2f}")
