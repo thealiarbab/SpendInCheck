@@ -158,5 +158,38 @@ def budgets():
     )
 
 
+@app.route("/investments", methods=["GET", "POST"])
+def investments():
+    """List investments and handle the add-investment form."""
+    if request.method == "POST":
+        asset_name = request.form.get("asset_name", "").strip()
+        asset_type = request.form.get("asset_type")
+        buy_date = parse_past_date(request.form.get("buy_date"))
+        buy_price = parse_amount(request.form.get("buy_price"))
+        quantity = parse_amount(request.form.get("quantity"))
+        current_price = parse_amount(request.form.get("current_price"))
+
+        if not asset_name:
+            flash("Asset name cannot be empty.", "error")
+        elif asset_type not in ("Stock", "Mutual Fund", "FD"):
+            flash("Asset type must be Stock, Mutual Fund or FD.", "error")
+        elif buy_date is None:
+            flash("Buy date must be a real date and cannot be in the future.", "error")
+        elif None in (buy_price, quantity, current_price):
+            flash("Prices and quantity must all be numbers greater than 0.", "error")
+        elif operations.add_investment(asset_name, asset_type, buy_date, buy_price,
+                                       quantity, current_price):
+            flash(f"Investment '{asset_name}' added.", "success")
+        else:
+            flash("Could not add that investment.", "error")
+        return redirect(url_for("investments"))
+
+    return render_template(
+        "investments.html",
+        investments=operations.get_all_investments(),
+        today=datetime.now().date().isoformat(),
+    )
+
+
 if __name__ == "__main__":
     app.run(debug=True)
