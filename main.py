@@ -272,3 +272,14 @@ def add_investment_menu():
 
     success = operations.add_investment(asset_name, asset_type, buy_date, buy_price, quantity, current_price)
     print("Investment added." if success else "Failed to add investment.")
+
+
+def view_investments_menu():
+    print("\n-- All Investments --")
+    rows = operations.get_all_investments()
+    if not rows:
+        print("No investments found.")
+        return
+    print(f"{'ID':<5}{'Asset':<22}{'Type':<13}{'Buy Date':<12}{'Buy Price':>10}{'Qty':>10}{'Current':>10}")
+    for investment_id, asset_name, asset_type, buy_date, buy_price, quantity, current_price in rows:
+        print(f"{investment_id:<5}{asset_name:<22}{asset_type:<13}{str(buy_date):<12}{buy_price:>10.2f}{quantity:>10.4f}{current_price:>10.2f}")
