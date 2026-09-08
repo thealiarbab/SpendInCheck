@@ -257,7 +257,7 @@ def portfolio_pnl_menu():
         print(f"{asset_name:<22}{asset_type:<13}{buy_price:>10.2f}{current_price:>10.2f}{quantity:>10.4f}{pnl:>12.2f}")
         total_value += float(current_value)
         total_pnl += float(pnl)
-    print("-" * 89)
+    print("-" * 77)
     print(f"Total portfolio value: {total_value:.2f}")
     print(f"Total portfolio P&L:   {total_pnl:.2f}")
 
