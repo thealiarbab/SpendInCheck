@@ -101,5 +101,15 @@ def transactions():
     )
 
 
+@app.route("/transactions/<int:transaction_id>/delete", methods=["POST"])
+def delete_transaction(transaction_id):
+    """Delete one transaction, then return to the list."""
+    if operations.delete_transaction(transaction_id):
+        flash(f"Transaction {transaction_id} deleted.", "success")
+    else:
+        flash(f"No transaction with id {transaction_id}.", "error")
+    return redirect(url_for("transactions"))
+
+
 if __name__ == "__main__":
     app.run(debug=True)
