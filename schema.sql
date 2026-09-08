@@ -77,3 +77,13 @@ INSERT INTO transactions (txn_date, category_id, amount, txn_type, description) 
 ('2026-08-09', 5,  1300.00, 'Expense', 'Fuel'),
 ('2026-08-12', 6,  950.00,  'Expense', 'Concert ticket'),
 ('2026-08-19', 8,  1400.00, 'Expense', 'Weekend brunch');
+
+-- Seed data: budgets (a few categories, current months)
+INSERT INTO budgets (category_id, month_year, budget_limit) VALUES
+(3, '2026-06', 4000.00),
+(4, '2026-06', 15000.00),
+(6, '2026-06', 1000.00),
+(3, '2026-07', 4000.00),
+(7, '2026-07', 2000.00),
+(3, '2026-08', 3500.00),
+(6, '2026-08', 1000.00);
