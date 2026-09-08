@@ -144,3 +144,29 @@ def get_transaction_by_id(transaction_id):
         return None
     finally:
         db.close_connection(connection)
+
+
+def update_transaction(transaction_id, txn_date, category_id, amount, txn_type, description):
+    """Update every field of an existing transaction.
+
+    Returns True if a row was actually changed (rowcount > 0), False otherwise.
+    """
+    connection = None
+    try:
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        query = """
+            UPDATE transactions
+            SET txn_date = %s, category_id = %s, amount = %s, txn_type = %s, description = %s
+            WHERE transaction_id = %s
+        """
+        cursor.execute(query, (txn_date, category_id, amount, txn_type, description, transaction_id))
+        connection.commit()
+        return cursor.rowcount > 0
+    except Error as e:
+        if connection:
+            connection.rollback()
+        print(f"Error updating transaction: {e}")
+        return False
+    finally:
+        db.close_connection(connection)
