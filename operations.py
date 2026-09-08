@@ -1,5 +1,5 @@
 """
-All business logic and SQL for SpendInCheck lives in this module.
+All business logic and SQL for SpendInCheck (PostgreSQL / Supabase build).
 
 Every function here opens its own connection, runs one or more
 parameterized queries, and returns plain Python data (tuples, lists
@@ -9,7 +9,7 @@ a Flask frontend (or any other frontend) can reuse every function
 here without touching a single line of SQL.
 """
 
-from mysql.connector import Error
+from psycopg2 import Error
 
 import db
 
@@ -152,10 +152,8 @@ def update_transaction(transaction_id, txn_date, category_id, amount, txn_type, 
     Returns True if the transaction exists and was saved, False if no
     transaction has that id.
 
-    Note: MySQL's rowcount reports rows actually *changed*, not rows matched.
-    Re-saving a row with identical values gives rowcount 0 even though the
-    update succeeded, so rowcount 0 is followed by an existence check rather
-    than being reported as a failure.
+    A rowcount of 0 is followed by an existence check so that "nothing
+    needed changing" is not reported as a failure.
     """
     connection = None
     try:
@@ -206,7 +204,7 @@ def delete_transaction(transaction_id):
 def set_budget(category_id, month_year, budget_limit):
     """Create or update the budget limit for a category in a given month.
 
-    Uses INSERT ... ON DUPLICATE KEY UPDATE against the uniq_cat_month
+    Uses INSERT ... ON CONFLICT ... DO UPDATE against the uniq_cat_month
     constraint, so calling this twice for the same category/month simply
     overwrites the limit instead of raising a duplicate-key error.
     """
@@ -217,7 +215,8 @@ def set_budget(category_id, month_year, budget_limit):
         query = """
             INSERT INTO budgets (category_id, month_year, budget_limit)
             VALUES (%s, %s, %s)
-            ON DUPLICATE KEY UPDATE budget_limit = VALUES(budget_limit)
+            ON CONFLICT (category_id, month_year)
+            DO UPDATE SET budget_limit = EXCLUDED.budget_limit
         """
         cursor.execute(query, (category_id, month_year, budget_limit))
         connection.commit()
@@ -264,9 +263,9 @@ def category_wise_spend(month_year):
     The GROUP BY collapses every transaction row in a category into one row
     so SUM(amount) can add up all of them together.
     """
-    # Split 'YYYY-MM' and match with YEAR()/MONTH() rather than DATE_FORMAT,
-    # so the SQL contains no '%' characters that would clash with the %s
-    # placeholders the connector substitutes.
+    # Split 'YYYY-MM' and match the year and month separately with EXTRACT,
+    # avoiding any date-format string containing '%' that would clash with
+    # the %s placeholders the driver substitutes.
     year_part, month_part = month_year.split("-")
     connection = None
     try:
@@ -277,8 +276,8 @@ def category_wise_spend(month_year):
             FROM transactions t
             JOIN categories c ON t.category_id = c.category_id
             WHERE t.txn_type = 'Expense'
-              AND YEAR(t.txn_date) = %s
-              AND MONTH(t.txn_date) = %s
+              AND EXTRACT(YEAR FROM t.txn_date) = %s
+              AND EXTRACT(MONTH FROM t.txn_date) = %s
             GROUP BY c.category_name
             ORDER BY total_spent DESC
         """
@@ -299,7 +298,7 @@ def budget_vs_actual(month_year):
     tuples, where difference = budget_limit - actual_spent (positive means
     under budget, negative means over budget).
     """
-    # Same reasoning as category_wise_spend: YEAR()/MONTH() keeps '%' out of the SQL.
+    # Same reasoning as category_wise_spend: EXTRACT keeps '%' out of the SQL.
     # The WHERE clause already pins every budget row to the requested month, so
     # matching transactions on that same year/month lines the two tables up.
     year_part, month_part = month_year.split("-")
@@ -318,8 +317,8 @@ def budget_vs_actual(month_year):
             LEFT JOIN transactions t
                 ON t.category_id = b.category_id
                 AND t.txn_type = 'Expense'
-                AND YEAR(t.txn_date) = %s
-                AND MONTH(t.txn_date) = %s
+                AND EXTRACT(YEAR FROM t.txn_date) = %s
+                AND EXTRACT(MONTH FROM t.txn_date) = %s
             WHERE b.month_year = %s
             GROUP BY c.category_name, b.budget_limit
             ORDER BY difference ASC
