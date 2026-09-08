@@ -311,3 +311,29 @@ def budget_vs_actual(month_year):
         return []
     finally:
         db.close_connection(connection)
+
+
+# ---------------------------------------------------------------------------
+# INVESTMENTS
+# ---------------------------------------------------------------------------
+
+def add_investment(asset_name, asset_type, buy_date, buy_price, quantity, current_price):
+    """Insert a new investment. Returns True on success, False on failure."""
+    connection = None
+    try:
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        query = """
+            INSERT INTO investments (asset_name, asset_type, buy_date, buy_price, quantity, current_price)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """
+        cursor.execute(query, (asset_name, asset_type, buy_date, buy_price, quantity, current_price))
+        connection.commit()
+        return True
+    except Error as e:
+        if connection:
+            connection.rollback()
+        print(f"Error adding investment: {e}")
+        return False
+    finally:
+        db.close_connection(connection)
