@@ -358,3 +358,23 @@ def get_all_investments():
         return []
     finally:
         db.close_connection(connection)
+
+
+def update_investment_price(investment_id, new_current_price):
+    """Update only the current_price of an investment (e.g. after checking
+    today's market price). Returns True if a row was changed."""
+    connection = None
+    try:
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        query = "UPDATE investments SET current_price = %s WHERE investment_id = %s"
+        cursor.execute(query, (new_current_price, investment_id))
+        connection.commit()
+        return cursor.rowcount > 0
+    except Error as e:
+        if connection:
+            connection.rollback()
+        print(f"Error updating investment price: {e}")
+        return False
+    finally:
+        db.close_connection(connection)
