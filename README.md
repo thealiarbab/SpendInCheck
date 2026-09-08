@@ -1,49 +1,95 @@
-# FinTrack — Personal Finance & Investment Ledger
+# SpendInCheck
 
-CBSE Class XII Computer Science (Code 083) practical project. A menu-driven
-Python console app backed by MySQL, using `mysql.connector`.
+**Know whether you're on budget — not just what you spent.**
 
-## Requirements
+SpendInCheck is a personal finance tracker that ties three things most trackers keep
+apart: where your money goes, what you planned to spend, and what your investments are
+actually worth. It answers the question a list of transactions can't — *am I over or
+under, and by how much?*
 
-- Python 3.11+
-- MySQL Server running locally
-- `mysql-connector-python` (see `requirements.txt`)
+Built as a console application and a web app on the same engine, backed by MySQL.
 
-## Setup
+---
 
-1. Install the Python dependency:
+## What it does
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+**Tracks the ledger.** Every rupee in and out, filed under a category, with full
+create / read / update / delete from either interface.
 
-2. Create the database and load seed data (you will be prompted for your
-   MySQL root password):
+**Holds you to a budget.** Set a monthly limit per category. The budget report puts
+planned against actual side by side and labels each category *Over budget*, *On budget*
+or *Under budget* — the report the whole app is named for.
 
-   ```bash
-   mysql -u root -p < schema.sql
-   ```
+**Watches the portfolio.** Stocks, mutual funds and fixed deposits with buy price
+against current price, giving per-holding profit and loss plus a portfolio total.
 
-3. Open `config.py` and fill in `DB_PASSWORD` with your MySQL root password.
+## Screens
 
-4. Run the app:
+| Dashboard | Reports |
+|---|---|
+| ![Dashboard](docs/dashboard.png) | ![Reports](docs/reports.png) |
 
-   ```bash
-   python main.py
-   ```
+| Transactions |
+|---|
+| ![Transactions](docs/transactions.png) |
 
-## File structure
+## Reports
 
-- `schema.sql` — table definitions and seed data
-- `config.py` — database connection settings
-- `db.py` — opens/closes the MySQL connection
-- `operations.py` — every SQL query, one function per operation
-- `main.py` — the console menu (run this file)
-- `VIVA_NOTES.md` — plain-English notes to prepare for the viva
+| Report | Question it answers |
+|---|---|
+| Category-wise spend | Where did the money actually go this month? |
+| Budget vs actual | Which categories blew past their limit, and by how much? |
+| Portfolio P&L | Which holdings are up, which are down, what's the net? |
 
-## Notes
+## How it's built
 
-- All database logic lives in `operations.py`. `main.py` only handles
-  input, validation, and printing — it never contains SQL.
-- This separation means a Flask web frontend can later reuse every
-  function in `operations.py` without duplicating any SQL.
+The design rule is that **all SQL lives in one module**. `operations.py` holds every
+query as a single function that returns plain Python data and never prints anything.
+
+That constraint is what makes the two interfaces possible. `main.py` (console) and
+`app.py` (web) both call the same functions and differ only in how they present the
+result — the web layer was added without changing a single line of SQL, and contains
+no database code at all.
+
+```
+config.py   →  connection settings
+db.py       →  opens/closes the MySQL connection
+operations.py  →  every SQL query, one function each   ← all database logic
+      ├── main.py   →  console menus
+      └── app.py    →  Flask routes + templates
+```
+
+Queries are parameterised throughout (`%s` placeholders, never string interpolation),
+so user input can never be executed as SQL. Writes commit on success and roll back on
+failure.
+
+**Stack:** Python 3.11 · MySQL 8 · `mysql-connector-python` · Flask · plain CSS
+
+## Running it
+
+```bash
+pip install -r requirements.txt
+```
+
+```bash
+mysql -u root -p < schema.sql
+```
+
+Set your MySQL password in `config.py`, then start either interface:
+
+```bash
+python main.py
+```
+
+```bash
+python app.py
+```
+
+The schema ships with seed data — categories, three months of transactions, budgets and
+a mixed portfolio — so every report returns real output immediately.
+
+## About
+
+Built by [Ali Arbab](https://github.com/thealiarbab) as the CBSE Class XII Computer
+Science (Code 083) practical project. `VIVA_NOTES.md` explains the schema design and
+the reasoning behind each query.
