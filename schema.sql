@@ -43,3 +43,14 @@ CREATE TABLE investments (
     quantity      DECIMAL(10,4) NOT NULL,
     current_price DECIMAL(10,2) NOT NULL
 );
+
+-- Seed data: categories
+INSERT INTO categories (category_name, category_type) VALUES
+('Salary',        'Income'),
+('Freelance',      'Income'),
+('Groceries',      'Expense'),
+('Rent',           'Expense'),
+('Transport',      'Expense'),
+('Entertainment',  'Expense'),
+('Utilities',      'Expense'),
+('Dining Out',     'Expense');
