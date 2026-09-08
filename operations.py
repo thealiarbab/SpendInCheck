@@ -382,7 +382,13 @@ def get_all_investments():
 
 def update_investment_price(investment_id, new_current_price):
     """Update only the current_price of an investment (e.g. after checking
-    today's market price). Returns True if a row was changed."""
+    today's market price).
+
+    Returns True if the investment exists and was saved, False if no
+    investment has that id. As in update_transaction, a rowcount of 0 can
+    simply mean the new price equalled the old one, so it is followed by an
+    existence check instead of being treated as a failure.
+    """
     connection = None
     try:
         connection = db.get_connection()
@@ -390,7 +396,10 @@ def update_investment_price(investment_id, new_current_price):
         query = "UPDATE investments SET current_price = %s WHERE investment_id = %s"
         cursor.execute(query, (new_current_price, investment_id))
         connection.commit()
-        return cursor.rowcount > 0
+        if cursor.rowcount > 0:
+            return True
+        cursor.execute("SELECT investment_id FROM investments WHERE investment_id = %s", (investment_id,))
+        return cursor.fetchone() is not None
     except Error as e:
         if connection:
             connection.rollback()
