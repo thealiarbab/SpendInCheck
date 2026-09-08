@@ -393,3 +393,36 @@ def investment_exists(investment_id):
         return False
     finally:
         db.close_connection(connection)
+
+
+def portfolio_pnl():
+    """Report: profit/loss for every investment.
+
+    For each row, (current_price - buy_price) * quantity gives the gain or
+    loss on that holding. Returns a list of
+    (asset_name, asset_type, buy_price, current_price, quantity, pnl, current_value)
+    tuples ordered by pnl descending (best performers first).
+    """
+    connection = None
+    try:
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        query = """
+            SELECT
+                asset_name,
+                asset_type,
+                buy_price,
+                current_price,
+                quantity,
+                (current_price - buy_price) * quantity AS pnl,
+                current_price * quantity AS current_value
+            FROM investments
+            ORDER BY pnl DESC
+        """
+        cursor.execute(query)
+        return cursor.fetchall()
+    except Error as e:
+        print(f"Error generating portfolio P&L report: {e}")
+        return []
+    finally:
+        db.close_connection(connection)
