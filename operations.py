@@ -125,3 +125,22 @@ def get_all_transactions():
         return []
     finally:
         db.close_connection(connection)
+
+
+def get_transaction_by_id(transaction_id):
+    """Return a single transaction row as a tuple, or None if it does not exist."""
+    connection = None
+    try:
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        query = """
+            SELECT transaction_id, txn_date, category_id, amount, txn_type, description
+            FROM transactions WHERE transaction_id = %s
+        """
+        cursor.execute(query, (transaction_id,))
+        return cursor.fetchone()
+    except Error as e:
+        print(f"Error fetching transaction: {e}")
+        return None
+    finally:
+        db.close_connection(connection)
