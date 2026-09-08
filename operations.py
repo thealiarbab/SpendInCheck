@@ -220,3 +220,25 @@ def set_budget(category_id, month_year, budget_limit):
         return False
     finally:
         db.close_connection(connection)
+
+
+def get_all_budgets():
+    """Return every budget joined with its category name, as
+    (budget_id, category_name, month_year, budget_limit) tuples."""
+    connection = None
+    try:
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        query = """
+            SELECT b.budget_id, c.category_name, b.month_year, b.budget_limit
+            FROM budgets b
+            JOIN categories c ON b.category_id = c.category_id
+            ORDER BY b.month_year DESC, c.category_name
+        """
+        cursor.execute(query)
+        return cursor.fetchall()
+    except Error as e:
+        print(f"Error fetching budgets: {e}")
+        return []
+    finally:
+        db.close_connection(connection)
