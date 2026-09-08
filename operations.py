@@ -170,3 +170,21 @@ def update_transaction(transaction_id, txn_date, category_id, amount, txn_type, 
         return False
     finally:
         db.close_connection(connection)
+
+
+def delete_transaction(transaction_id):
+    """Delete a transaction by its id. Returns True if a row was removed."""
+    connection = None
+    try:
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        cursor.execute("DELETE FROM transactions WHERE transaction_id = %s", (transaction_id,))
+        connection.commit()
+        return cursor.rowcount > 0
+    except Error as e:
+        if connection:
+            connection.rollback()
+        print(f"Error deleting transaction: {e}")
+        return False
+    finally:
+        db.close_connection(connection)
