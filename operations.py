@@ -149,7 +149,13 @@ def get_transaction_by_id(transaction_id):
 def update_transaction(transaction_id, txn_date, category_id, amount, txn_type, description):
     """Update every field of an existing transaction.
 
-    Returns True if a row was actually changed (rowcount > 0), False otherwise.
+    Returns True if the transaction exists and was saved, False if no
+    transaction has that id.
+
+    Note: MySQL's rowcount reports rows actually *changed*, not rows matched.
+    Re-saving a row with identical values gives rowcount 0 even though the
+    update succeeded, so rowcount 0 is followed by an existence check rather
+    than being reported as a failure.
     """
     connection = None
     try:
@@ -162,7 +168,10 @@ def update_transaction(transaction_id, txn_date, category_id, amount, txn_type, 
         """
         cursor.execute(query, (txn_date, category_id, amount, txn_type, description, transaction_id))
         connection.commit()
-        return cursor.rowcount > 0
+        if cursor.rowcount > 0:
+            return True
+        cursor.execute("SELECT transaction_id FROM transactions WHERE transaction_id = %s", (transaction_id,))
+        return cursor.fetchone() is not None
     except Error as e:
         if connection:
             connection.rollback()
