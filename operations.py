@@ -38,3 +38,18 @@ def add_category(category_name, category_type):
         return False
     finally:
         db.close_connection(connection)
+
+
+def get_all_categories():
+    """Return every category as a list of (category_id, category_name, category_type) tuples."""
+    connection = None
+    try:
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        cursor.execute("SELECT category_id, category_name, category_type FROM categories ORDER BY category_name")
+        return cursor.fetchall()
+    except Error as e:
+        print(f"Error fetching categories: {e}")
+        return []
+    finally:
+        db.close_connection(connection)
