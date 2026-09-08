@@ -100,3 +100,28 @@ def add_transaction(txn_date, category_id, amount, txn_type, description):
         return False
     finally:
         db.close_connection(connection)
+
+
+def get_all_transactions():
+    """Return every transaction joined with its category name.
+
+    Each row is (transaction_id, txn_date, category_name, amount, txn_type, description),
+    ordered by most recent date first.
+    """
+    connection = None
+    try:
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        query = """
+            SELECT t.transaction_id, t.txn_date, c.category_name, t.amount, t.txn_type, t.description
+            FROM transactions t
+            JOIN categories c ON t.category_id = c.category_id
+            ORDER BY t.txn_date DESC, t.transaction_id DESC
+        """
+        cursor.execute(query)
+        return cursor.fetchall()
+    except Error as e:
+        print(f"Error fetching transactions: {e}")
+        return []
+    finally:
+        db.close_connection(connection)
