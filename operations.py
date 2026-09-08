@@ -274,3 +274,40 @@ def category_wise_spend(month_year):
         return []
     finally:
         db.close_connection(connection)
+
+
+def budget_vs_actual(month_year):
+    """Report: for each budgeted category in the given month, compare the
+    budget limit against the actual amount spent.
+
+    Returns a list of (category_name, budget_limit, actual_spent, difference)
+    tuples, where difference = budget_limit - actual_spent (positive means
+    under budget, negative means over budget).
+    """
+    connection = None
+    try:
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        query = """
+            SELECT
+                c.category_name,
+                b.budget_limit,
+                COALESCE(SUM(t.amount), 0) AS actual_spent,
+                b.budget_limit - COALESCE(SUM(t.amount), 0) AS difference
+            FROM budgets b
+            JOIN categories c ON b.category_id = c.category_id
+            LEFT JOIN transactions t
+                ON t.category_id = b.category_id
+                AND t.txn_type = 'Expense'
+                AND DATE_FORMAT(t.txn_date, '%%Y-%%m') = b.month_year
+            WHERE b.month_year = %s
+            GROUP BY c.category_name, b.budget_limit
+            ORDER BY difference ASC
+        """
+        cursor.execute(query, (month_year,))
+        return cursor.fetchall()
+    except Error as e:
+        print(f"Error generating budget-vs-actual report: {e}")
+        return []
+    finally:
+        db.close_connection(connection)
