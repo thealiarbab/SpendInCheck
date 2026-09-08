@@ -242,3 +242,35 @@ def get_all_budgets():
         return []
     finally:
         db.close_connection(connection)
+
+
+# ---------------------------------------------------------------------------
+# REPORTS
+# ---------------------------------------------------------------------------
+
+def category_wise_spend(month_year):
+    """Report: total Expense amount per category for the given 'YYYY-MM' month.
+
+    Returns a list of (category_name, total_spent) tuples, highest spend first.
+    The GROUP BY collapses every transaction row in a category into one row
+    so SUM(amount) can add up all of them together.
+    """
+    connection = None
+    try:
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        query = """
+            SELECT c.category_name, SUM(t.amount) AS total_spent
+            FROM transactions t
+            JOIN categories c ON t.category_id = c.category_id
+            WHERE t.txn_type = 'Expense' AND DATE_FORMAT(t.txn_date, '%%Y-%%m') = %s
+            GROUP BY c.category_name
+            ORDER BY total_spent DESC
+        """
+        cursor.execute(query, (month_year,))
+        return cursor.fetchall()
+    except Error as e:
+        print(f"Error generating category-wise spend report: {e}")
+        return []
+    finally:
+        db.close_connection(connection)
