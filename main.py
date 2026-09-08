@@ -82,3 +82,14 @@ def read_choice_from(prompt_text, valid_choices):
             if raw_value.lower() == choice.lower():
                 return choice
         print(f"Please enter one of: {choices_display}")
+
+
+def read_valid_category_id(prompt_text):
+    """Show all categories, then keep asking until the user enters an
+    existing category_id."""
+    show_categories()
+    while True:
+        raw_value = input(prompt_text).strip()
+        if raw_value.isdigit() and operations.category_exists(int(raw_value)):
+            return int(raw_value)
+        print("That category_id does not exist. Please pick one from the list above.")
