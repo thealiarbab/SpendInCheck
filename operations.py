@@ -12,3 +12,29 @@ here without touching a single line of SQL.
 from mysql.connector import Error
 
 import db
+
+
+# ---------------------------------------------------------------------------
+# CATEGORIES
+# ---------------------------------------------------------------------------
+
+def add_category(category_name, category_type):
+    """Insert a new category. category_type must be 'Income' or 'Expense'.
+
+    Returns True on success, False if the insert failed (e.g. duplicate name).
+    """
+    connection = None
+    try:
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        query = "INSERT INTO categories (category_name, category_type) VALUES (%s, %s)"
+        cursor.execute(query, (category_name, category_type))
+        connection.commit()
+        return True
+    except Error as e:
+        if connection:
+            connection.rollback()
+        print(f"Error adding category: {e}")
+        return False
+    finally:
+        db.close_connection(connection)
