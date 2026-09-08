@@ -7,7 +7,12 @@ apart: where your money goes, what you planned to spend, and what your investmen
 actually worth. It answers the question a list of transactions can't — *am I over or
 under, and by how much?*
 
-Built as a console application and a web app on the same engine, backed by MySQL.
+Built as a console application and a web app on the same engine.
+
+The project was written against **MySQL** for the CBSE syllabus, which requires
+`mysql.connector` and raw SQL. The hosted copy runs on **PostgreSQL (Supabase)**,
+since no free MySQL host stays awake reliably; the two differ only in the driver
+and a handful of dialect details.
 
 ---
 
@@ -53,7 +58,7 @@ no database code at all.
 
 ```
 config.py   →  connection settings
-db.py       →  opens/closes the MySQL connection
+db.py       →  opens/closes the database connection
 operations.py  →  every SQL query, one function each   ← all database logic
       ├── main.py   →  console menus
       └── app.py    →  Flask routes + templates
@@ -63,7 +68,7 @@ Queries are parameterised throughout (`%s` placeholders, never string interpolat
 so user input can never be executed as SQL. Writes commit on success and roll back on
 failure.
 
-**Stack:** Python 3.11 · MySQL 8 · `mysql-connector-python` · Flask · plain CSS
+**Stack:** Python 3.11 · PostgreSQL (Supabase) / MySQL 8 · Flask · plain CSS
 
 ## Running it
 
@@ -71,11 +76,14 @@ failure.
 pip install -r requirements.txt
 ```
 
+Load the schema — `schema.sql` for MySQL, or `schema_postgres.sql` for Postgres:
+
 ```bash
 mysql -u root -p < schema.sql
 ```
 
-Set your MySQL password in `config.py`, then start either interface:
+Put your connection settings in a `.env` file (see `.env.example`), then start
+either interface:
 
 ```bash
 python main.py
