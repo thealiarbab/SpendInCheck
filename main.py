@@ -71,3 +71,14 @@ def read_month_year(prompt_text):
             return raw_value
         except ValueError:
             print("Please enter the month as YYYY-MM, e.g. 2026-07.")
+
+
+def read_choice_from(prompt_text, valid_choices):
+    """Keep asking until the user picks one of the given valid choices."""
+    choices_display = "/".join(valid_choices)
+    while True:
+        raw_value = input(f"{prompt_text} ({choices_display}): ").strip()
+        for choice in valid_choices:
+            if raw_value.lower() == choice.lower():
+                return choice
+        print(f"Please enter one of: {choices_display}")
