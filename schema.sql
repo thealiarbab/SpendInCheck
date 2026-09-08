@@ -14,3 +14,13 @@ CREATE TABLE categories (
     category_name VARCHAR(50) NOT NULL UNIQUE,
     category_type ENUM('Income','Expense') NOT NULL
 );
+
+CREATE TABLE transactions (
+    transaction_id INT AUTO_INCREMENT PRIMARY KEY,
+    txn_date        DATE NOT NULL,
+    category_id     INT NOT NULL,
+    amount          DECIMAL(10,2) NOT NULL,
+    txn_type        ENUM('Income','Expense') NOT NULL,
+    description     VARCHAR(255),
+    FOREIGN KEY (category_id) REFERENCES categories(category_id)
+);
