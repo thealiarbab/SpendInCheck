@@ -337,3 +337,24 @@ def add_investment(asset_name, asset_type, buy_date, buy_price, quantity, curren
         return False
     finally:
         db.close_connection(connection)
+
+
+def get_all_investments():
+    """Return every investment as (investment_id, asset_name, asset_type,
+    buy_date, buy_price, quantity, current_price) tuples."""
+    connection = None
+    try:
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        query = """
+            SELECT investment_id, asset_name, asset_type, buy_date, buy_price, quantity, current_price
+            FROM investments
+            ORDER BY asset_name
+        """
+        cursor.execute(query)
+        return cursor.fetchall()
+    except Error as e:
+        print(f"Error fetching investments: {e}")
+        return []
+    finally:
+        db.close_connection(connection)
