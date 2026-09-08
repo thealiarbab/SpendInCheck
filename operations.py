@@ -68,3 +68,35 @@ def category_exists(category_id):
         return False
     finally:
         db.close_connection(connection)
+
+
+# ---------------------------------------------------------------------------
+# TRANSACTIONS
+# ---------------------------------------------------------------------------
+
+def add_transaction(txn_date, category_id, amount, txn_type, description):
+    """Insert a new transaction row.
+
+    Caller (main.py) is expected to have already validated amount > 0,
+    that category_id exists, and that txn_date is not in the future --
+    this function focuses only on the SQL insert and error handling.
+    Returns True on success, False on failure.
+    """
+    connection = None
+    try:
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        query = """
+            INSERT INTO transactions (txn_date, category_id, amount, txn_type, description)
+            VALUES (%s, %s, %s, %s, %s)
+        """
+        cursor.execute(query, (txn_date, category_id, amount, txn_type, description))
+        connection.commit()
+        return True
+    except Error as e:
+        if connection:
+            connection.rollback()
+        print(f"Error adding transaction: {e}")
+        return False
+    finally:
+        db.close_connection(connection)
