@@ -60,3 +60,14 @@ def read_valid_date(prompt_text):
             return entered_date
         except ValueError:
             print("Please enter the date as YYYY-MM-DD.")
+
+
+def read_month_year(prompt_text):
+    """Keep asking until the user enters a month in YYYY-MM format."""
+    while True:
+        raw_value = input(prompt_text).strip()
+        try:
+            datetime.strptime(raw_value, "%Y-%m")
+            return raw_value
+        except ValueError:
+            print("Please enter the month as YYYY-MM, e.g. 2026-07.")
