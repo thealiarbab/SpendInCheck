@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Sign in &mdash; SpendInCheck{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width:380px;margin:60px auto">
+  <h2>Sign in</h2>
+  <p class="subtitle">This ledger is private. Enter the password to continue.</p>
+  <form method="post">
+    <label for="password">Password</label>
+    <input type="password" id="password" name="password" autofocus required>
+    <div style="margin-top:14px"><button type="submit">Sign in</button></div>
+  </form>
+</div>
+{% endblock %}

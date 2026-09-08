@@ -14,12 +14,55 @@ Run with:  python app.py    then open http://127.0.0.1:5000
 
 from datetime import datetime
 
-from flask import Flask, flash, redirect, render_template, request, url_for
+import os
+
+from flask import (Flask, flash, redirect, render_template, request, session,
+                   url_for)
 
 import operations
 
 app = Flask(__name__)
-app.secret_key = "spendincheck-dev-key"  # only used for flash messages in local dev
+# Supplied as an environment variable when hosted; a fixed value is fine locally
+# because nothing sensitive is stored in the session.
+app.secret_key = os.environ.get("SECRET_KEY", "spendincheck-dev-key")
+
+# When APP_PASSWORD is set, every page requires signing in first. Leaving it
+# unset (the default on this machine) keeps local development password-free.
+APP_PASSWORD = os.environ.get("APP_PASSWORD")
+
+
+@app.before_request
+def require_sign_in():
+    """Redirect to the sign-in page unless this visitor has already signed in.
+
+    Only active when APP_PASSWORD is configured, which is the case on the
+    hosted site. Without this, anyone who found the URL could add or delete
+    records, since the app has no other notion of a user.
+    """
+    if not APP_PASSWORD:
+        return None
+    if session.get("signed_in") or request.endpoint in ("sign_in", "static"):
+        return None
+    return redirect(url_for("sign_in"))
+
+
+@app.route("/sign-in", methods=["GET", "POST"])
+def sign_in():
+    """Show the sign-in form and check the submitted password."""
+    if request.method == "POST":
+        if request.form.get("password") == APP_PASSWORD:
+            session["signed_in"] = True
+            return redirect(url_for("dashboard"))
+        flash("Incorrect password.", "error")
+        return redirect(url_for("sign_in"))
+    return render_template("sign_in.html")
+
+
+@app.route("/sign-out")
+def sign_out():
+    """Clear the session and return to the sign-in page."""
+    session.clear()
+    return redirect(url_for("sign_in"))
 
 
 def parse_amount(raw_value):

@@ -9,6 +9,7 @@
 <body>
   <header class="topbar">
     <a class="brand" href="{{ url_for('dashboard') }}">Spend<span>InCheck</span></a>
+    {% if request.endpoint != 'sign_in' %}
     <nav>
       <a href="{{ url_for('dashboard') }}">Dashboard</a>
       <a href="{{ url_for('transactions') }}">Transactions</a>
@@ -17,6 +18,7 @@
       <a href="{{ url_for('investments') }}">Investments</a>
       <a href="{{ url_for('reports') }}">Reports</a>
     </nav>
+    {% endif %}
   </header>
 
   <main>
