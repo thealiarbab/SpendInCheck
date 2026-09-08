@@ -235,7 +235,12 @@ def budget_vs_actual_menu():
         return
     print(f"{'Category':<15}{'Budget':>10}{'Actual':>10}{'Difference':>14}  Status")
     for category_name, budget_limit, actual_spent, difference in rows:
-        status = "Over budget" if difference < 0 else "Under budget"
+        if difference < 0:
+            status = "Over budget"
+        elif difference == 0:
+            status = "On budget"
+        else:
+            status = "Under budget"
         print(f"{category_name:<15}{budget_limit:>10.2f}{actual_spent:>10.2f}{difference:>14.2f}  {status}")
 
 
