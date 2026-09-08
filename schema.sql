@@ -33,3 +33,13 @@ CREATE TABLE budgets (
     FOREIGN KEY (category_id) REFERENCES categories(category_id),
     UNIQUE KEY uniq_cat_month (category_id, month_year)
 );
+
+CREATE TABLE investments (
+    investment_id INT AUTO_INCREMENT PRIMARY KEY,
+    asset_name    VARCHAR(100) NOT NULL,
+    asset_type    ENUM('Stock','Mutual Fund','FD') NOT NULL,
+    buy_date      DATE NOT NULL,
+    buy_price     DECIMAL(10,2) NOT NULL,
+    quantity      DECIMAL(10,4) NOT NULL,
+    current_price DECIMAL(10,2) NOT NULL
+);
