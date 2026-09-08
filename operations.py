@@ -290,6 +290,10 @@ def budget_vs_actual(month_year):
     tuples, where difference = budget_limit - actual_spent (positive means
     under budget, negative means over budget).
     """
+    # Same reasoning as category_wise_spend: YEAR()/MONTH() keeps '%' out of the SQL.
+    # The WHERE clause already pins every budget row to the requested month, so
+    # matching transactions on that same year/month lines the two tables up.
+    year_part, month_part = month_year.split("-")
     connection = None
     try:
         connection = db.get_connection()
@@ -305,12 +309,13 @@ def budget_vs_actual(month_year):
             LEFT JOIN transactions t
                 ON t.category_id = b.category_id
                 AND t.txn_type = 'Expense'
-                AND DATE_FORMAT(t.txn_date, '%%Y-%%m') = b.month_year
+                AND YEAR(t.txn_date) = %s
+                AND MONTH(t.txn_date) = %s
             WHERE b.month_year = %s
             GROUP BY c.category_name, b.budget_limit
             ORDER BY difference ASC
         """
-        cursor.execute(query, (month_year,))
+        cursor.execute(query, (year_part, month_part, month_year))
         return cursor.fetchall()
     except Error as e:
         print(f"Error generating budget-vs-actual report: {e}")
