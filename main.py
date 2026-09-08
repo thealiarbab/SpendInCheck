@@ -184,3 +184,16 @@ def show_categories():
 def view_categories_menu():
     print("\n-- All Categories --")
     show_categories()
+
+
+# ---------------------------------------------------------------------------
+# BUDGETS
+# ---------------------------------------------------------------------------
+
+def set_budget_menu():
+    print("\n-- Set Monthly Budget --")
+    category_id = read_valid_category_id("Category ID: ")
+    month_year = read_month_year("Month (YYYY-MM): ")
+    budget_limit = read_positive_amount("Budget limit: ")
+    success = operations.set_budget(category_id, month_year, budget_limit)
+    print("Budget saved." if success else "Failed to save budget.")
