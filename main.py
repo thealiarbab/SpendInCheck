@@ -224,3 +224,16 @@ def category_wise_spend_menu():
     print(f"{'Category':<20}Total Spent")
     for category_name, total_spent in rows:
         print(f"{category_name:<20}{total_spent:.2f}")
+
+
+def budget_vs_actual_menu():
+    print("\n-- Report: Budget vs Actual --")
+    month_year = read_month_year("Month (YYYY-MM): ")
+    rows = operations.budget_vs_actual(month_year)
+    if not rows:
+        print("No budgets found for that month.")
+        return
+    print(f"{'Category':<15}{'Budget':>10}{'Actual':>10}{'Difference':>14}  Status")
+    for category_name, budget_limit, actual_spent, difference in rows:
+        status = "Over budget" if difference < 0 else "Under budget"
+        print(f"{category_name:<15}{budget_limit:>10.2f}{actual_spent:>10.2f}{difference:>14.2f}  {status}")
