@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Categories &mdash; FinTrack{% endblock %}
+
+{% block content %}
+<h1>Categories</h1>
+<p class="subtitle">The shared vocabulary that transactions and budgets both point at.</p>
+
+<div class="card">
+  <h2>Add a category</h2>
+  <form method="post" class="form-grid">
+    <div>
+      <label for="category_name">Name</label>
+      <input type="text" id="category_name" name="category_name" maxlength="50" required>
+    </div>
+    <div>
+      <label for="category_type">Type</label>
+      <select id="category_type" name="category_type">
+        <option value="Expense">Expense</option>
+        <option value="Income">Income</option>
+      </select>
+    </div>
+    <div><button type="submit">Add</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <h2>All categories</h2>
+  {% if categories %}
+  <table>
+    <tr><th>ID</th><th>Name</th><th>Type</th></tr>
+    {% for id, name, type in categories %}
+    <tr>
+      <td>{{ id }}</td>
+      <td>{{ name }}</td>
+      <td><span class="pill pill-{{ type|lower }}">{{ type }}</span></td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="empty">No categories yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

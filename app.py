@@ -111,5 +111,24 @@ def delete_transaction(transaction_id):
     return redirect(url_for("transactions"))
 
 
+@app.route("/categories", methods=["GET", "POST"])
+def categories():
+    """List categories and handle the add-category form."""
+    if request.method == "POST":
+        category_name = request.form.get("category_name", "").strip()
+        category_type = request.form.get("category_type")
+        if not category_name:
+            flash("Category name cannot be empty.", "error")
+        elif category_type not in ("Income", "Expense"):
+            flash("Type must be Income or Expense.", "error")
+        elif operations.add_category(category_name, category_type):
+            flash(f"Category '{category_name}' added.", "success")
+        else:
+            flash("Could not add that category -- the name may already exist.", "error")
+        return redirect(url_for("categories"))
+
+    return render_template("categories.html", categories=operations.get_all_categories())
+
+
 if __name__ == "__main__":
     app.run(debug=True)
