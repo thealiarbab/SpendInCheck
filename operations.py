@@ -188,3 +188,35 @@ def delete_transaction(transaction_id):
         return False
     finally:
         db.close_connection(connection)
+
+
+# ---------------------------------------------------------------------------
+# BUDGETS
+# ---------------------------------------------------------------------------
+
+def set_budget(category_id, month_year, budget_limit):
+    """Create or update the budget limit for a category in a given month.
+
+    Uses INSERT ... ON DUPLICATE KEY UPDATE against the uniq_cat_month
+    constraint, so calling this twice for the same category/month simply
+    overwrites the limit instead of raising a duplicate-key error.
+    """
+    connection = None
+    try:
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        query = """
+            INSERT INTO budgets (category_id, month_year, budget_limit)
+            VALUES (%s, %s, %s)
+            ON DUPLICATE KEY UPDATE budget_limit = VALUES(budget_limit)
+        """
+        cursor.execute(query, (category_id, month_year, budget_limit))
+        connection.commit()
+        return True
+    except Error as e:
+        if connection:
+            connection.rollback()
+        print(f"Error setting budget: {e}")
+        return False
+    finally:
+        db.close_connection(connection)
