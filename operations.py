@@ -378,3 +378,18 @@ def update_investment_price(investment_id, new_current_price):
         return False
     finally:
         db.close_connection(connection)
+
+
+def investment_exists(investment_id):
+    """Return True if an investment with this investment_id exists."""
+    connection = None
+    try:
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        cursor.execute("SELECT investment_id FROM investments WHERE investment_id = %s", (investment_id,))
+        return cursor.fetchone() is not None
+    except Error as e:
+        print(f"Error checking investment: {e}")
+        return False
+    finally:
+        db.close_connection(connection)
