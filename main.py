@@ -19,3 +19,16 @@ def read_non_empty_string(prompt_text):
         if value:
             return value
         print("This field cannot be empty. Please try again.")
+
+
+def read_positive_amount(prompt_text):
+    """Keep asking until the user enters a number greater than zero."""
+    while True:
+        raw_value = input(prompt_text).strip()
+        try:
+            amount = float(raw_value)
+            if amount > 0:
+                return amount
+            print("Amount must be greater than 0.")
+        except ValueError:
+            print("Please enter a valid number.")
