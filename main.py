@@ -157,3 +157,15 @@ def delete_transaction_menu():
 
     success = operations.delete_transaction(transaction_id)
     print("Transaction deleted." if success else "Failed to delete transaction.")
+
+
+# ---------------------------------------------------------------------------
+# CATEGORIES
+# ---------------------------------------------------------------------------
+
+def add_category_menu():
+    print("\n-- Add Category --")
+    category_name = read_non_empty_string("Category name: ")
+    category_type = read_choice_from("Category type", ["Income", "Expense"])
+    success = operations.add_category(category_name, category_type)
+    print("Category added." if success else "Failed to add category (name may already exist).")
