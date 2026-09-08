@@ -32,3 +32,16 @@ def read_positive_amount(prompt_text):
             print("Amount must be greater than 0.")
         except ValueError:
             print("Please enter a valid number.")
+
+
+def read_non_negative_number(prompt_text):
+    """Keep asking until the user enters a number >= 0 (used for quantity/price)."""
+    while True:
+        raw_value = input(prompt_text).strip()
+        try:
+            value = float(raw_value)
+            if value >= 0:
+                return value
+            print("Value cannot be negative.")
+        except ValueError:
+            print("Please enter a valid number.")
