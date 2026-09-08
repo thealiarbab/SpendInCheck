@@ -208,3 +208,19 @@ def view_budgets_menu():
     print(f"{'ID':<5}{'Category':<15}{'Month':<10}Limit")
     for budget_id, category_name, month_year, budget_limit in rows:
         print(f"{budget_id:<5}{category_name:<15}{month_year:<10}{budget_limit:.2f}")
+
+
+# ---------------------------------------------------------------------------
+# REPORTS
+# ---------------------------------------------------------------------------
+
+def category_wise_spend_menu():
+    print("\n-- Report: Category-wise Spend --")
+    month_year = read_month_year("Month (YYYY-MM): ")
+    rows = operations.category_wise_spend(month_year)
+    if not rows:
+        print("No expenses found for that month.")
+        return
+    print(f"{'Category':<20}Total Spent")
+    for category_name, total_spent in rows:
+        print(f"{category_name:<20}{total_spent:.2f}")
