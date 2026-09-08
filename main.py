@@ -283,3 +283,16 @@ def view_investments_menu():
     print(f"{'ID':<5}{'Asset':<22}{'Type':<13}{'Buy Date':<12}{'Buy Price':>10}{'Qty':>10}{'Current':>10}")
     for investment_id, asset_name, asset_type, buy_date, buy_price, quantity, current_price in rows:
         print(f"{investment_id:<5}{asset_name:<22}{asset_type:<13}{str(buy_date):<12}{buy_price:>10.2f}{quantity:>10.4f}{current_price:>10.2f}")
+
+
+def update_investment_menu():
+    print("\n-- Update Investment Current Price --")
+    view_investments_menu()
+    raw_id = input("Enter investment_id to update: ").strip()
+    if not raw_id.isdigit() or not operations.investment_exists(int(raw_id)):
+        print("That investment_id does not exist.")
+        return
+    investment_id = int(raw_id)
+    new_price = read_non_negative_number("New current price: ")
+    success = operations.update_investment_price(investment_id, new_price)
+    print("Investment updated." if success else "Failed to update investment.")
