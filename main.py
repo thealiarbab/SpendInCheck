@@ -169,3 +169,13 @@ def add_category_menu():
     category_type = read_choice_from("Category type", ["Income", "Expense"])
     success = operations.add_category(category_name, category_type)
     print("Category added." if success else "Failed to add category (name may already exist).")
+
+
+def show_categories():
+    rows = operations.get_all_categories()
+    if not rows:
+        print("No categories found.")
+        return
+    print(f"{'ID':<5}{'Name':<20}Type")
+    for category_id, category_name, category_type in rows:
+        print(f"{category_id:<5}{category_name:<20}{category_type}")
