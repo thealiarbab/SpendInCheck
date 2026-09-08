@@ -109,3 +109,14 @@ def add_transaction_menu():
 
     success = operations.add_transaction(txn_date, category_id, amount, txn_type, description)
     print("Transaction added." if success else "Failed to add transaction.")
+
+
+def view_transactions_menu():
+    print("\n-- All Transactions --")
+    rows = operations.get_all_transactions()
+    if not rows:
+        print("No transactions found.")
+        return
+    print(f"{'ID':<5}{'Date':<12}{'Category':<15}{'Amount':>10}  {'Type':<8} Description")
+    for transaction_id, txn_date, category_name, amount, txn_type, description in rows:
+        print(f"{transaction_id:<5}{str(txn_date):<12}{category_name:<15}{amount:>10.2f}  {txn_type:<8} {description or ''}")
