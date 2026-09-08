@@ -139,3 +139,21 @@ def update_transaction_menu():
 
     success = operations.update_transaction(transaction_id, txn_date, category_id, amount, txn_type, description)
     print("Transaction updated." if success else "Failed to update transaction.")
+
+
+def delete_transaction_menu():
+    print("\n-- Delete Transaction --")
+    view_transactions_menu()
+    raw_id = input("Enter transaction_id to delete: ").strip()
+    if not raw_id.isdigit() or operations.get_transaction_by_id(int(raw_id)) is None:
+        print("That transaction_id does not exist.")
+        return
+    transaction_id = int(raw_id)
+
+    confirm = input(f"Are you sure you want to delete transaction {transaction_id}? (y/n): ").strip().lower()
+    if confirm != "y":
+        print("Deletion cancelled.")
+        return
+
+    success = operations.delete_transaction(transaction_id)
+    print("Transaction deleted." if success else "Failed to delete transaction.")
