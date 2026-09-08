@@ -1,14 +1,19 @@
 """
 Database configuration for SpendInCheck.
 
-Kept separate from db.py so credentials are in exactly one place.
-
-DB_PASSWORD is set to the password of the local MySQL server this project
-was tested against. Change it if your MySQL root password is different, and
-blank it out before submitting if you would rather not hand in a password.
+Values are read from environment variables when they exist, falling back to
+local development defaults. That way the same code runs on this machine and
+on a hosted server, where the real credentials are supplied as environment
+variables instead of being written into the file.
 """
 
-DB_HOST = "localhost"
-DB_USER = "root"
-DB_PASSWORD = "root"
-DB_NAME = "spendincheck"
+import os
+
+DB_HOST = os.environ.get("DB_HOST", "localhost")
+DB_PORT = int(os.environ.get("DB_PORT", "3306"))
+DB_USER = os.environ.get("DB_USER", "root")
+DB_PASSWORD = os.environ.get("DB_PASSWORD", "root")
+DB_NAME = os.environ.get("DB_NAME", "spendincheck")
+
+# Hosted MySQL providers require an encrypted connection; a local server does not.
+DB_USE_SSL = os.environ.get("DB_USE_SSL", "").lower() in ("1", "true", "yes")

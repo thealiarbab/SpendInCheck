@@ -21,12 +21,17 @@ def get_connection():
     (wrong password, MySQL server not running, etc.).
     """
     try:
-        connection = mysql.connector.connect(
-            host=config.DB_HOST,
-            user=config.DB_USER,
-            password=config.DB_PASSWORD,
-            database=config.DB_NAME,
-        )
+        settings = {
+            "host": config.DB_HOST,
+            "port": config.DB_PORT,
+            "user": config.DB_USER,
+            "password": config.DB_PASSWORD,
+            "database": config.DB_NAME,
+        }
+        # Hosted MySQL servers only accept encrypted connections.
+        if config.DB_USE_SSL:
+            settings["ssl_disabled"] = False
+        connection = mysql.connector.connect(**settings)
         return connection
     except Error as e:
         # Re-raise after printing a clear message so the caller decides what to do next.
