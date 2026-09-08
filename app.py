@@ -69,5 +69,37 @@ def dashboard():
     )
 
 
+@app.route("/transactions", methods=["GET", "POST"])
+def transactions():
+    """List every transaction and handle the add-transaction form."""
+    if request.method == "POST":
+        txn_date = parse_past_date(request.form.get("txn_date"))
+        amount = parse_amount(request.form.get("amount"))
+        raw_category = request.form.get("category_id", "")
+        txn_type = request.form.get("txn_type")
+
+        if txn_date is None:
+            flash("Date must be a real date and cannot be in the future.", "error")
+        elif amount is None:
+            flash("Amount must be a number greater than 0.", "error")
+        elif not raw_category.isdigit() or not operations.category_exists(int(raw_category)):
+            flash("Please choose a valid category.", "error")
+        elif txn_type not in ("Income", "Expense"):
+            flash("Type must be Income or Expense.", "error")
+        elif operations.add_transaction(txn_date, int(raw_category), amount, txn_type,
+                                        request.form.get("description", "").strip()):
+            flash("Transaction added.", "success")
+        else:
+            flash("Could not add that transaction.", "error")
+        return redirect(url_for("transactions"))
+
+    return render_template(
+        "transactions.html",
+        transactions=operations.get_all_transactions(),
+        categories=operations.get_all_categories(),
+        today=datetime.now().date().isoformat(),
+    )
+
+
 if __name__ == "__main__":
     app.run(debug=True)

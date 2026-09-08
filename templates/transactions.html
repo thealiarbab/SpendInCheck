@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Transactions &mdash; FinTrack{% endblock %}
+
+{% block content %}
+<h1>Transactions</h1>
+<p class="subtitle">Every rupee in and out, tied to a category.</p>
+
+<div class="card">
+  <h2>Add a transaction</h2>
+  <form method="post" class="form-grid">
+    <div>
+      <label for="txn_date">Date</label>
+      <input type="date" id="txn_date" name="txn_date" value="{{ today }}" max="{{ today }}" required>
+    </div>
+    <div>
+      <label for="category_id">Category</label>
+      <select id="category_id" name="category_id" required>
+        {% for id, name, type in categories %}
+        <option value="{{ id }}">{{ name }} ({{ type }})</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="amount">Amount</label>
+      <input type="number" id="amount" name="amount" step="0.01" min="0.01" required>
+    </div>
+    <div>
+      <label for="txn_type">Type</label>
+      <select id="txn_type" name="txn_type">
+        <option value="Expense">Expense</option>
+        <option value="Income">Income</option>
+      </select>
+    </div>
+    <div>
+      <label for="description">Description</label>
+      <input type="text" id="description" name="description" maxlength="255">
+    </div>
+    <div><button type="submit">Add</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <h2>All transactions</h2>
+  {% if transactions %}
+  <table>
+    <tr>
+      <th>ID</th><th>Date</th><th>Category</th><th>Type</th>
+      <th class="num">Amount</th><th>Description</th><th></th>
+    </tr>
+    {% for id, date, category, amount, type, description in transactions %}
+    <tr>
+      <td>{{ id }}</td>
+      <td>{{ date }}</td>
+      <td>{{ category }}</td>
+      <td><span class="pill pill-{{ type|lower }}">{{ type }}</span></td>
+      <td class="num">{{ "%.2f"|format(amount) }}</td>
+      <td>{{ description or "" }}</td>
+      <td class="num">
+        <form method="post" action="{{ url_for('delete_transaction', transaction_id=id) }}"
+              onsubmit="return confirm('Delete transaction {{ id }}?');">
+          <button type="submit" class="danger">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="empty">No transactions yet.</p>
+  {% endif %}
+</div>
+{% endblock %}
