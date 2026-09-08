@@ -53,3 +53,18 @@ def get_all_categories():
         return []
     finally:
         db.close_connection(connection)
+
+
+def category_exists(category_id):
+    """Return True if a category with this category_id exists, else False."""
+    connection = None
+    try:
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        cursor.execute("SELECT category_id FROM categories WHERE category_id = %s", (category_id,))
+        return cursor.fetchone() is not None
+    except Error as e:
+        print(f"Error checking category: {e}")
+        return False
+    finally:
+        db.close_connection(connection)
