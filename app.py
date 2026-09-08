@@ -191,5 +191,18 @@ def investments():
     )
 
 
+@app.route("/investments/<int:investment_id>/price", methods=["POST"])
+def update_price(investment_id):
+    """Update one investment's current price, then return to the list."""
+    new_price = parse_amount(request.form.get("current_price"))
+    if new_price is None:
+        flash("Price must be a number greater than 0.", "error")
+    elif operations.update_investment_price(investment_id, new_price):
+        flash(f"Price updated for investment {investment_id}.", "success")
+    else:
+        flash(f"No investment with id {investment_id}.", "error")
+    return redirect(url_for("investments"))
+
+
 if __name__ == "__main__":
     app.run(debug=True)
