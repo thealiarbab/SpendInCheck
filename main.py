@@ -296,3 +296,64 @@ def update_investment_menu():
     new_price = read_non_negative_number("New current price: ")
     success = operations.update_investment_price(investment_id, new_price)
     print("Investment updated." if success else "Failed to update investment.")
+
+
+# ---------------------------------------------------------------------------
+# MENU
+# ---------------------------------------------------------------------------
+
+MENU_TEXT = """
+=========== FinTrack ===========
+ 1. Add transaction
+ 2. View all transactions
+ 3. Update a transaction
+ 4. Delete a transaction
+ 5. Add category
+ 6. View categories
+ 7. Set monthly budget
+ 8. View budgets
+ 9. Report: category-wise spend
+10. Report: budget vs actual
+11. Add investment
+12. View investments
+13. Update investment current price
+14. Report: portfolio P&L
+15. Exit
+=================================
+"""
+
+MENU_ACTIONS = {
+    "1": add_transaction_menu,
+    "2": view_transactions_menu,
+    "3": update_transaction_menu,
+    "4": delete_transaction_menu,
+    "5": add_category_menu,
+    "6": view_categories_menu,
+    "7": set_budget_menu,
+    "8": view_budgets_menu,
+    "9": category_wise_spend_menu,
+    "10": budget_vs_actual_menu,
+    "11": add_investment_menu,
+    "12": view_investments_menu,
+    "13": update_investment_menu,
+    "14": portfolio_pnl_menu,
+}
+
+
+def main():
+    """Run the FinTrack console menu loop until the user chooses to exit."""
+    while True:
+        print(MENU_TEXT)
+        choice = input("Enter your choice (1-15): ").strip()
+        if choice == "15":
+            print("Goodbye!")
+            break
+        action = MENU_ACTIONS.get(choice)
+        if action:
+            action()
+        else:
+            print("Invalid choice. Please enter a number from 1 to 15.")
+
+
+if __name__ == "__main__":
+    main()
