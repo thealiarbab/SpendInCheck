@@ -255,6 +255,10 @@ def category_wise_spend(month_year):
     The GROUP BY collapses every transaction row in a category into one row
     so SUM(amount) can add up all of them together.
     """
+    # Split 'YYYY-MM' and match with YEAR()/MONTH() rather than DATE_FORMAT,
+    # so the SQL contains no '%' characters that would clash with the %s
+    # placeholders the connector substitutes.
+    year_part, month_part = month_year.split("-")
     connection = None
     try:
         connection = db.get_connection()
@@ -263,11 +267,13 @@ def category_wise_spend(month_year):
             SELECT c.category_name, SUM(t.amount) AS total_spent
             FROM transactions t
             JOIN categories c ON t.category_id = c.category_id
-            WHERE t.txn_type = 'Expense' AND DATE_FORMAT(t.txn_date, '%%Y-%%m') = %s
+            WHERE t.txn_type = 'Expense'
+              AND YEAR(t.txn_date) = %s
+              AND MONTH(t.txn_date) = %s
             GROUP BY c.category_name
             ORDER BY total_spent DESC
         """
-        cursor.execute(query, (month_year,))
+        cursor.execute(query, (year_part, month_part))
         return cursor.fetchall()
     except Error as e:
         print(f"Error generating category-wise spend report: {e}")
