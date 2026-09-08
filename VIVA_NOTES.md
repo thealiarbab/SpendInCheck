@@ -1,4 +1,4 @@
-# FinTrack — Viva Notes
+# SpendInCheck — Viva Notes
 
 Read this before your viva. It explains *why* the database looks the way it
 does and *what* each report query is doing, in plain English, with no code.
