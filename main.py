@@ -45,3 +45,18 @@ def read_non_negative_number(prompt_text):
             print("Value cannot be negative.")
         except ValueError:
             print("Please enter a valid number.")
+
+
+def read_valid_date(prompt_text):
+    """Keep asking until the user enters a date in YYYY-MM-DD format that
+    is not in the future."""
+    while True:
+        raw_value = input(prompt_text).strip()
+        try:
+            entered_date = datetime.strptime(raw_value, "%Y-%m-%d").date()
+            if entered_date > datetime.now().date():
+                print("Date cannot be in the future.")
+                continue
+            return entered_date
+        except ValueError:
+            print("Please enter the date as YYYY-MM-DD.")
