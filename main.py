@@ -120,3 +120,22 @@ def view_transactions_menu():
     print(f"{'ID':<5}{'Date':<12}{'Category':<15}{'Amount':>10}  {'Type':<8} Description")
     for transaction_id, txn_date, category_name, amount, txn_type, description in rows:
         print(f"{transaction_id:<5}{str(txn_date):<12}{category_name:<15}{amount:>10.2f}  {txn_type:<8} {description or ''}")
+
+
+def update_transaction_menu():
+    print("\n-- Update Transaction --")
+    view_transactions_menu()
+    raw_id = input("Enter transaction_id to update: ").strip()
+    if not raw_id.isdigit() or operations.get_transaction_by_id(int(raw_id)) is None:
+        print("That transaction_id does not exist.")
+        return
+    transaction_id = int(raw_id)
+
+    txn_date = read_valid_date("New date (YYYY-MM-DD): ")
+    category_id = read_valid_category_id("New category ID: ")
+    amount = read_positive_amount("New amount: ")
+    txn_type = read_choice_from("New type", ["Income", "Expense"])
+    description = input("New description (optional): ").strip()
+
+    success = operations.update_transaction(transaction_id, txn_date, category_id, amount, txn_type, description)
+    print("Transaction updated." if success else "Failed to update transaction.")
