@@ -87,3 +87,12 @@ INSERT INTO budgets (category_id, month_year, budget_limit) VALUES
 (7, '2026-07', 2000.00),
 (3, '2026-08', 3500.00),
 (6, '2026-08', 1000.00);
+
+-- Seed data: investments (mix of stock/mutual fund/FD)
+INSERT INTO investments (asset_name, asset_type, buy_date, buy_price, quantity, current_price) VALUES
+('Tata Motors',            'Stock',       '2026-02-10',  650.00, 20.0000,  720.50),
+('Infosys',                'Stock',       '2026-03-15', 1450.00, 10.0000, 1390.00),
+('HDFC Flexi Cap Fund',    'Mutual Fund', '2026-01-20',   45.20, 500.0000,   48.75),
+('SBI Bluechip Fund',      'Mutual Fund', '2026-04-05',   62.10, 300.0000,   60.90),
+('SBI Fixed Deposit',      'FD',          '2026-01-01', 100000.00, 1.0000, 104500.00),
+('Reliance Industries',    'Stock',       '2026-05-12', 2450.00,  8.0000, 2510.75);
