@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Budgets &mdash; FinTrack{% endblock %}
+
+{% block content %}
+<h1>Budgets</h1>
+<p class="subtitle">A monthly spending limit per category. Setting one twice overwrites it.</p>
+
+<div class="card">
+  <h2>Set a budget</h2>
+  <form method="post" class="form-grid">
+    <div>
+      <label for="category_id">Category</label>
+      <select id="category_id" name="category_id" required>
+        {% for id, name, type in categories %}
+        <option value="{{ id }}">{{ name }} ({{ type }})</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="month_year">Month</label>
+      <input type="month" id="month_year" name="month_year" value="{{ this_month }}" required>
+    </div>
+    <div>
+      <label for="budget_limit">Limit</label>
+      <input type="number" id="budget_limit" name="budget_limit" step="0.01" min="0.01" required>
+    </div>
+    <div><button type="submit">Save</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <h2>All budgets</h2>
+  {% if budgets %}
+  <table>
+    <tr><th>ID</th><th>Category</th><th>Month</th><th class="num">Limit</th></tr>
+    {% for id, category, month, limit in budgets %}
+    <tr>
+      <td>{{ id }}</td>
+      <td>{{ category }}</td>
+      <td>{{ month }}</td>
+      <td class="num">{{ "%.2f"|format(limit) }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="empty">No budgets set yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

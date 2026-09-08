@@ -130,5 +130,33 @@ def categories():
     return render_template("categories.html", categories=operations.get_all_categories())
 
 
+@app.route("/budgets", methods=["GET", "POST"])
+def budgets():
+    """List budgets and handle the set-budget form."""
+    if request.method == "POST":
+        raw_category = request.form.get("category_id", "")
+        month_year = request.form.get("month_year", "")
+        budget_limit = parse_amount(request.form.get("budget_limit"))
+
+        if not raw_category.isdigit() or not operations.category_exists(int(raw_category)):
+            flash("Please choose a valid category.", "error")
+        elif not is_valid_month(month_year):
+            flash("Month must be in YYYY-MM format.", "error")
+        elif budget_limit is None:
+            flash("Budget limit must be a number greater than 0.", "error")
+        elif operations.set_budget(int(raw_category), month_year, budget_limit):
+            flash("Budget saved.", "success")
+        else:
+            flash("Could not save that budget.", "error")
+        return redirect(url_for("budgets"))
+
+    return render_template(
+        "budgets.html",
+        budgets=operations.get_all_budgets(),
+        categories=operations.get_all_categories(),
+        this_month=datetime.now().strftime("%Y-%m"),
+    )
+
+
 if __name__ == "__main__":
     app.run(debug=True)
