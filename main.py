@@ -179,3 +179,8 @@ def show_categories():
     print(f"{'ID':<5}{'Name':<20}Type")
     for category_id, category_name, category_type in rows:
         print(f"{category_id:<5}{category_name:<20}{category_type}")
+
+
+def view_categories_menu():
+    print("\n-- All Categories --")
+    show_categories()
