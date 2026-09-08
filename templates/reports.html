@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Reports &mdash; FinTrack{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+  <div>
+    <h1>Reports</h1>
+    <p class="subtitle" style="margin:0">Showing {{ month_year }}.</p>
+  </div>
+  <form method="get" class="inline-form">
+    <input type="month" name="month" value="{{ month_year }}" style="width:auto">
+    <button type="submit">Show</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Category-wise spend</h2>
+  {% if spend_rows %}
+  <table>
+    <tr><th>Category</th><th class="num">Total spent</th></tr>
+    {% for category, total in spend_rows %}
+    <tr>
+      <td>{{ category }}</td>
+      <td class="num">{{ "%.2f"|format(total) }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="empty">No expenses recorded for {{ month_year }}.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Budget vs actual</h2>
+  {% if budget_rows %}
+  <table>
+    <tr>
+      <th>Category</th><th class="num">Budget</th><th class="num">Actual</th>
+      <th class="num">Difference</th><th>Status</th>
+    </tr>
+    {% for category, limit, actual, difference in budget_rows %}
+    <tr>
+      <td>{{ category }}</td>
+      <td class="num">{{ "%.2f"|format(limit) }}</td>
+      <td class="num">{{ "%.2f"|format(actual) }}</td>
+      <td class="num {% if difference < 0 %}loss{% elif difference > 0 %}gain{% endif %}">
+        {{ "%+.2f"|format(difference) }}
+      </td>
+      <td>
+        {% if difference < 0 %}
+          <span class="pill pill-over">Over budget</span>
+        {% elif difference == 0 %}
+          <span class="pill pill-on">On budget</span>
+        {% else %}
+          <span class="pill pill-under">Under budget</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="empty">No budgets set for {{ month_year }}.</p>
+  {% endif %}
+</div>
+{% endblock %}

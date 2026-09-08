@@ -204,5 +204,20 @@ def update_price(investment_id):
     return redirect(url_for("investments"))
 
 
+@app.route("/reports")
+def reports():
+    """Show both monthly reports for the month given in the query string."""
+    month_year = request.args.get("month", "")
+    if not is_valid_month(month_year):
+        month_year = datetime.now().strftime("%Y-%m")
+
+    return render_template(
+        "reports.html",
+        month_year=month_year,
+        spend_rows=operations.category_wise_spend(month_year),
+        budget_rows=operations.budget_vs_actual(month_year),
+    )
+
+
 if __name__ == "__main__":
     app.run(debug=True)
