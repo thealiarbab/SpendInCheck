@@ -255,3 +255,20 @@ def portfolio_pnl_menu():
     print("-" * 89)
     print(f"Total portfolio value: {total_value:.2f}")
     print(f"Total portfolio P&L:   {total_pnl:.2f}")
+
+
+# ---------------------------------------------------------------------------
+# INVESTMENTS
+# ---------------------------------------------------------------------------
+
+def add_investment_menu():
+    print("\n-- Add Investment --")
+    asset_name = read_non_empty_string("Asset name: ")
+    asset_type = read_choice_from("Asset type", ["Stock", "Mutual Fund", "FD"])
+    buy_date = read_valid_date("Buy date (YYYY-MM-DD): ")
+    buy_price = read_positive_amount("Buy price: ")
+    quantity = read_positive_amount("Quantity: ")
+    current_price = read_non_negative_number("Current price: ")
+
+    success = operations.add_investment(asset_name, asset_type, buy_date, buy_price, quantity, current_price)
+    print("Investment added." if success else "Failed to add investment.")
