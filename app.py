@@ -1,5 +1,5 @@
 """
-FinTrack -- optional Flask web frontend.
+SpendInCheck -- optional Flask web frontend.
 
 This layer is NOT part of the CBSE deliverable; main.py is. It exists to show
 the same backend driven by a different interface.
@@ -19,7 +19,7 @@ from flask import Flask, flash, redirect, render_template, request, url_for
 import operations
 
 app = Flask(__name__)
-app.secret_key = "fintrack-dev-key"  # only used for flash messages in local dev
+app.secret_key = "spendincheck-dev-key"  # only used for flash messages in local dev
 
 
 def parse_amount(raw_value):

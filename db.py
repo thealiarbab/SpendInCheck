@@ -1,5 +1,5 @@
 """
-Connection handling for FinTrack.
+Connection handling for SpendInCheck.
 
 This module only opens and closes the MySQL connection. All actual
 queries live in operations.py, keeping this file tiny and easy to

@@ -1,5 +1,5 @@
 """
-Database configuration for FinTrack.
+Database configuration for SpendInCheck.
 
 Kept separate from db.py so credentials are in exactly one place.
 
@@ -11,4 +11,4 @@ blank it out before submitting if you would rather not hand in a password.
 DB_HOST = "localhost"
 DB_USER = "root"
 DB_PASSWORD = "root"
-DB_NAME = "fintrack"
+DB_NAME = "spendincheck"

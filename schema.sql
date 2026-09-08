@@ -1,8 +1,8 @@
--- FinTrack database schema and seed data
+-- SpendInCheck database schema and seed data
 -- Run with: mysql -u root -p < schema.sql
 
-CREATE DATABASE IF NOT EXISTS fintrack;
-USE fintrack;
+CREATE DATABASE IF NOT EXISTS spendincheck;
+USE spendincheck;
 
 DROP TABLE IF EXISTS budgets;
 DROP TABLE IF EXISTS transactions;

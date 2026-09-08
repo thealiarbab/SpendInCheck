@@ -1,5 +1,5 @@
 """
-FinTrack -- console menu.
+SpendInCheck -- console menu.
 
 This is the CBSE deliverable: a plain text menu that reads user input,
 validates it, calls the matching function in operations.py, and prints
@@ -308,7 +308,7 @@ def update_investment_menu():
 # ---------------------------------------------------------------------------
 
 MENU_TEXT = """
-=========== FinTrack ===========
+========== SpendInCheck ==========
  1. Add transaction
  2. View all transactions
  3. Update a transaction
@@ -324,7 +324,7 @@ MENU_TEXT = """
 13. Update investment current price
 14. Report: portfolio P&L
 15. Exit
-=================================
+==================================
 """
 
 MENU_ACTIONS = {
@@ -346,7 +346,7 @@ MENU_ACTIONS = {
 
 
 def main():
-    """Run the FinTrack console menu loop until the user chooses to exit."""
+    """Run the SpendInCheck console menu loop until the user chooses to exit."""
     while True:
         print(MENU_TEXT)
         choice = input("Enter your choice (1-15): ").strip()

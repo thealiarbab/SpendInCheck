@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}FinTrack{% endblock %}</title>
+  <title>{% block title %}SpendInCheck{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="{{ url_for('dashboard') }}">Fin<span>Track</span></a>
+    <a class="brand" href="{{ url_for('dashboard') }}">Spend<span>InCheck</span></a>
     <nav>
       <a href="{{ url_for('dashboard') }}">Dashboard</a>
       <a href="{{ url_for('transactions') }}">Transactions</a>
@@ -32,7 +32,7 @@
   </main>
 
   <footer>
-    FinTrack &mdash; CBSE Class XII Computer Science project. This web layer
+    SpendInCheck &mdash; CBSE Class XII Computer Science project. This web layer
     calls the same operations.py functions as the console app.
   </footer>
 </body>

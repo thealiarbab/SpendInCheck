@@ -1,5 +1,5 @@
 """
-All business logic and SQL for FinTrack lives in this module.
+All business logic and SQL for SpendInCheck lives in this module.
 
 Every function here opens its own connection, runs one or more
 parameterized queries, and returns plain Python data (tuples, lists
