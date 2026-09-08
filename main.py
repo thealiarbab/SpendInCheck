@@ -197,3 +197,14 @@ def set_budget_menu():
     budget_limit = read_positive_amount("Budget limit: ")
     success = operations.set_budget(category_id, month_year, budget_limit)
     print("Budget saved." if success else "Failed to save budget.")
+
+
+def view_budgets_menu():
+    print("\n-- All Budgets --")
+    rows = operations.get_all_budgets()
+    if not rows:
+        print("No budgets found.")
+        return
+    print(f"{'ID':<5}{'Category':<15}{'Month':<10}Limit")
+    for budget_id, category_name, month_year, budget_limit in rows:
+        print(f"{budget_id:<5}{category_name:<15}{month_year:<10}{budget_limit:.2f}")
