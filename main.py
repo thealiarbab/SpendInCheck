@@ -93,3 +93,19 @@ def read_valid_category_id(prompt_text):
         if raw_value.isdigit() and operations.category_exists(int(raw_value)):
             return int(raw_value)
         print("That category_id does not exist. Please pick one from the list above.")
+
+
+# ---------------------------------------------------------------------------
+# TRANSACTIONS
+# ---------------------------------------------------------------------------
+
+def add_transaction_menu():
+    print("\n-- Add Transaction --")
+    txn_date = read_valid_date("Date (YYYY-MM-DD): ")
+    category_id = read_valid_category_id("Category ID: ")
+    amount = read_positive_amount("Amount: ")
+    txn_type = read_choice_from("Type", ["Income", "Expense"])
+    description = input("Description (optional): ").strip()
+
+    success = operations.add_transaction(txn_date, category_id, amount, txn_type, description)
+    print("Transaction added." if success else "Failed to add transaction.")
