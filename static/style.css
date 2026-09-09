@@ -285,3 +285,7 @@ a.btn-lg.ghost:hover { background: var(--panel); border-color: var(--paper-mute)
 .demo-bar a { color: var(--paper); text-decoration: none;
               border-bottom: 1px solid var(--brass-dim); font-weight: 600; }
 .demo-bar a:hover { color: var(--brass); }
+.demo-note { color: var(--paper-mute); font-size: 13px; margin: 18px 0 0; max-width: 560px;
+             line-height: 1.6; }
+.demo-note a { color: var(--brass); text-decoration: none;
+               border-bottom: 1px solid var(--brass-dim); }

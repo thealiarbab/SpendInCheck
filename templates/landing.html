@@ -14,14 +14,32 @@
   </p>
 
   <div class="cta-row">
-    {% if signed_in %}
-      <a href="{{ url_for('dashboard') }}" class="btn-lg">Open the ledger &rarr;</a>
-      <a href="{{ url_for('reports') }}" class="btn-lg ghost">See the reports</a>
+    {% if in_demo %}
+      <a href="{{ url_for('dashboard') }}" class="btn-lg">Back to the demo ledger &rarr;</a>
+      <a href="{{ url_for('register') }}" class="btn-lg ghost">Create your own account</a>
+    {% elif signed_in %}
+      <a href="{{ url_for('dashboard') }}" class="btn-lg">Open your ledger &rarr;</a>
+      <a href="{{ url_for('demo_login') }}" class="btn-lg ghost">Try the demo</a>
     {% else %}
-      <a href="{{ url_for('dashboard') }}" class="btn-lg">Open the ledger &rarr;</a>
-      <a href="{{ url_for('sign_in') }}" class="btn-lg ghost">I have a password</a>
+      <a href="{{ url_for('register') }}" class="btn-lg">Create account &rarr;</a>
+      <a href="{{ url_for('demo_login') }}" class="btn-lg ghost">Try the demo &mdash; no signup</a>
     {% endif %}
   </div>
+
+  <p class="demo-note">
+    {% if in_demo %}
+      You are signed in to the shared demo. Anything you change is reset when you
+      sign out &mdash; <a href="{{ url_for('register') }}">create an account</a> to keep your own figures.
+    {% elif signed_in %}
+      The demo is a separate shared account loaded with three months of figures.
+      Opening it signs you out of your own ledger, so
+      <a href="{{ url_for('sign_in') }}">sign back in</a> when you are done.
+    {% else %}
+      Already have an account? <a href="{{ url_for('sign_in') }}">Sign in</a>.
+      The demo is loaded with three months of real figures &mdash; edit and delete
+      anything, it resets when you leave.
+    {% endif %}
+  </p>
 
   <div class="stat-row">
     <div class="lstat">

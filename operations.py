@@ -166,6 +166,7 @@ DEMO_INVESTMENTS = [
     ("Reliance Industries", "Stock", "2026-05-12", 2450.00, 8.0000, 2510.75),
 ]
 
+
 def reset_demo_data(user_id):
     """Wipe this account's rows and rebuild the demonstration data.
 
@@ -217,6 +218,7 @@ def reset_demo_data(user_id):
         return False
     finally:
         db.close_connection(connection)
+
 
 def ensure_demo_user(username, email, password_hash):
     """Return the demo account's user_id, creating the row if it is missing.
