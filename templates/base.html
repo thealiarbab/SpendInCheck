@@ -4,17 +4,23 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}SpendInCheck{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
   <header class="topbar">
     <a class="brand" href="{{ url_for('landing') }}">Spend<span>InCheck</span></a>
-    {% if request.endpoint in ('landing', 'sign_in') %}
-    <nav class="nav-right">
-      {% if request.endpoint == 'landing' %}
-      <a href="{{ url_for('dashboard') }}">Open the ledger</a>
+    {% if request.endpoint in ('landing', 'sign_in', 'register') %}
+    <div class="who">
+      {% if session.get('user_id') %}
+        <a href="{{ url_for('dashboard') }}">Open the ledger</a>
+      {% else %}
+        <a href="{{ url_for('sign_in') }}">Sign in</a>
+        <a href="{{ url_for('register') }}">Create account</a>
       {% endif %}
-    </nav>
+    </div>
     {% else %}
     <nav>
       <a href="{{ url_for('dashboard') }}">Dashboard</a>
@@ -24,6 +30,10 @@
       <a href="{{ url_for('investments') }}">Investments</a>
       <a href="{{ url_for('reports') }}">Reports</a>
     </nav>
+    <div class="who">
+      <span>signed in as <b>{{ session.get('username') }}</b></span>
+      <a href="{{ url_for('sign_out') }}">Sign out</a>
+    </div>
     {% endif %}
   </header>
 
