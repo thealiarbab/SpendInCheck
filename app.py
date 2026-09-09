@@ -139,16 +139,16 @@ def is_valid_month(raw_value):
 @app.route("/")
 def landing():
     """Public front page. Shown to everyone, signed in or not."""
-    return render_template("landing.html", signed_in=bool(session.get("signed_in")))
+    return render_template("landing.html", signed_in=bool(current_user_id()))
 
 
 @app.route("/dashboard")
 def dashboard():
     """Landing page: portfolio totals plus the most recent transactions."""
-    holdings = operations.portfolio_pnl()
+    holdings = operations.portfolio_pnl(current_user_id())
     total_value = sum(float(row[6]) for row in holdings)
     total_pnl = sum(float(row[5]) for row in holdings)
-    recent_transactions = operations.get_all_transactions()[:8]
+    recent_transactions = operations.get_all_transactions(current_user_id())[:8]
     return render_template(
         "dashboard.html",
         holdings=holdings,
@@ -171,11 +171,11 @@ def transactions():
             flash("Date must be a real date and cannot be in the future.", "error")
         elif amount is None:
             flash("Amount must be a number greater than 0.", "error")
-        elif not raw_category.isdigit() or not operations.category_exists(int(raw_category)):
+        elif not raw_category.isdigit() or not operations.category_exists(current_user_id(), int(raw_category)):
             flash("Please choose a valid category.", "error")
         elif txn_type not in ("Income", "Expense"):
             flash("Type must be Income or Expense.", "error")
-        elif operations.add_transaction(txn_date, int(raw_category), amount, txn_type,
+        elif operations.add_transaction(current_user_id(), txn_date, int(raw_category), amount, txn_type,
                                         request.form.get("description", "").strip()):
             flash("Transaction added.", "success")
         else:
@@ -184,8 +184,8 @@ def transactions():
 
     return render_template(
         "transactions.html",
-        transactions=operations.get_all_transactions(),
-        categories=operations.get_all_categories(),
+        transactions=operations.get_all_transactions(current_user_id()),
+        categories=operations.get_all_categories(current_user_id()),
         today=datetime.now().date().isoformat(),
     )
 
@@ -193,7 +193,7 @@ def transactions():
 @app.route("/transactions/<int:transaction_id>/delete", methods=["POST"])
 def delete_transaction(transaction_id):
     """Delete one transaction, then return to the list."""
-    if operations.delete_transaction(transaction_id):
+    if operations.delete_transaction(current_user_id(), transaction_id):
         flash(f"Transaction {transaction_id} deleted.", "success")
     else:
         flash(f"No transaction with id {transaction_id}.", "error")
@@ -210,13 +210,13 @@ def categories():
             flash("Category name cannot be empty.", "error")
         elif category_type not in ("Income", "Expense"):
             flash("Type must be Income or Expense.", "error")
-        elif operations.add_category(category_name, category_type):
+        elif operations.add_category(current_user_id(), category_name, category_type):
             flash(f"Category '{category_name}' added.", "success")
         else:
             flash("Could not add that category -- the name may already exist.", "error")
         return redirect(url_for("categories"))
 
-    return render_template("categories.html", categories=operations.get_all_categories())
+    return render_template("categories.html", categories=operations.get_all_categories(current_user_id()))
 
 
 @app.route("/budgets", methods=["GET", "POST"])
@@ -227,13 +227,13 @@ def budgets():
         month_year = request.form.get("month_year", "")
         budget_limit = parse_amount(request.form.get("budget_limit"))
 
-        if not raw_category.isdigit() or not operations.category_exists(int(raw_category)):
+        if not raw_category.isdigit() or not operations.category_exists(current_user_id(), int(raw_category)):
             flash("Please choose a valid category.", "error")
         elif not is_valid_month(month_year):
             flash("Month must be in YYYY-MM format.", "error")
         elif budget_limit is None:
             flash("Budget limit must be a number greater than 0.", "error")
-        elif operations.set_budget(int(raw_category), month_year, budget_limit):
+        elif operations.set_budget(current_user_id(), int(raw_category), month_year, budget_limit):
             flash("Budget saved.", "success")
         else:
             flash("Could not save that budget.", "error")
@@ -241,8 +241,8 @@ def budgets():
 
     return render_template(
         "budgets.html",
-        budgets=operations.get_all_budgets(),
-        categories=operations.get_all_categories(),
+        budgets=operations.get_all_budgets(current_user_id()),
+        categories=operations.get_all_categories(current_user_id()),
         this_month=datetime.now().strftime("%Y-%m"),
     )
 
@@ -266,8 +266,8 @@ def investments():
             flash("Buy date must be a real date and cannot be in the future.", "error")
         elif None in (buy_price, quantity, current_price):
             flash("Prices and quantity must all be numbers greater than 0.", "error")
-        elif operations.add_investment(asset_name, asset_type, buy_date, buy_price,
-                                       quantity, current_price):
+        elif operations.add_investment(current_user_id(), asset_name, asset_type, buy_date,
+                                       buy_price, quantity, current_price):
             flash(f"Investment '{asset_name}' added.", "success")
         else:
             flash("Could not add that investment.", "error")
@@ -275,7 +275,7 @@ def investments():
 
     return render_template(
         "investments.html",
-        investments=operations.get_all_investments(),
+        investments=operations.get_all_investments(current_user_id()),
         today=datetime.now().date().isoformat(),
     )
 
@@ -286,7 +286,7 @@ def update_price(investment_id):
     new_price = parse_amount(request.form.get("current_price"))
     if new_price is None:
         flash("Price must be a number greater than 0.", "error")
-    elif operations.update_investment_price(investment_id, new_price):
+    elif operations.update_investment_price(current_user_id(), investment_id, new_price):
         flash(f"Price updated for investment {investment_id}.", "success")
     else:
         flash(f"No investment with id {investment_id}.", "error")
@@ -303,8 +303,8 @@ def reports():
     return render_template(
         "reports.html",
         month_year=month_year,
-        spend_rows=operations.category_wise_spend(month_year),
-        budget_rows=operations.budget_vs_actual(month_year),
+        spend_rows=operations.category_wise_spend(current_user_id(), month_year),
+        budget_rows=operations.budget_vs_actual(current_user_id(), month_year),
     )
 
 
