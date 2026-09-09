@@ -8,8 +8,14 @@
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="{{ url_for('dashboard') }}">Spend<span>InCheck</span></a>
-    {% if request.endpoint != 'sign_in' %}
+    <a class="brand" href="{{ url_for('landing') }}">Spend<span>InCheck</span></a>
+    {% if request.endpoint in ('landing', 'sign_in') %}
+    <nav class="nav-right">
+      {% if request.endpoint == 'landing' %}
+      <a href="{{ url_for('dashboard') }}">Open the ledger</a>
+      {% endif %}
+    </nav>
+    {% else %}
     <nav>
       <a href="{{ url_for('dashboard') }}">Dashboard</a>
       <a href="{{ url_for('transactions') }}">Transactions</a>
