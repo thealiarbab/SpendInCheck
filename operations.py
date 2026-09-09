@@ -218,6 +218,49 @@ def reset_demo_data(user_id):
     finally:
         db.close_connection(connection)
 
+def ensure_demo_user(username, email, password_hash):
+    """Return the demo account's user_id, creating the row if it is missing.
+
+    The stored password is rewritten to the supplied hash every time, so the
+    credentials are whatever the application declares them to be. That is what
+    makes them unresettable: nothing that happens to the row can leave the
+    published demo password not working.
+    """
+    existing = get_user_by_login(username)
+    if existing:
+        connection = None
+        try:
+            connection = db.get_connection()
+            cursor = connection.cursor()
+            cursor.execute("UPDATE users SET password_hash = %s WHERE user_id = %s",
+                           (password_hash, existing[0]))
+            connection.commit()
+        except Error as e:
+            if connection:
+                connection.rollback()
+            print(f"Error refreshing demo password: {e}")
+        finally:
+            db.close_connection(connection)
+        return existing[0]
+    connection = None
+    try:
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        cursor.execute(
+            "INSERT INTO users (username, email, password_hash) VALUES (%s, %s, %s) "
+            "RETURNING user_id",
+            (username, email, password_hash))
+        user_id = cursor.fetchone()[0]
+        connection.commit()
+        return user_id
+    except Error as e:
+        if connection:
+            connection.rollback()
+        print(f"Error creating demo user: {e}")
+        return None
+    finally:
+        db.close_connection(connection)
+
 
 # ---------------------------------------------------------------------------
 # CATEGORIES
