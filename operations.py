@@ -114,7 +114,7 @@ def username_taken(username, email):
 # CATEGORIES
 # ---------------------------------------------------------------------------
 
-def add_category(category_name, category_type):
+def add_category(user_id, category_name, category_type):
     """Insert a new category. category_type must be 'Income' or 'Expense'.
 
     Returns True on success, False if the insert failed (e.g. duplicate name).
@@ -123,8 +123,9 @@ def add_category(category_name, category_type):
     try:
         connection = db.get_connection()
         cursor = connection.cursor()
-        query = "INSERT INTO categories (category_name, category_type) VALUES (%s, %s)"
-        cursor.execute(query, (category_name, category_type))
+        query = ("INSERT INTO categories (user_id, category_name, category_type) "
+                 "VALUES (%s, %s, %s)")
+        cursor.execute(query, (user_id, category_name, category_type))
         connection.commit()
         return True
     except Error as e:
@@ -136,13 +137,14 @@ def add_category(category_name, category_type):
         db.close_connection(connection)
 
 
-def get_all_categories():
+def get_all_categories(user_id):
     """Return every category as a list of (category_id, category_name, category_type) tuples."""
     connection = None
     try:
         connection = db.get_connection()
         cursor = connection.cursor()
-        cursor.execute("SELECT category_id, category_name, category_type FROM categories ORDER BY category_name")
+        cursor.execute("SELECT category_id, category_name, category_type FROM categories "
+                       "WHERE user_id = %s ORDER BY category_name", (user_id,))
         return cursor.fetchall()
     except Error as e:
         print(f"Error fetching categories: {e}")
@@ -151,13 +153,14 @@ def get_all_categories():
         db.close_connection(connection)
 
 
-def category_exists(category_id):
+def category_exists(user_id, category_id):
     """Return True if a category with this category_id exists, else False."""
     connection = None
     try:
         connection = db.get_connection()
         cursor = connection.cursor()
-        cursor.execute("SELECT category_id FROM categories WHERE category_id = %s", (category_id,))
+        cursor.execute("SELECT category_id FROM categories "
+                       "WHERE category_id = %s AND user_id = %s", (category_id, user_id))
         return cursor.fetchone() is not None
     except Error as e:
         print(f"Error checking category: {e}")
