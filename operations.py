@@ -441,17 +441,20 @@ def budget_vs_actual(user_id, month_year):
 # INVESTMENTS
 # ---------------------------------------------------------------------------
 
-def add_investment(asset_name, asset_type, buy_date, buy_price, quantity, current_price):
+def add_investment(user_id, asset_name, asset_type, buy_date, buy_price,
+                   quantity, current_price):
     """Insert a new investment. Returns True on success, False on failure."""
     connection = None
     try:
         connection = db.get_connection()
         cursor = connection.cursor()
         query = """
-            INSERT INTO investments (asset_name, asset_type, buy_date, buy_price, quantity, current_price)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            INSERT INTO investments (user_id, asset_name, asset_type, buy_date,
+                                     buy_price, quantity, current_price)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
         """
-        cursor.execute(query, (asset_name, asset_type, buy_date, buy_price, quantity, current_price))
+        cursor.execute(query, (user_id, asset_name, asset_type, buy_date, buy_price,
+                               quantity, current_price))
         connection.commit()
         return True
     except Error as e:
@@ -463,7 +466,7 @@ def add_investment(asset_name, asset_type, buy_date, buy_price, quantity, curren
         db.close_connection(connection)
 
 
-def get_all_investments():
+def get_all_investments(user_id):
     """Return every investment as (investment_id, asset_name, asset_type,
     buy_date, buy_price, quantity, current_price) tuples."""
     connection = None
@@ -473,9 +476,10 @@ def get_all_investments():
         query = """
             SELECT investment_id, asset_name, asset_type, buy_date, buy_price, quantity, current_price
             FROM investments
+            WHERE user_id = %s
             ORDER BY asset_name
         """
-        cursor.execute(query)
+        cursor.execute(query, (user_id,))
         return cursor.fetchall()
     except Error as e:
         print(f"Error fetching investments: {e}")
@@ -484,7 +488,7 @@ def get_all_investments():
         db.close_connection(connection)
 
 
-def update_investment_price(investment_id, new_current_price):
+def update_investment_price(user_id, investment_id, new_current_price):
     """Update only the current_price of an investment (e.g. after checking
     today's market price).
 
@@ -497,12 +501,14 @@ def update_investment_price(investment_id, new_current_price):
     try:
         connection = db.get_connection()
         cursor = connection.cursor()
-        query = "UPDATE investments SET current_price = %s WHERE investment_id = %s"
-        cursor.execute(query, (new_current_price, investment_id))
+        query = ("UPDATE investments SET current_price = %s "
+                 "WHERE investment_id = %s AND user_id = %s")
+        cursor.execute(query, (new_current_price, investment_id, user_id))
         connection.commit()
         if cursor.rowcount > 0:
             return True
-        cursor.execute("SELECT investment_id FROM investments WHERE investment_id = %s", (investment_id,))
+        cursor.execute("SELECT investment_id FROM investments "
+                       "WHERE investment_id = %s AND user_id = %s", (investment_id, user_id))
         return cursor.fetchone() is not None
     except Error as e:
         if connection:
@@ -513,7 +519,7 @@ def update_investment_price(investment_id, new_current_price):
         db.close_connection(connection)
 
 
-def investment_exists(investment_id):
+def investment_exists(user_id, investment_id):
     """Return True if an investment with this investment_id exists."""
     connection = None
     try:
@@ -528,7 +534,7 @@ def investment_exists(investment_id):
         db.close_connection(connection)
 
 
-def portfolio_pnl():
+def portfolio_pnl(user_id):
     """Report: profit/loss for every investment.
 
     For each row, (current_price - buy_price) * quantity gives the gain or
@@ -550,9 +556,10 @@ def portfolio_pnl():
                 (current_price - buy_price) * quantity AS pnl,
                 current_price * quantity AS current_value
             FROM investments
+            WHERE user_id = %s
             ORDER BY pnl DESC
         """
-        cursor.execute(query)
+        cursor.execute(query, (user_id,))
         return cursor.fetchall()
     except Error as e:
         print(f"Error generating portfolio P&L report: {e}")
