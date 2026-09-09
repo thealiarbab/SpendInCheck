@@ -173,7 +173,7 @@ def category_exists(user_id, category_id):
 # TRANSACTIONS
 # ---------------------------------------------------------------------------
 
-def add_transaction(txn_date, category_id, amount, txn_type, description):
+def add_transaction(user_id, txn_date, category_id, amount, txn_type, description):
     """Insert a new transaction row.
 
     Caller (main.py) is expected to have already validated amount > 0,
@@ -186,10 +186,10 @@ def add_transaction(txn_date, category_id, amount, txn_type, description):
         connection = db.get_connection()
         cursor = connection.cursor()
         query = """
-            INSERT INTO transactions (txn_date, category_id, amount, txn_type, description)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO transactions (user_id, txn_date, category_id, amount, txn_type, description)
+            VALUES (%s, %s, %s, %s, %s, %s)
         """
-        cursor.execute(query, (txn_date, category_id, amount, txn_type, description))
+        cursor.execute(query, (user_id, txn_date, category_id, amount, txn_type, description))
         connection.commit()
         return True
     except Error as e:
@@ -201,7 +201,7 @@ def add_transaction(txn_date, category_id, amount, txn_type, description):
         db.close_connection(connection)
 
 
-def get_all_transactions():
+def get_all_transactions(user_id):
     """Return every transaction joined with its category name.
 
     Each row is (transaction_id, txn_date, category_name, amount, txn_type, description),
@@ -215,9 +215,10 @@ def get_all_transactions():
             SELECT t.transaction_id, t.txn_date, c.category_name, t.amount, t.txn_type, t.description
             FROM transactions t
             JOIN categories c ON t.category_id = c.category_id
+            WHERE t.user_id = %s
             ORDER BY t.txn_date DESC, t.transaction_id DESC
         """
-        cursor.execute(query)
+        cursor.execute(query, (user_id,))
         return cursor.fetchall()
     except Error as e:
         print(f"Error fetching transactions: {e}")
@@ -226,7 +227,7 @@ def get_all_transactions():
         db.close_connection(connection)
 
 
-def get_transaction_by_id(transaction_id):
+def get_transaction_by_id(user_id, transaction_id):
     """Return a single transaction row as a tuple, or None if it does not exist."""
     connection = None
     try:
@@ -234,9 +235,9 @@ def get_transaction_by_id(transaction_id):
         cursor = connection.cursor()
         query = """
             SELECT transaction_id, txn_date, category_id, amount, txn_type, description
-            FROM transactions WHERE transaction_id = %s
+            FROM transactions WHERE transaction_id = %s AND user_id = %s
         """
-        cursor.execute(query, (transaction_id,))
+        cursor.execute(query, (transaction_id, user_id))
         return cursor.fetchone()
     except Error as e:
         print(f"Error fetching transaction: {e}")
@@ -245,7 +246,8 @@ def get_transaction_by_id(transaction_id):
         db.close_connection(connection)
 
 
-def update_transaction(transaction_id, txn_date, category_id, amount, txn_type, description):
+def update_transaction(user_id, transaction_id, txn_date, category_id, amount,
+                       txn_type, description):
     """Update every field of an existing transaction.
 
     Returns True if the transaction exists and was saved, False if no
@@ -261,13 +263,15 @@ def update_transaction(transaction_id, txn_date, category_id, amount, txn_type, 
         query = """
             UPDATE transactions
             SET txn_date = %s, category_id = %s, amount = %s, txn_type = %s, description = %s
-            WHERE transaction_id = %s
+            WHERE transaction_id = %s AND user_id = %s
         """
-        cursor.execute(query, (txn_date, category_id, amount, txn_type, description, transaction_id))
+        cursor.execute(query, (txn_date, category_id, amount, txn_type, description,
+                               transaction_id, user_id))
         connection.commit()
         if cursor.rowcount > 0:
             return True
-        cursor.execute("SELECT transaction_id FROM transactions WHERE transaction_id = %s", (transaction_id,))
+        cursor.execute("SELECT transaction_id FROM transactions "
+                       "WHERE transaction_id = %s AND user_id = %s", (transaction_id, user_id))
         return cursor.fetchone() is not None
     except Error as e:
         if connection:
@@ -278,13 +282,14 @@ def update_transaction(transaction_id, txn_date, category_id, amount, txn_type, 
         db.close_connection(connection)
 
 
-def delete_transaction(transaction_id):
+def delete_transaction(user_id, transaction_id):
     """Delete a transaction by its id. Returns True if a row was removed."""
     connection = None
     try:
         connection = db.get_connection()
         cursor = connection.cursor()
-        cursor.execute("DELETE FROM transactions WHERE transaction_id = %s", (transaction_id,))
+        cursor.execute("DELETE FROM transactions "
+                       "WHERE transaction_id = %s AND user_id = %s", (transaction_id, user_id))
         connection.commit()
         return cursor.rowcount > 0
     except Error as e:
