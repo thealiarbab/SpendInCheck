@@ -305,7 +305,7 @@ def delete_transaction(user_id, transaction_id):
 # BUDGETS
 # ---------------------------------------------------------------------------
 
-def set_budget(category_id, month_year, budget_limit):
+def set_budget(user_id, category_id, month_year, budget_limit):
     """Create or update the budget limit for a category in a given month.
 
     Uses INSERT ... ON CONFLICT ... DO UPDATE against the uniq_cat_month
@@ -317,12 +317,12 @@ def set_budget(category_id, month_year, budget_limit):
         connection = db.get_connection()
         cursor = connection.cursor()
         query = """
-            INSERT INTO budgets (category_id, month_year, budget_limit)
-            VALUES (%s, %s, %s)
+            INSERT INTO budgets (user_id, category_id, month_year, budget_limit)
+            VALUES (%s, %s, %s, %s)
             ON CONFLICT (category_id, month_year)
             DO UPDATE SET budget_limit = EXCLUDED.budget_limit
         """
-        cursor.execute(query, (category_id, month_year, budget_limit))
+        cursor.execute(query, (user_id, category_id, month_year, budget_limit))
         connection.commit()
         return True
     except Error as e:
@@ -334,7 +334,7 @@ def set_budget(category_id, month_year, budget_limit):
         db.close_connection(connection)
 
 
-def get_all_budgets():
+def get_all_budgets(user_id):
     """Return every budget joined with its category name, as
     (budget_id, category_name, month_year, budget_limit) tuples."""
     connection = None
@@ -345,9 +345,10 @@ def get_all_budgets():
             SELECT b.budget_id, c.category_name, b.month_year, b.budget_limit
             FROM budgets b
             JOIN categories c ON b.category_id = c.category_id
+            WHERE b.user_id = %s
             ORDER BY b.month_year DESC, c.category_name
         """
-        cursor.execute(query)
+        cursor.execute(query, (user_id,))
         return cursor.fetchall()
     except Error as e:
         print(f"Error fetching budgets: {e}")
