@@ -15,8 +15,10 @@
     {% if request.endpoint in ('landing', 'sign_in', 'register') %}
     <div class="who">
       {% if session.get('user_id') %}
+        {% if not in_demo %}<a href="{{ url_for('demo_login') }}">Try the demo</a>{% endif %}
         <a href="{{ url_for('dashboard') }}">Open the ledger</a>
       {% else %}
+        <a href="{{ url_for('demo_login') }}">Try the demo</a>
         <a href="{{ url_for('sign_in') }}">Sign in</a>
         <a href="{{ url_for('register') }}">Create account</a>
       {% endif %}
