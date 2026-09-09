@@ -361,7 +361,7 @@ def get_all_budgets(user_id):
 # REPORTS
 # ---------------------------------------------------------------------------
 
-def category_wise_spend(month_year):
+def category_wise_spend(user_id, month_year):
     """Report: total Expense amount per category for the given 'YYYY-MM' month.
 
     Returns a list of (category_name, total_spent) tuples, highest spend first.
@@ -380,13 +380,13 @@ def category_wise_spend(month_year):
             SELECT c.category_name, SUM(t.amount) AS total_spent
             FROM transactions t
             JOIN categories c ON t.category_id = c.category_id
-            WHERE t.txn_type = 'Expense'
+            WHERE t.user_id = %s AND t.txn_type = 'Expense'
               AND EXTRACT(YEAR FROM t.txn_date) = %s
               AND EXTRACT(MONTH FROM t.txn_date) = %s
             GROUP BY c.category_name
             ORDER BY total_spent DESC
         """
-        cursor.execute(query, (year_part, month_part))
+        cursor.execute(query, (user_id, year_part, month_part))
         return cursor.fetchall()
     except Error as e:
         print(f"Error generating category-wise spend report: {e}")
@@ -395,7 +395,7 @@ def category_wise_spend(month_year):
         db.close_connection(connection)
 
 
-def budget_vs_actual(month_year):
+def budget_vs_actual(user_id, month_year):
     """Report: for each budgeted category in the given month, compare the
     budget limit against the actual amount spent.
 
@@ -424,11 +424,11 @@ def budget_vs_actual(month_year):
                 AND t.txn_type = 'Expense'
                 AND EXTRACT(YEAR FROM t.txn_date) = %s
                 AND EXTRACT(MONTH FROM t.txn_date) = %s
-            WHERE b.month_year = %s
+            WHERE b.user_id = %s AND b.month_year = %s
             GROUP BY c.category_name, b.budget_limit
             ORDER BY difference ASC
         """
-        cursor.execute(query, (year_part, month_part, month_year))
+        cursor.execute(query, (year_part, month_part, user_id, month_year))
         return cursor.fetchall()
     except Error as e:
         print(f"Error generating budget-vs-actual report: {e}")
