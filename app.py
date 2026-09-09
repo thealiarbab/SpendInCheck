@@ -41,7 +41,7 @@ def require_sign_in():
     """
     if not APP_PASSWORD:
         return None
-    if session.get("signed_in") or request.endpoint in ("sign_in", "static"):
+    if session.get("signed_in") or request.endpoint in ("landing", "sign_in", "static"):
         return None
     return redirect(url_for("sign_in"))
 
