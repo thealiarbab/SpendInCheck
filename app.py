@@ -18,51 +18,91 @@ import os
 
 from flask import (Flask, flash, redirect, render_template, request, session,
                    url_for)
+from werkzeug.security import check_password_hash, generate_password_hash
 
 import operations
 
 app = Flask(__name__)
-# Supplied as an environment variable when hosted; a fixed value is fine locally
-# because nothing sensitive is stored in the session.
+# Signs the session cookie. Supplied as an environment variable when hosted.
 app.secret_key = os.environ.get("SECRET_KEY", "spendincheck-dev-key")
 
-# When APP_PASSWORD is set, every page requires signing in first. Leaving it
-# unset (the default on this machine) keeps local development password-free.
-APP_PASSWORD = os.environ.get("APP_PASSWORD")
+PUBLIC_ENDPOINTS = ("landing", "sign_in", "register", "static")
+
+
+def current_user_id():
+    """The signed-in account's id, or None when nobody is signed in."""
+    return session.get("user_id")
+
 
 
 @app.before_request
 def require_sign_in():
-    """Redirect to the sign-in page unless this visitor has already signed in.
+    """Send anyone who is not signed in to the sign-in page.
 
-    Only active when APP_PASSWORD is configured, which is the case on the
-    hosted site. Without this, anyone who found the URL could add or delete
-    records, since the app has no other notion of a user.
+    Every page except the landing page, sign-in and registration needs an
+    account, because all data is stored per user and there is nothing
+    meaningful to show without knowing whose ledger to read.
     """
-    if not APP_PASSWORD:
-        return None
-    if session.get("signed_in") or request.endpoint in ("landing", "sign_in", "static"):
+    if current_user_id() or request.endpoint in PUBLIC_ENDPOINTS:
         return None
     return redirect(url_for("sign_in"))
+
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    """Create a new account, then sign it in."""
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+
+        if not (3 <= len(username) <= 30) or not username.replace("_", "").isalnum():
+            flash("Username must be 3-30 characters, letters, digits or underscores.", "error")
+        elif "@" not in email or "." not in email.split("@")[-1]:
+            flash("Please enter a valid email address.", "error")
+        elif len(password) < 8:
+            flash("Password must be at least 8 characters.", "error")
+        else:
+            taken = operations.username_taken(username, email)
+            if taken:
+                flash(taken, "error")
+            else:
+                user_id = operations.create_user(
+                    username, email, generate_password_hash(password))
+                if user_id:
+                    session["user_id"] = user_id
+                    session["username"] = username
+                    flash(f"Welcome, {username}. Your ledger is ready.", "success")
+                    return redirect(url_for("dashboard"))
+                flash("Could not create that account.", "error")
+        return redirect(url_for("register"))
+    return render_template("register.html")
 
 
 @app.route("/sign-in", methods=["GET", "POST"])
 def sign_in():
-    """Show the sign-in form and check the submitted password."""
+    """Sign in with a username or email plus password."""
     if request.method == "POST":
-        if request.form.get("password") == APP_PASSWORD:
-            session["signed_in"] = True
+        login = request.form.get("login", "").strip()
+        password = request.form.get("password", "")
+        account = operations.get_user_by_login(login)
+        # One message for both cases, so this cannot be used to discover
+        # which usernames exist.
+        if account and check_password_hash(account[3], password):
+            session["user_id"] = account[0]
+            session["username"] = account[1]
             return redirect(url_for("dashboard"))
-        flash("Incorrect password.", "error")
+        flash("Incorrect username or password.", "error")
         return redirect(url_for("sign_in"))
     return render_template("sign_in.html")
 
 
+
 @app.route("/sign-out")
 def sign_out():
-    """Clear the session and return to the sign-in page."""
+    """Clear the session and return to the front page."""
     session.clear()
-    return redirect(url_for("sign_in"))
+    return redirect(url_for("landing"))
 
 
 def parse_amount(raw_value):
