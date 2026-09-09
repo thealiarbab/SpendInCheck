@@ -122,3 +122,32 @@ h2 { font-size: 12px; margin: 0 0 16px; font-weight: 600; text-transform: upperc
                letter-spacing: 1.2px; margin-bottom: 9px; font-weight: 600; }
 .stat .value { font-family: var(--mono); font-size: 27px; font-weight: 500;
                letter-spacing: -.6px; font-variant-numeric: tabular-nums; }
+
+/* ---------------- tables ---------------- */
+table { width: 100%; border-collapse: collapse; }
+th {
+  text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: 1.2px;
+  color: var(--paper-mute); font-weight: 700; padding: 10px 12px;
+  border-bottom: 1px solid var(--rule);
+}
+td { padding: 11px 12px; border-bottom: 1px solid var(--rule-soft); font-size: 14px; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--panel-2); }
+.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums;
+       font-size: 13.5px; }
+
+.gain { color: var(--credit); }
+.loss { color: var(--debit); }
+.warn { color: var(--level); }
+
+/* ledger-style tags: a ruled underline, not a pill */
+.pill {
+  display: inline-block; padding: 2px 0 3px; font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 1px; border-bottom: 2px solid;
+  background: none; border-radius: 0;
+}
+.pill-income  { color: var(--credit); border-color: var(--credit); }
+.pill-expense { color: var(--debit);  border-color: var(--debit); }
+.pill-over    { color: var(--debit);  border-color: var(--debit); }
+.pill-under   { color: var(--credit); border-color: var(--credit); }
+.pill-on      { color: var(--level);  border-color: var(--level); }
