@@ -139,7 +139,13 @@ def demo_login():
 
 @app.route("/sign-out")
 def sign_out():
-    """Clear the session and return to the front page."""
+    """Clear the session and return to the front page.
+
+    If this was the demo account, its data is rebuilt on the way out so the
+    next visitor starts from the same place.
+    """
+    if is_demo(current_user_id()):
+        operations.reset_demo_data(current_user_id())
     session.clear()
     return redirect(url_for("landing"))
 
