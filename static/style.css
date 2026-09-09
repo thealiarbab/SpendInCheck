@@ -42,3 +42,58 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
+
+/* ---------------- top bar ---------------- */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+  height: 62px;
+  padding: 0 30px;
+  background: var(--ink-2);
+  border-bottom: 1px solid var(--rule);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+.brand {
+  font-family: var(--serif);
+  font-size: 25px;
+  letter-spacing: .2px;
+  color: var(--paper);
+  text-decoration: none;
+}
+.brand span { color: var(--brass); font-style: italic; }
+
+.topbar nav { display: flex; gap: 2px; flex-wrap: wrap; }
+.topbar nav a {
+  color: var(--paper-mute);
+  text-decoration: none;
+  padding: 7px 12px;
+  font-size: 13.5px;
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+}
+.topbar nav a:hover { color: var(--paper); border-bottom-color: var(--brass-dim); }
+
+.topbar .who,
+.topbar nav.nav-right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+.topbar .who { color: var(--paper-mute); font-size: 13px; }
+.topbar .who b { color: var(--paper); font-weight: 600; }
+.topbar .who a, .topbar nav.nav-right a {
+  color: var(--paper-dim); text-decoration: none; font-size: 13px;
+  padding: 7px 14px; border: 1px solid var(--rule);
+}
+.topbar .who a:hover, .topbar nav.nav-right a:hover {
+  color: var(--ink); background: var(--brass); border-color: var(--brass);
+}
+
+main { max-width: 1060px; margin: 0 auto; padding: 34px 30px 60px; }
+
+footer {
+  max-width: 1060px; margin: 0 auto;
+  padding: 22px 30px 46px;
+  color: var(--paper-mute);
+  font-size: 12.5px;
+  border-top: 1px solid var(--rule-soft);
+}
