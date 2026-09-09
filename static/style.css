@@ -151,3 +151,33 @@ tr:hover td { background: var(--panel-2); }
 .pill-over    { color: var(--debit);  border-color: var(--debit); }
 .pill-under   { color: var(--credit); border-color: var(--credit); }
 .pill-on      { color: var(--level);  border-color: var(--level); }
+
+/* ---------------- forms ---------------- */
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
+             gap: 16px; align-items: end; }
+label { display: block; font-size: 10.5px; color: var(--paper-mute); margin-bottom: 7px;
+        text-transform: uppercase; letter-spacing: 1.2px; font-weight: 600; }
+input, select {
+  width: 100%; padding: 10px 12px; background: var(--ink);
+  border: 1px solid var(--rule); border-radius: 0; color: var(--paper);
+  font-size: 14px; font-family: var(--sans);
+}
+input:focus, select:focus { outline: none; border-color: var(--brass); }
+input::placeholder { color: var(--paper-mute); }
+
+button {
+  padding: 10px 20px; background: var(--brass); color: var(--ink);
+  border: 1px solid var(--brass); border-radius: 0; font-size: 13.5px;
+  font-weight: 700; letter-spacing: .3px; cursor: pointer; font-family: var(--sans);
+}
+button:hover { background: #f0bb4c; border-color: #f0bb4c; }
+
+button.danger { background: none; color: var(--debit); border-color: var(--rule);
+                padding: 6px 12px; font-size: 12px; font-weight: 600; }
+button.danger:hover { background: var(--debit); border-color: var(--debit); color: var(--paper); }
+button.subtle { background: none; color: var(--paper-dim); border-color: var(--rule);
+                padding: 6px 12px; font-size: 12px; }
+button.subtle:hover { background: var(--panel-2); color: var(--paper); }
+
+.inline-form { display: flex; gap: 8px; align-items: center; }
+.inline-form input { width: 108px; padding: 6px 9px; font-size: 13px; font-family: var(--mono); }
