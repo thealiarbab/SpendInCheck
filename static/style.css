@@ -248,3 +248,20 @@ a.btn-lg.ghost:hover { background: var(--panel); border-color: var(--paper-mute)
 .closer-card { border: 1px solid var(--rule); border-left: 3px solid var(--brass);
                padding: 38px; background: var(--panel); border-radius: 0; }
 .num-em { font-family: var(--mono); color: var(--paper); font-variant-numeric: tabular-nums; }
+
+/* ================= sign in / register ================= */
+.signin-wrap { max-width: 400px; margin: 78px auto 50px; }
+.signin-title { font-family: var(--serif); font-size: 44px; font-weight: 400;
+                margin: 20px 0 8px; letter-spacing: -.2px; }
+.signin-sub { color: var(--paper-dim); font-size: 14.5px; line-height: 1.6; margin: 0 0 30px; }
+.signin-form { background: var(--panel); border: 1px solid var(--rule);
+               border-top: 3px solid var(--brass); padding: 26px; border-radius: 0; }
+.signin-form label { margin-bottom: 7px; }
+.signin-form input { font-size: 15px; padding: 11px 13px; }
+.signin-btn { width: 100%; margin-top: 20px; padding: 12px; font-size: 14px; }
+.signin-alt { margin: 20px 0 0; color: var(--paper-mute); font-size: 13.5px; }
+.signin-alt a { color: var(--brass); text-decoration: none;
+                border-bottom: 1px solid var(--brass-dim); }
+.signin-back { display: inline-block; margin-top: 24px; color: var(--paper-mute);
+               font-size: 12.5px; text-decoration: none; }
+.signin-back:hover { color: var(--paper); }
