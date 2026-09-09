@@ -96,6 +96,12 @@ def is_valid_month(raw_value):
         return False
 
 
+@app.route("/")
+def landing():
+    """Public front page. Shown to everyone, signed in or not."""
+    return render_template("landing.html", signed_in=bool(session.get("signed_in")))
+
+
 @app.route("/dashboard")
 def dashboard():
     """Landing page: portfolio totals plus the most recent transactions."""
