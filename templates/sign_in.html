@@ -2,13 +2,24 @@
 {% block title %}Sign in &mdash; SpendInCheck{% endblock %}
 
 {% block content %}
-<div class="card" style="max-width:380px;margin:60px auto">
-  <h2>Sign in</h2>
-  <p class="subtitle">This ledger is private. Enter the password to continue.</p>
-  <form method="post">
-    <label for="password">Password</label>
-    <input type="password" id="password" name="password" autofocus required>
-    <div style="margin-top:14px"><button type="submit">Sign in</button></div>
+<div class="signin-wrap">
+  <span class="pill pill-brand">Welcome back</span>
+  <h1 class="signin-title">Sign in.</h1>
+  <p class="signin-sub">Open your transactions, budgets and portfolio.</p>
+
+  <form method="post" class="signin-form">
+    <label for="login">Username or email</label>
+    <input type="text" id="login" name="login" autofocus required
+           autocomplete="username" placeholder="aliarbab">
+
+    <label for="password" style="margin-top:14px">Password</label>
+    <input type="password" id="password" name="password" required
+           autocomplete="current-password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;">
+
+    <button type="submit" class="signin-btn">Sign in &rarr;</button>
   </form>
+
+  <p class="signin-alt">No account yet? <a href="{{ url_for('register') }}">Create one</a></p>
+  <a class="signin-back" href="{{ url_for('landing') }}">&larr; Back to the front page</a>
 </div>
 {% endblock %}
