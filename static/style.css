@@ -274,3 +274,14 @@ a.btn-lg.ghost:hover { background: var(--panel); border-color: var(--paper-mute)
   main { padding: 24px 20px 50px; }
   .topbar { padding: 0 20px; gap: 16px; }
 }
+
+/* ---------------- demo ---------------- */
+.demo-bar {
+  display: flex; align-items: center; justify-content: center; gap: 18px;
+  flex-wrap: wrap; padding: 10px 20px; font-size: 12.5px;
+  background: rgba(224, 168, 54, .09); color: var(--brass);
+  border-bottom: 1px solid var(--brass-dim);
+}
+.demo-bar a { color: var(--paper); text-decoration: none;
+              border-bottom: 1px solid var(--brass-dim); font-weight: 600; }
+.demo-bar a:hover { color: var(--brass); }

@@ -37,6 +37,13 @@
     {% endif %}
   </header>
 
+  {% if in_demo %}
+  <div class="demo-bar">
+    <span>Demo account &mdash; everything you change here is reset when you sign out.</span>
+    <a href="{{ url_for('register') }}">Create your own ledger &rarr;</a>
+  </div>
+  {% endif %}
+
   <main>
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
