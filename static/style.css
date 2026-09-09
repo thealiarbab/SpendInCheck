@@ -181,3 +181,13 @@ button.subtle:hover { background: var(--panel-2); color: var(--paper); }
 
 .inline-form { display: flex; gap: 8px; align-items: center; }
 .inline-form input { width: 108px; padding: 6px 9px; font-size: 13px; font-family: var(--mono); }
+
+/* ---------------- flash ---------------- */
+.flash { padding: 12px 16px; margin-bottom: 18px; font-size: 13.5px;
+         border-left: 3px solid; background: var(--panel); border-radius: 0; }
+.flash-success { border-color: var(--credit); color: var(--credit); }
+.flash-error   { border-color: var(--debit);  color: var(--debit); }
+
+.empty { color: var(--paper-mute); font-size: 14px; padding: 16px 2px; }
+.toolbar { display: flex; justify-content: space-between; align-items: flex-end;
+           margin-bottom: 18px; gap: 18px; flex-wrap: wrap; }
