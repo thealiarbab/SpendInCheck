@@ -8,8 +8,15 @@ Flask frontend be added later without changing operations.py at all.
 """
 
 from datetime import datetime
+from getpass import getpass
+
+from werkzeug.security import check_password_hash, generate_password_hash
 
 import operations
+
+# The account whose ledger this session is working on. Set by sign_in_menu()
+# before the menu appears, so every query below is scoped to one user.
+CURRENT_USER_ID = None
 
 
 def read_non_empty_string(prompt_text):
@@ -90,7 +97,7 @@ def read_valid_category_id(prompt_text):
     show_categories()
     while True:
         raw_value = input(prompt_text).strip()
-        if raw_value.isdigit() and operations.category_exists(int(raw_value)):
+        if raw_value.isdigit() and operations.category_exists(CURRENT_USER_ID, int(raw_value)):
             return int(raw_value)
         print("That category_id does not exist. Please pick one from the list above.")
 
@@ -107,13 +114,13 @@ def add_transaction_menu():
     txn_type = read_choice_from("Type", ["Income", "Expense"])
     description = input("Description (optional): ").strip()
 
-    success = operations.add_transaction(txn_date, category_id, amount, txn_type, description)
+    success = operations.add_transaction(CURRENT_USER_ID, txn_date, category_id, amount, txn_type, description)
     print("Transaction added." if success else "Failed to add transaction.")
 
 
 def view_transactions_menu():
     print("\n-- All Transactions --")
-    rows = operations.get_all_transactions()
+    rows = operations.get_all_transactions(CURRENT_USER_ID)
     if not rows:
         print("No transactions found.")
         return
@@ -126,7 +133,7 @@ def update_transaction_menu():
     print("\n-- Update Transaction --")
     view_transactions_menu()
     raw_id = input("Enter transaction_id to update: ").strip()
-    if not raw_id.isdigit() or operations.get_transaction_by_id(int(raw_id)) is None:
+    if not raw_id.isdigit() or operations.get_transaction_by_id(CURRENT_USER_ID, int(raw_id)) is None:
         print("That transaction_id does not exist.")
         return
     transaction_id = int(raw_id)
@@ -137,7 +144,7 @@ def update_transaction_menu():
     txn_type = read_choice_from("New type", ["Income", "Expense"])
     description = input("New description (optional): ").strip()
 
-    success = operations.update_transaction(transaction_id, txn_date, category_id, amount, txn_type, description)
+    success = operations.update_transaction(CURRENT_USER_ID, transaction_id, txn_date, category_id, amount, txn_type, description)
     print("Transaction updated." if success else "Failed to update transaction.")
 
 
@@ -145,7 +152,7 @@ def delete_transaction_menu():
     print("\n-- Delete Transaction --")
     view_transactions_menu()
     raw_id = input("Enter transaction_id to delete: ").strip()
-    if not raw_id.isdigit() or operations.get_transaction_by_id(int(raw_id)) is None:
+    if not raw_id.isdigit() or operations.get_transaction_by_id(CURRENT_USER_ID, int(raw_id)) is None:
         print("That transaction_id does not exist.")
         return
     transaction_id = int(raw_id)
@@ -155,7 +162,7 @@ def delete_transaction_menu():
         print("Deletion cancelled.")
         return
 
-    success = operations.delete_transaction(transaction_id)
+    success = operations.delete_transaction(CURRENT_USER_ID, transaction_id)
     print("Transaction deleted." if success else "Failed to delete transaction.")
 
 
@@ -167,12 +174,12 @@ def add_category_menu():
     print("\n-- Add Category --")
     category_name = read_non_empty_string("Category name: ")
     category_type = read_choice_from("Category type", ["Income", "Expense"])
-    success = operations.add_category(category_name, category_type)
+    success = operations.add_category(CURRENT_USER_ID, category_name, category_type)
     print("Category added." if success else "Failed to add category (name may already exist).")
 
 
 def show_categories():
-    rows = operations.get_all_categories()
+    rows = operations.get_all_categories(CURRENT_USER_ID)
     if not rows:
         print("No categories found.")
         return
@@ -195,13 +202,13 @@ def set_budget_menu():
     category_id = read_valid_category_id("Category ID: ")
     month_year = read_month_year("Month (YYYY-MM): ")
     budget_limit = read_positive_amount("Budget limit: ")
-    success = operations.set_budget(category_id, month_year, budget_limit)
+    success = operations.set_budget(CURRENT_USER_ID, category_id, month_year, budget_limit)
     print("Budget saved." if success else "Failed to save budget.")
 
 
 def view_budgets_menu():
     print("\n-- All Budgets --")
-    rows = operations.get_all_budgets()
+    rows = operations.get_all_budgets(CURRENT_USER_ID)
     if not rows:
         print("No budgets found.")
         return
@@ -217,7 +224,7 @@ def view_budgets_menu():
 def category_wise_spend_menu():
     print("\n-- Report: Category-wise Spend --")
     month_year = read_month_year("Month (YYYY-MM): ")
-    rows = operations.category_wise_spend(month_year)
+    rows = operations.category_wise_spend(CURRENT_USER_ID, month_year)
     if not rows:
         print("No expenses found for that month.")
         return
@@ -229,7 +236,7 @@ def category_wise_spend_menu():
 def budget_vs_actual_menu():
     print("\n-- Report: Budget vs Actual --")
     month_year = read_month_year("Month (YYYY-MM): ")
-    rows = operations.budget_vs_actual(month_year)
+    rows = operations.budget_vs_actual(CURRENT_USER_ID, month_year)
     if not rows:
         print("No budgets found for that month.")
         return
@@ -246,7 +253,7 @@ def budget_vs_actual_menu():
 
 def portfolio_pnl_menu():
     print("\n-- Report: Portfolio P&L --")
-    rows = operations.portfolio_pnl()
+    rows = operations.portfolio_pnl(CURRENT_USER_ID)
     if not rows:
         print("No investments found.")
         return
@@ -275,13 +282,13 @@ def add_investment_menu():
     quantity = read_positive_amount("Quantity: ")
     current_price = read_non_negative_number("Current price: ")
 
-    success = operations.add_investment(asset_name, asset_type, buy_date, buy_price, quantity, current_price)
+    success = operations.add_investment(CURRENT_USER_ID, asset_name, asset_type, buy_date, buy_price, quantity, current_price)
     print("Investment added." if success else "Failed to add investment.")
 
 
 def view_investments_menu():
     print("\n-- All Investments --")
-    rows = operations.get_all_investments()
+    rows = operations.get_all_investments(CURRENT_USER_ID)
     if not rows:
         print("No investments found.")
         return
@@ -294,12 +301,12 @@ def update_investment_menu():
     print("\n-- Update Investment Current Price --")
     view_investments_menu()
     raw_id = input("Enter investment_id to update: ").strip()
-    if not raw_id.isdigit() or not operations.investment_exists(int(raw_id)):
+    if not raw_id.isdigit() or not operations.investment_exists(CURRENT_USER_ID, int(raw_id)):
         print("That investment_id does not exist.")
         return
     investment_id = int(raw_id)
     new_price = read_non_negative_number("New current price: ")
-    success = operations.update_investment_price(investment_id, new_price)
+    success = operations.update_investment_price(CURRENT_USER_ID, investment_id, new_price)
     print("Investment updated." if success else "Failed to update investment.")
 
 
@@ -345,8 +352,57 @@ MENU_ACTIONS = {
 }
 
 
+def sign_in_menu():
+    """Ask the user to sign in or register, and return their user_id.
+
+    Returns None if the user gives up, in which case the program exits.
+    """
+    global CURRENT_USER_ID
+    print("\n========== SpendInCheck ==========")
+    print(" 1. Sign in")
+    print(" 2. Create a new account")
+    print(" 3. Quit")
+    choice = input("Choose (1-3): ").strip()
+
+    if choice == "2":
+        username = read_non_empty_string("Choose a username: ")
+        email = read_non_empty_string("Email: ")
+        password = getpass("Choose a password (min 8 characters): ")
+        if len(password) < 8:
+            print("Password too short.")
+            return None
+        taken = operations.username_taken(username, email)
+        if taken:
+            print(taken)
+            return None
+        user_id = operations.create_user(username, email, generate_password_hash(password))
+        if user_id:
+            print(f"Account created. Welcome, {username}.")
+            CURRENT_USER_ID = user_id
+            return user_id
+        print("Could not create that account.")
+        return None
+
+    if choice == "1":
+        login = read_non_empty_string("Username or email: ")
+        password = getpass("Password: ")
+        account = operations.get_user_by_login(login)
+        if account and check_password_hash(account[3], password):
+            print(f"Signed in as {account[1]}.")
+            CURRENT_USER_ID = account[0]
+            return account[0]
+        print("Incorrect username or password.")
+        return None
+
+    return None
+
+
 def main():
-    """Run the SpendInCheck console menu loop until the user chooses to exit."""
+    """Sign the user in, then run the console menu until they choose to exit."""
+    if sign_in_menu() is None:
+        print("Goodbye!")
+        return
+
     while True:
         print(MENU_TEXT)
         choice = input("Enter your choice (1-15): ").strip()
