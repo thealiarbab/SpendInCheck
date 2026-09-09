@@ -96,7 +96,7 @@ def is_valid_month(raw_value):
         return False
 
 
-@app.route("/")
+@app.route("/dashboard")
 def dashboard():
     """Landing page: portfolio totals plus the most recent transactions."""
     holdings = operations.portfolio_pnl()
