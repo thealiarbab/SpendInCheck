@@ -120,13 +120,26 @@ def sign_in():
     return render_template("sign_in.html")
 
 
+@app.route("/demo")
+def demo_login():
+    """Sign in to the shared demo account, rebuilding its data first."""
+    user_id = demo_user_id()
+    if user_id is None:
+        flash("The demo is unavailable right now.", "error")
+        return redirect(url_for("landing"))
+    operations.reset_demo_data(user_id)
+    session.clear()
+    session["user_id"] = user_id
+    session["username"] = DEMO_USERNAME
+    session["demo_id"] = user_id
+    flash("You are exploring the demo account. Anything you change here is "
+          "reset when you sign out.", "success")
+    return redirect(url_for("dashboard"))
+
+
 @app.route("/sign-out")
 def sign_out():
-    """Clear the session and return to the front page.
-
-    If this was the demo account, its data is rebuilt on the way out so the
-    next visitor starts from the same place.
-    """
+    """Clear the session and return to the front page."""
     session.clear()
     return redirect(url_for("landing"))
 
