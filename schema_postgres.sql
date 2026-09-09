@@ -1,5 +1,5 @@
--- SpendInCheck schema for PostgreSQL (Supabase deployment only).
--- The graded project uses schema.sql on MySQL; this is a port for hosting.
+-- SpendInCheck schema for PostgreSQL (Supabase deployment).
+-- The graded project uses schema.sql on MySQL; this is the hosted multi-user port.
 
 DROP TABLE IF EXISTS budgets CASCADE;
 DROP TABLE IF EXISTS transactions CASCADE;
@@ -52,3 +52,6 @@ CREATE TABLE investments (
     quantity      DECIMAL(10,4) NOT NULL,
     current_price DECIMAL(10,2) NOT NULL
 );
+
+CREATE INDEX idx_txn_user_date ON transactions (user_id, txn_date);
+CREATE INDEX idx_budget_user_month ON budgets (user_id, month_year);
