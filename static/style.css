@@ -104,3 +104,21 @@ h1 { font-family: var(--serif); font-size: 34px; font-weight: 400; margin: 0 0 4
 h2 { font-size: 12px; margin: 0 0 16px; font-weight: 600; text-transform: uppercase;
      letter-spacing: 1.4px; color: var(--paper-mute); }
 .subtitle { color: var(--paper-dim); margin: 0 0 26px; font-size: 14px; }
+
+/* ---------------- cards & stats ---------------- */
+.card {
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  padding: 22px 24px;
+  margin-bottom: 22px;
+}
+
+.stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 0; margin-bottom: 24px; border: 1px solid var(--rule);
+            background: var(--panel); }
+.stat { padding: 20px 24px; border-right: 1px solid var(--rule-soft); }
+.stat:last-child { border-right: none; }
+.stat .label { color: var(--paper-mute); font-size: 11px; text-transform: uppercase;
+               letter-spacing: 1.2px; margin-bottom: 9px; font-weight: 600; }
+.stat .value { font-family: var(--mono); font-size: 27px; font-weight: 500;
+               letter-spacing: -.6px; font-variant-numeric: tabular-nums; }
