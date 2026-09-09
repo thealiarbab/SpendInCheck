@@ -166,6 +166,58 @@ DEMO_INVESTMENTS = [
     ("Reliance Industries", "Stock", "2026-05-12", 2450.00, 8.0000, 2510.75),
 ]
 
+def reset_demo_data(user_id):
+    """Wipe this account's rows and rebuild the demonstration data.
+
+    Everything happens in one transaction, so a visitor can never catch the
+    demo account half-emptied. Returns True on success.
+    """
+    connection = None
+    try:
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        # Children first: transactions and budgets both point at categories.
+        cursor.execute("DELETE FROM transactions WHERE user_id = %s", (user_id,))
+        cursor.execute("DELETE FROM budgets WHERE user_id = %s", (user_id,))
+        cursor.execute("DELETE FROM investments WHERE user_id = %s", (user_id,))
+        cursor.execute("DELETE FROM categories WHERE user_id = %s", (user_id,))
+
+        category_ids = {}
+        for name, kind in DEMO_CATEGORIES:
+            cursor.execute(
+                "INSERT INTO categories (user_id, category_name, category_type) "
+                "VALUES (%s, %s, %s) RETURNING category_id",
+                (user_id, name, kind))
+            category_ids[name] = cursor.fetchone()[0]
+
+        for txn_date, name, amount, kind, description in DEMO_TRANSACTIONS:
+            cursor.execute(
+                "INSERT INTO transactions (user_id, txn_date, category_id, amount, "
+                "txn_type, description) VALUES (%s, %s, %s, %s, %s, %s)",
+                (user_id, txn_date, category_ids[name], amount, kind, description))
+
+        for name, month_year, limit in DEMO_BUDGETS:
+            cursor.execute(
+                "INSERT INTO budgets (user_id, category_id, month_year, budget_limit) "
+                "VALUES (%s, %s, %s, %s)",
+                (user_id, category_ids[name], month_year, limit))
+
+        for row in DEMO_INVESTMENTS:
+            cursor.execute(
+                "INSERT INTO investments (user_id, asset_name, asset_type, buy_date, "
+                "buy_price, quantity, current_price) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                (user_id,) + row)
+
+        connection.commit()
+        return True
+    except Error as e:
+        if connection:
+            connection.rollback()
+        print(f"Error resetting demo data: {e}")
+        return False
+    finally:
+        db.close_connection(connection)
+
 
 # ---------------------------------------------------------------------------
 # CATEGORIES
