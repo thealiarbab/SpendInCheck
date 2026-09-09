@@ -26,13 +26,36 @@ app = Flask(__name__)
 # Signs the session cookie. Supplied as an environment variable when hosted.
 app.secret_key = os.environ.get("SECRET_KEY", "spendincheck-dev-key")
 
-PUBLIC_ENDPOINTS = ("landing", "sign_in", "register", "static")
+PUBLIC_ENDPOINTS = ("landing", "sign_in", "register", "demo_login", "static")
+
+# A public account anyone can try. The credentials are fixed here rather than
+# stored as changeable settings, and its data is rebuilt on every sign-in and
+# sign-out, so visitors can edit and delete freely without spoiling it.
+DEMO_USERNAME = "demo"
+DEMO_EMAIL = "demo@spendincheck.com"
+DEMO_PASSWORD = "demo1234"
+
+
+def demo_user_id():
+    """The demo account's id, creating the account on first use."""
+    return operations.ensure_demo_user(
+        DEMO_USERNAME, DEMO_EMAIL, generate_password_hash(DEMO_PASSWORD))
+
+
+def is_demo(user_id):
+    """True when this session is using the shared demo account."""
+    return user_id is not None and user_id == session.get("demo_id")
 
 
 def current_user_id():
     """The signed-in account's id, or None when nobody is signed in."""
     return session.get("user_id")
 
+
+@app.context_processor
+def template_flags():
+    """Make the demo state available to every template."""
+    return {"in_demo": is_demo(current_user_id())}
 
 
 @app.before_request
@@ -97,10 +120,13 @@ def sign_in():
     return render_template("sign_in.html")
 
 
-
 @app.route("/sign-out")
 def sign_out():
-    """Clear the session and return to the front page."""
+    """Clear the session and return to the front page.
+
+    If this was the demo account, its data is rebuilt on the way out so the
+    next visitor starts from the same place.
+    """
     session.clear()
     return redirect(url_for("landing"))
 
