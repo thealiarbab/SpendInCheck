@@ -86,6 +86,9 @@ def register():
         elif len(password) < 8:
             flash("Password must be at least 8 characters.", "error")
         else:
+            if username.lower() == DEMO_USERNAME or email.lower() == DEMO_EMAIL:
+                flash("That name is reserved for the public demo.", "error")
+                return redirect(url_for("register"))
             taken = operations.username_taken(username, email)
             if taken:
                 flash(taken, "error")
@@ -112,6 +115,10 @@ def sign_in():
         # One message for both cases, so this cannot be used to discover
         # which usernames exist.
         if account and check_password_hash(account[3], password):
+            # Reaching the demo through the ordinary form must behave the same
+            # as the /demo link, or its data would drift.
+            if account[1] == DEMO_USERNAME:
+                return redirect(url_for("demo_login"))
             session["user_id"] = account[0]
             session["username"] = account[1]
             return redirect(url_for("dashboard"))
