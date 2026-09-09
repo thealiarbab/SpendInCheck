@@ -185,13 +185,20 @@ def add_transaction(user_id, txn_date, category_id, amount, txn_type, descriptio
     try:
         connection = db.get_connection()
         cursor = connection.cursor()
+        # Same ownership guard as set_budget: the insert only happens if the
+        # category is this user's.
         query = """
-            INSERT INTO transactions (user_id, txn_date, category_id, amount, txn_type, description)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            INSERT INTO transactions (user_id, txn_date, category_id, amount,
+                                      txn_type, description)
+            SELECT %s, %s, %s, %s, %s, %s
+            WHERE EXISTS (
+                SELECT 1 FROM categories WHERE category_id = %s AND user_id = %s
+            )
         """
-        cursor.execute(query, (user_id, txn_date, category_id, amount, txn_type, description))
+        cursor.execute(query, (user_id, txn_date, category_id, amount, txn_type,
+                               description, category_id, user_id))
         connection.commit()
-        return True
+        return cursor.rowcount > 0
     except Error as e:
         if connection:
             connection.rollback()
@@ -264,9 +271,12 @@ def update_transaction(user_id, transaction_id, txn_date, category_id, amount,
             UPDATE transactions
             SET txn_date = %s, category_id = %s, amount = %s, txn_type = %s, description = %s
             WHERE transaction_id = %s AND user_id = %s
+              AND EXISTS (
+                SELECT 1 FROM categories WHERE category_id = %s AND user_id = %s
+              )
         """
         cursor.execute(query, (txn_date, category_id, amount, txn_type, description,
-                               transaction_id, user_id))
+                               transaction_id, user_id, category_id, user_id))
         connection.commit()
         if cursor.rowcount > 0:
             return True
@@ -316,15 +326,22 @@ def set_budget(user_id, category_id, month_year, budget_limit):
     try:
         connection = db.get_connection()
         cursor = connection.cursor()
+        # The SELECT ... WHERE EXISTS means the row is only written when the
+        # category belongs to this user, so a guessed category_id from another
+        # account inserts nothing rather than silently attaching to it.
         query = """
             INSERT INTO budgets (user_id, category_id, month_year, budget_limit)
-            VALUES (%s, %s, %s, %s)
+            SELECT %s, %s, %s, %s
+            WHERE EXISTS (
+                SELECT 1 FROM categories WHERE category_id = %s AND user_id = %s
+            )
             ON CONFLICT (category_id, month_year)
             DO UPDATE SET budget_limit = EXCLUDED.budget_limit
         """
-        cursor.execute(query, (user_id, category_id, month_year, budget_limit))
+        cursor.execute(query, (user_id, category_id, month_year, budget_limit,
+                               category_id, user_id))
         connection.commit()
-        return True
+        return cursor.rowcount > 0
     except Error as e:
         if connection:
             connection.rollback()
