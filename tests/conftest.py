@@ -20,9 +20,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from server import db  # noqa: E402
 from server import operations  # noqa: E402
+from server.app import create_app  # noqa: E402
 
 
-def _delete_user(user_id):
+def delete_user(user_id):
     """Remove a user and, by cascade, everything they own."""
     connection = db.get_connection()
     try:
@@ -52,4 +53,35 @@ def make_user():
     yield _make
 
     for user_id in created:
-        _delete_user(user_id)
+        delete_user(user_id)
+
+
+@pytest.fixture
+def client():
+    """A test client for the whole app, pages and API alike."""
+    app = create_app("test-key")
+    app.config["TESTING"] = True
+    return app.test_client()
+
+
+@pytest.fixture
+def api_account(client):
+    """Register an account through the API and clean it up afterwards.
+
+    Yields a dict with the client, the account, and a headers mapping that
+    already carries the CSRF token, since every write needs one.
+    """
+    tag = uuid.uuid4().hex[:10]
+    password = "a-long-enough-password"
+    token = client.get("/api/v1/auth/session").get_json()["csrf_token"]
+    response = client.post("/api/v1/auth/register", headers={"X-CSRF-Token": token},
+                           json={"username": f"test_{tag}",
+                                 "email": f"test_{tag}@example.invalid",
+                                 "password": password})
+    assert response.status_code == 201, response.get_json()
+    body = response.get_json()
+
+    yield {"client": client, "user": body["user"], "password": password,
+           "headers": {"X-CSRF-Token": body["csrf_token"]}}
+
+    delete_user(body["user"]["id"])
