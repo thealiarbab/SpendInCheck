@@ -45,6 +45,8 @@ export function Holdings() {
   const refresh = () => {
     client.invalidateQueries({ queryKey: ["investments"] });
     client.invalidateQueries({ queryKey: ["portfolio"] });
+    // The opening screen shows the same holdings and their totals.
+    client.invalidateQueries({ queryKey: ["dashboard"] });
   };
 
   const add = useMutation({

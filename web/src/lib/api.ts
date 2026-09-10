@@ -107,12 +107,20 @@ export async function readSession(): Promise<Account | null> {
   return body.user;
 }
 
-/** Create a private demonstration account and sign into it. */
-export async function startDemo(): Promise<Account> {
-  const body = await request<{ user: Account; csrf_token: string }>(
+/**
+ * Create a private demonstration account and sign into it.
+ *
+ * The dashboard rides along in the response, so the caller can put it
+ * straight into the cache: the server already had the rows open, and asking
+ * for them again is two more round trips to Mumbai while somebody watches a
+ * spinner.
+ */
+export async function startDemo(): Promise<{ user: Account; dashboard: DashboardPayload }> {
+  const body = await request<{ user: Account; csrf_token: string;
+                               dashboard: DashboardPayload }>(
     "/auth/demo", { method: "POST" });
   csrfToken = body.csrf_token;
-  return body.user;
+  return { user: body.user, dashboard: body.dashboard };
 }
 
 /** Abandon the session. A demonstration account is deleted on the way out. */
@@ -134,6 +142,12 @@ export interface Holding {
 export interface PortfolioReport {
   items: Holding[];
   totals: { value: string; pnl: string; holdings: number };
+}
+
+/** Everything the opening screen shows, in one request. */
+export interface DashboardPayload {
+  portfolio: PortfolioReport;
+  recent: TransactionRow[];
 }
 
 export interface TransactionRow {
@@ -280,6 +294,8 @@ export const api = {
     request<{ currency: string; decimals: number }>(
       "/settings/currency", { method: "PUT", body: { currency } }),
 
+  /** The opening screen in one request rather than two. */
+  dashboard: () => request<DashboardPayload>("/reports/dashboard"),
   portfolio: () => request<PortfolioReport>("/reports/portfolio"),
   categorySpend: (month: string) =>
     request<{ items: { category: string; total: string }[] }>(

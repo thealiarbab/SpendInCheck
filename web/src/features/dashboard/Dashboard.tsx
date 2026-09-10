@@ -10,12 +10,16 @@ import { Card, Empty, Loading, Money, Notice, PageHead, Stat, StatRow, Table, Ta
  * numbers can be diffed against it side by side while both are running.
  */
 export function Dashboard() {
-  const portfolio = useQuery({ queryKey: ["portfolio"], queryFn: api.portfolio });
-  const transactions = useQuery({ queryKey: ["transactions"], queryFn: api.transactions });
+  // One request, not two. Both halves come from the same connection on the
+  // server, so asking separately costs a second trip to Mumbai for rows it
+  // had already opened a connection to read.
+  const dashboard = useQuery({ queryKey: ["dashboard"], queryFn: () => api.dashboard() });
 
-  const totals = portfolio.data?.totals;
+  const portfolio = dashboard;
+  const transactions = dashboard;
+  const totals = dashboard.data?.portfolio.totals;
   const pnl = totals ? toMinor(totals.pnl) : 0;
-  const recent = transactions.data?.items.slice(0, 8) ?? [];
+  const recent = dashboard.data?.recent ?? [];
 
   return (
     <>
@@ -44,9 +48,9 @@ export function Dashboard() {
       )}
 
       <Card title="Holdings" flush>
-        {portfolio.isPending && !portfolio.data ? (
+        {dashboard.isPending && !dashboard.data ? (
           <Loading what="holdings" />
-        ) : portfolio.data?.items.length ? (
+        ) : dashboard.data?.portfolio.items.length ? (
           <Table
             head={
               <tr>
@@ -59,7 +63,7 @@ export function Dashboard() {
               </tr>
             }
           >
-            {portfolio.data.items.map((holding) => (
+            {dashboard.data.portfolio.items.map((holding) => (
               <tr key={holding.asset_name}>
                 <td className={cell.primary}>{holding.asset_name}</td>
                 <td>{holding.asset_type}</td>

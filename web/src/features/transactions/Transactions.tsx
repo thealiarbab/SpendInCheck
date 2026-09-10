@@ -100,10 +100,12 @@ export function Transactions() {
   const chosen: Category | undefined = categories.data?.items
     .find((one) => String(one.id) === draft.category_id);
 
-  // Everything a write changes: the list, and the reports that count it.
+  // Everything a write changes: the list, the reports that count it, and
+  // the opening screen, which shows the most recent rows.
   const refresh = () => {
     client.invalidateQueries({ queryKey: ["transactions"] });
     client.invalidateQueries({ queryKey: ["report"] });
+    client.invalidateQueries({ queryKey: ["dashboard"] });
   };
 
   const save = useMutation({

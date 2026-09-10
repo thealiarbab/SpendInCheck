@@ -50,6 +50,7 @@ export function Categories() {
     client.invalidateQueries({ queryKey: ["transactions"] });
     client.invalidateQueries({ queryKey: ["budgets"] });
     client.invalidateQueries({ queryKey: ["report"] });
+    client.invalidateQueries({ queryKey: ["dashboard"] });
   };
 
   const save = useMutation({

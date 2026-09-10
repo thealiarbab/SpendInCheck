@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import type { Account } from "../lib/api";
 import { readSession, signOut as endSession, startDemo } from "../lib/api";
@@ -26,6 +27,7 @@ interface SessionValue {
 const SessionContext = createContext<SessionValue | null>(null);
 
 export function SessionProvider({ children }: { children: ReactNode }) {
+  const queries = useQueryClient();
   const [status, setStatus] = useState<SessionStatus>("checking");
   const [account, setAccount] = useState<Account | null>(null);
   const [unreachable, setUnreachable] = useState(false);
@@ -54,12 +56,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [refresh]);
 
   const beginDemo = useCallback(async () => {
-    const user = await startDemo();
+    const { user, dashboard } = await startDemo();
     if (user.currency) setCurrency(user.currency);
+    // The response already carries the opening screen, so put it in the
+    // cache rather than letting the dashboard ask for it again. Without
+    // this the visitor waits out two further round trips staring at a
+    // spinner, for rows the server had already read.
+    if (dashboard) queries.setQueryData(["dashboard"], dashboard);
     setAccount(user);
     setStatus("signed-in");
     setUnreachable(false);
-  }, []);
+  }, [queries]);
 
   const leave = useCallback(async () => {
     await endSession();
