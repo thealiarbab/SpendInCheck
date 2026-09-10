@@ -32,7 +32,7 @@ BASELINE = "b2c9a7c"
 # mapping rather than a range. Any commit not listed is treated as part of
 # CURRENT_PHASE, which is what keeps this accurate as new work lands without
 # anyone editing the file.
-CURRENT_PHASE = 8
+CURRENT_PHASE = 9
 
 COMMIT_PHASE = {
     0: ["5e3ab5e", "6308244", "931dabe", "490f434", "c030a97", "e166bb4", "efb70ab"],
@@ -42,7 +42,7 @@ COMMIT_PHASE = {
         "8b7896b", "aaca719", "89c58b0", "9324f7e", "2a00990", "ad743d9",
         "2fddf8d", "44e2272", "f2b37c8", "269ea6a", "a56f0fd", "f7c0cf4",
         "5f13215", "29ca7b1", "2ff172d", "c0b8098", "f3e57b2", "e40f64e",
-        "cd7f9d8"],
+        "cd7f9d8", "43a42c2", "503c8fb"],
     # 1d97254 and 9b45dc7 are the API client and the UI primitives: both were
     # on Phase 3's checklist and both were written after the marker had moved
     # to Phase 4, so they are counted where they belong rather than where they
@@ -70,7 +70,15 @@ COMMIT_PHASE = {
     # been killed at all.
     7: ["24f8a64", "146ea3d", "5a4534c", "53b3104", "51a8db6", "79eea4b",
         "96d4087", "754576a", "a543936", "8a477cd", "72ca61f", "145318d",
-        "afd4d04"],
+        "afd4d04", "7c157f7"],
+    # cf190d7 is a fix rather than a feature, and is counted here because it
+    # is what made the phase possible: `npm run build` had not typechecked
+    # for some time, which nobody had noticed while the site was served by
+    # Vite in development. Phase 8 makes that build the deployment.
+    # The commit that closes this phase lands after this list is written and
+    # so falls into CURRENT_PHASE -- same as 6501316 in phase 6. Pin it here
+    # next time anything is added.
+    8: ["cf190d7", "00d171b", "4665ff9", "17c2947", "bebb16c"],
 }
 
 PHASES = [
@@ -125,10 +133,18 @@ PHASES = [
               "shows every row, and the reason for each one it will skip, "
               "before writing anything.",
      "open": []},
-    {"n": 8, "name": "Kill Jinja", "state": "now",
-     "blurb": "Flip the rewrite so React owns /*. One revertable commit.",
-     "open": []},
-    {"n": 9, "name": "StockSaathi prices", "state": "next",
+    {"n": 8, "name": "Kill Jinja", "state": "done",
+     "blurb": "templates/, static/ and routes/web.py deleted in one revertable "
+              "commit; Flask now answers /api/v1 and nothing else. The client "
+              "gained the three screens the port never had -- the front page, "
+              "sign in and register -- because deleting the pages is what took "
+              "away the last place to sign in. \"/\" is two pages: a stranger "
+              "gets the front page, an account gets its ledger. vercel.json "
+              "serves the built bundle from the edge and sends only /api to "
+              "Python, where before every asset woke a serverless function.",
+     "open": ["Not deployed. Pushing to main puts this in front of visitors, "
+              "and the new vercel.json has never run -- read the build log."]},
+    {"n": 9, "name": "StockSaathi prices", "state": "now",
      "blurb": "Symbol autocomplete first, because it populates the ticker every later "
               "price feature depends on.",
      "open": []},

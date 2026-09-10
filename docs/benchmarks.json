@@ -1,39 +1,39 @@
 {
-  "measured_at": 1789072494,
+  "measured_at": 1789076476,
   "runs": 5,
   "entries": [
     {
       "label": "Open the demo, to a screen with figures",
-      "best": 156,
-      "median": 169,
+      "best": 134,
+      "median": 137,
       "baseline": 3100,
       "note": "Session, account creation, seeding and the dashboard payload."
     },
     {
       "label": "Dashboard, already signed in",
-      "best": 32,
-      "median": 32,
+      "best": 28,
+      "median": 29,
       "baseline": 489,
       "note": "Holdings and recent rows together, sharing one connection."
     },
     {
       "label": "Transactions list",
-      "best": 32,
-      "median": 33,
+      "best": 28,
+      "median": 30,
       "baseline": 234,
       "note": "A single query."
     },
     {
       "label": "Budget vs actual report",
-      "best": 31,
-      "median": 31,
+      "best": 28,
+      "median": 28,
       "baseline": 312,
       "note": "Joins budgets to transactions."
     },
     {
       "label": "Reports screen, a year of every series",
-      "best": 33,
-      "median": 36,
+      "best": 30,
+      "median": 31,
       "baseline": 1496,
       "note": "Seven queries on one connection. The baseline is the same figures asked for as four separate requests."
     },

@@ -19,21 +19,25 @@ The plan those phases come from is
 each phase's **verify** step; do that step rather than deciding for
 yourself that a phase is finished.
 
-## 2. Restart the four servers
+## 2. Restart the servers
 
 None survive a power cut. Start them with `preview_start`, by name, from
 `.claude/launch.json`:
 
 | name | port | what |
 |---|---|---|
-| `spendincheck-mirror` | 8000 | **the site** — `/` is the React client, Jinja pages at their own paths |
-| `spendincheck-flask` | 5000 | the API and the old pages |
-| `spendincheck-spa` | 5173 | Vite |
+| `spendincheck-spa` | 5173 | **the site** — Vite, proxying `/api` to Flask |
+| `spendincheck-flask` | 5000 | the API, and nothing else |
+| `spendincheck-built` | 4173 | the built bundle in `web/dist`, same proxy |
 | `spendincheck-progress` | 5099 | the progress page |
 
-Open `http://localhost:8000`. Compare old against new by dropping `/app`:
-`/transactions` is the Jinja page, `/app/transactions` the React one, on
-one session.
+Open `http://localhost:5173`. Since Phase 8 that is the whole site: there is
+no second half to compare it against and no mirror to join them.
+
+`spendincheck-built` is the rehearsal. It serves what Vercel will serve —
+static files, and `index.html` for any path that is not one — so a deep
+link, a hard refresh and the production bundle can all be checked before a
+deploy. Run `npm --prefix web run build` first; it does not build for you.
 
 ## 3. After a power cut, check for corruption first
 
@@ -111,40 +115,54 @@ found this.
   at once.
 - **The demo is open to anyone, any time, with no sign-up.** One throwaway
   account per visitor.
-- **Nothing is deployed until Phase 8.** The React client is not on
-  spendincheck.com; pushing to `main` deploys, so it needs asking first.
+- **The client is built but not deployed.** Phase 8 is finished locally and
+  nothing has been pushed: spendincheck.com is still serving the Jinja
+  pages from an older commit. Pushing to `main` deploys, so it needs
+  asking first.
 - **Money never converts between currencies.** There are no exchange rates;
   changing currency relabels and re-rounds, and the settings screen says so
   before the control.
 
-## 9. Where Phase 8 starts
+## 9. What Phase 8 left, and where Phase 9 starts
 
-Phase 7 is closed, and so is the round of latency work that followed it.
-Nothing is in progress; the tree is clean and the marker is on 8.
+Phase 8 is done in the repository and **not in production**. The Jinja app
+is deleted, the client owns every URL, and the tests pass — but nothing was
+pushed, so spendincheck.com is still serving `templates/` from an older
+commit. That is the one open item, and it is not a code decision:
 
-Phase 8 is **kill Jinja**. From the plan:
+> Pushing to `main` deploys. This is the first phase a visitor sees, so it
+> needs asking first.
 
-> Flip the rewrite; delete `templates/`, `static/style.css`, every
-> `render_template` / `flash` / `url_for`. One revertable commit.
-> **Verify:** every old URL works or 404s cleanly; no server route shadows
-> a React route.
+Two things to know before that push.
 
-What that touches, none of it started:
+**`vercel.json` changed shape and has never run.** It now declares two
+builds instead of one: `@vercel/python` for `app.py` as before, and
+`@vercel/static-build` on `web/package.json` for the client. Only `/api`
+reaches Python; everything else is served from the edge, with
+`index.html` as the fallback for any path that is not a file.
 
-- `server/routes/web.py` -- 364 lines, thirteen routes, all of them Jinja.
-- `templates/` and `static/`, both still listed in `vercel.json`'s
-  `includeFiles`.
-- `vercel.json` routes everything to `app.py`; React has to be built and
-  served, and `/api/v1/*` must keep working.
-- `scripts/mirror.py` exists only because Flask and Vite are separate
-  origins. After this it has no job.
+The risk is the one line that cannot be checked locally: a legacy build
+mounts its output under the directory of its entrypoint, so the client's
+files are addressed as `/web/...` in `dest`. If that prefix is wrong the
+symptom is unmissable — the site 404s on every path — and the fix is one
+word. Read the deployment's build log rather than assuming, and if it is
+wrong, `vercel build` locally reproduces the same layout.
 
-Two things to be careful of. The old URLs are `/transactions`,
-`/categories` and so on, and the React routes are the same paths under
-`/app` today -- so the flip is also a decision about whether `/app/*`
-keeps working or redirects. And **this is the first phase a visitor
-sees**: pushing to `main` deploys spendincheck.com, so it needs asking
-first.
+**An unknown URL answers 200, not 404.** The catch-all serves
+`index.html`, and React renders "Not found" inside it. That is how a
+single-page app works and the alternative is worse — the edge cannot tell
+`/reports` from `/nonsense` — but it does mean a crawler sees 200 for
+anything. The old URLs are all accounted for: `/dashboard`,
+`/transactions`, `/categories`, `/budgets`, `/investments`, `/reports`
+and `/sign-in` and `/register` are real routes; `/app/*` redirects to the
+same path without the prefix; `/demo` and `/sign-out` were POST-only
+actions and are now `/api/v1/auth/demo` and `/api/v1/auth/sign-out`.
+
+Phase 9 is **StockSaathi prices**. From the plan: symbol autocomplete
+first, because it populates the ticker every later price feature depends
+on. Nothing has been started, and it is the first phase that reaches
+outside this repository — `G:\StockSaathi` is the other working
+directory.
 
 Everything else in this file still applies: one round trip per screen, the
 REST API deliberately closed, and the tests running against the real
