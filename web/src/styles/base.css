@@ -1,0 +1,96 @@
+/*
+ * Element-level defaults. Everything here reads semantic tokens only, so the
+ * whole document re-themes from the single data-theme attribute on <html>.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--surface-page);
+  color: var(--content-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  line-height: var(--leading-tight);
+  margin: 0;
+}
+
+h1 { font-size: var(--text-2xl); }
+h2 { font-size: var(--text-lg); }
+h3 { font-size: var(--text-md); }
+
+p { margin: 0; }
+
+a {
+  color: var(--accent-default);
+  text-decoration: none;
+}
+
+a:hover { color: var(--accent-hover); }
+
+/* One visible focus treatment for every interactive element. The old stylesheet
+   signalled focus by swapping a border colour, which keyboard users could miss
+   entirely on a dark ground. */
+:focus-visible {
+  outline: 2px solid var(--line-focus);
+  outline-offset: 2px;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+/* Every figure is mono with tabular numerals, so columns of rupees line up on
+   the decimal point instead of drifting with each digit's natural width. */
+.num,
+td.num,
+th.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  /* A figure must never wrap. "+" left on one line with the amount on the next
+     reads as a completely different number. */
+  white-space: nowrap;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Wide content must scroll inside its own box. The page body itself never
+   scrolls sideways - that was the single worst mobile failure in the old UI,
+   where an 8-column investments table simply ran off the screen. */
+.scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
