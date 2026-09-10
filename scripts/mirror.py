@@ -28,8 +28,12 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 PORT = 8000
-FLASK = ("127.0.0.1", 5000)
-VITE = ("127.0.0.1", 5173)
+# Named rather than pinned to 127.0.0.1: Vite listens on ::1 only, so a
+# literal IPv4 address silently misses it and the mirror quietly serves a
+# stale web/dist instead. "localhost" resolves to both, and Python tries
+# each address in turn.
+FLASK = ("localhost", 5000)
+VITE = ("localhost", 5173)
 
 REPO = Path(__file__).resolve().parent.parent
 DIST = REPO / "web" / "dist"
