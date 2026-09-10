@@ -1,1 +1,1 @@
-"""HTTP layer: the Jinja pages today, the JSON API blueprints next."""
+"""HTTP layer: the JSON API blueprints. Nothing here renders HTML."""

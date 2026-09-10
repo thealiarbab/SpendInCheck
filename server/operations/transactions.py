@@ -323,7 +323,7 @@ def _revive(carried, money_columns):
 def get_all_transactions(user_id):
     """Every transaction, newest first.
 
-    Kept as the no-filter case of search_transactions so the Jinja pages and
+    Kept as the no-filter case of search_transactions so the CSV export and
     the dashboard have one query between them rather than a second copy that
     can drift. MAX_PER_PAGE is the cap: the old query had none, which was
     only ever safe because no account has yet grown large enough to notice.

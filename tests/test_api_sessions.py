@@ -104,11 +104,17 @@ def test_an_unknown_api_path_answers_in_json(client):
     assert response.get_json()["error"]["code"] == "not_found"
 
 
-def test_the_pages_still_redirect_rather_than_returning_json(client):
-    """The API exemption must not have loosened the page guard."""
+def test_a_page_path_also_answers_in_json(client):
+    """There are no pages here any more.
+
+    /dashboard used to redirect a signed-out visitor to /sign-in. Since
+    Phase 8 this server has no such route: in production the edge answers
+    that path with the client's index.html and never asks Python. Anything
+    reaching here is a mistyped endpoint, and it gets the API's answer.
+    """
     response = client.get("/dashboard")
-    assert response.status_code == 302
-    assert "/sign-in" in response.headers["Location"]
+    assert response.status_code == 404
+    assert response.get_json()["error"]["code"] == "not_found"
 
 
 def test_a_session_whose_demo_account_was_swept_reports_signed_out(client, monkeypatch):

@@ -153,8 +153,8 @@ def sign_out_route():
     """Abandon the session.
 
     A POST, not a GET. As a GET this destroys data on any prefetch, link
-    scan or <img src> pointed at it -- which is exactly how the Jinja version
-    can currently be triggered by something that never meant to.
+    scan or <img src> pointed at it -- which is how the page version could
+    be triggered by something that never meant to.
     """
     require_user()
     sign_out()

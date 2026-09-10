@@ -31,12 +31,18 @@
       "port": 5099
     },
     {
-      "name": "spendincheck-mirror",
-      "runtimeExecutable": "python",
+      "name": "spendincheck-built",
+      "runtimeExecutable": "C:/Users/Alig/AppData/Roaming/fnm/node-versions/v22.22.2/installation/node.exe",
       "runtimeArgs": [
-        "scripts/mirror.py"
+        "web/node_modules/vite/bin/vite.js",
+        "preview",
+        "web",
+        "--port",
+        "4173",
+        "--strictPort"
       ],
-      "port": 8000
+      "port": 4173,
+      "url": "http://localhost:4173"
     }
   ]
 }

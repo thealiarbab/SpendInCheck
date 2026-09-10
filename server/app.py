@@ -4,21 +4,18 @@ Building the app inside a function rather than at import time is what lets
 tests construct an app with their own settings, and keeps importing this
 module free of side effects. The Vercel entrypoint and the local dev server
 both call create_app(); neither owns configuration.
+
+Since Phase 8 this app answers /api/v1 and nothing else. The site itself is
+the built React bundle in web/dist, which Vercel serves from the edge
+without troubling Python -- see vercel.json.
 """
 
-import os
 from datetime import timedelta
 
 from flask import Flask
 
 from server import config, db
-from server.routes import web
 from server.routes.api import api, handle_unknown_path
-
-# Templates and static files stayed at the repo root when this module moved
-# into server/. Flask resolves both relative to the module's own directory,
-# so without these absolute paths every render would fail at request time.
-_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def create_app(secret_key=None):
@@ -27,11 +24,11 @@ def create_app(secret_key=None):
     Passing secret_key overrides the configured one, which is how tests get a
     stable signing key without touching the environment.
     """
-    app = Flask(
-        __name__,
-        template_folder=os.path.join(_REPO_ROOT, "templates"),
-        static_folder=os.path.join(_REPO_ROOT, "static"),
-    )
+    # No templates and no static folder: this app serves JSON and nothing
+    # else. The client is a built bundle the CDN serves, and static_folder
+    # left at its default would register a /static route for a directory
+    # that does not exist.
+    app = Flask(__name__, static_folder=None)
     app.secret_key = secret_key or config.SECRET_KEY
 
     app.config.update(
@@ -51,11 +48,10 @@ def create_app(secret_key=None):
     # serverless container, never be given back to the pool.
     app.teardown_appcontext(db.close_request_connection)
 
-    web.register(app)
     app.register_blueprint(api)
 
     # See handle_unknown_path: a routing miss belongs to no blueprint, so this
-    # has to be registered here to answer unknown /api paths in JSON.
+    # has to be registered here rather than on it.
     app.register_error_handler(404, handle_unknown_path)
 
     return app

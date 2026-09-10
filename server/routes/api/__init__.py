@@ -4,8 +4,9 @@ Everything shared by every endpoint lives here: the error shape, the CSRF
 check, and the JSON 404. Individual route modules below only describe their
 own resource, so no route can forget to guard itself.
 
-Mounted at /api/v1 alongside the Jinja pages rather than replacing them. Both
-read the same session, so a screen can move to the client one at a time.
+Mounted at /api/v1, which is the whole of what this server answers: the
+site itself is a built bundle served from the edge, and every screen in it
+reaches the database through here.
 """
 
 from flask import Blueprint, jsonify, request
@@ -68,15 +69,19 @@ def handle_database_error(error):
 
 
 def handle_unknown_path(error):
-    """Answer an unknown API path in JSON, never in Flask's HTML page.
+    """Answer any unknown path in JSON, never in Flask's HTML page.
 
     Registered on the app rather than the blueprint: when no route matches,
     Flask has not chosen a blueprint, so a blueprint-level 404 handler never
-    runs. The path check is what keeps this from stealing the HTML 404 that
-    the pages should still serve.
+    runs.
+
+    It answers for every path, not only /api, because there is nothing else
+    here to answer for one. In production a non-API path never reaches this
+    server at all -- the edge serves the client's index.html -- so anything
+    arriving here is either a mistyped endpoint or a local request to a
+    server that is now only an API. Flask's styled HTML 404 would be a
+    misleading answer to both.
     """
-    if not request.path.startswith("/api/"):
-        return error
     return jsonify({"error": {
         "code": "not_found",
         "message": "No such endpoint.",

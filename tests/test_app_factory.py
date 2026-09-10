@@ -30,21 +30,41 @@ def in_production(monkeypatch):
 
 # --- assembly ---------------------------------------------------------------
 
-def test_every_page_route_is_registered():
-    """All thirteen Jinja routes survive being moved into register()."""
+def test_the_app_serves_the_api_and_nothing_else():
+    """Every route is under /api/v1 since Phase 8 deleted the pages.
+
+    Worth asserting rather than assuming: a route added at "/" here would
+    not fail anything, it would simply never be reached in production --
+    the edge serves the client's index.html for that path and this server
+    never sees the request. The failure would be a page that works locally
+    and 404s once deployed.
+    """
+    app = create_app("test-key")
+    served = [rule.rule for rule in app.url_map.iter_rules()]
+    assert served, "no routes registered at all"
+    assert all(rule.startswith("/api/v1/") for rule in served), served
+
+
+def test_the_auth_endpoints_are_registered():
+    """The four the client cannot start without."""
     app = create_app("test-key")
     rules = {rule.rule for rule in app.url_map.iter_rules()}
-    for path in ("/", "/dashboard", "/transactions", "/categories", "/budgets",
-                 "/investments", "/reports", "/sign-in", "/sign-out",
-                 "/register", "/demo"):
+    for path in ("/api/v1/auth/session", "/api/v1/auth/sign-in",
+                 "/api/v1/auth/register", "/api/v1/auth/sign-out",
+                 "/api/v1/auth/demo"):
         assert path in rules
 
 
-def test_templates_resolve_to_the_repo_root():
-    """The factory lives in server/ but the templates never moved."""
+def test_there_is_no_static_route():
+    """static_folder is off deliberately.
+
+    Flask registers /static/<path> by default, pointing at a directory that
+    no longer exists -- an endpoint that can only ever 404, on a server that
+    answers in JSON.
+    """
     app = create_app("test-key")
-    assert os.path.isfile(os.path.join(app.template_folder, "landing.html"))
-    assert os.path.isdir(app.static_folder)
+    assert app.static_folder is None
+    assert "static" not in app.view_functions
 
 
 def test_session_cookie_is_hardened():
@@ -55,17 +75,20 @@ def test_session_cookie_is_hardened():
     assert app.config["PERMANENT_SESSION_LIFETIME"].days == 14
 
 
-def test_signed_out_visitor_is_redirected_away_from_private_pages():
-    """Proves the before_request hook is still attached after the move.
+def test_an_unknown_path_answers_in_json():
+    """Including one that is not under /api.
 
-    Worth asserting explicitly: a hook registered on the wrong object would
-    leave every private page serving to anyone, and still return 200.
+    Flask's own 404 is a styled HTML page. Nothing here serves HTML any
+    more, and a fetch() handed a page instead of a body fails somewhere
+    less obvious than the request that caused it.
     """
     app = create_app("test-key")
     app.config["TESTING"] = True
-    response = app.test_client().get("/dashboard")
-    assert response.status_code == 302
-    assert "/sign-in" in response.headers["Location"]
+    for path in ("/api/v1/nothing-here", "/dashboard"):
+        response = app.test_client().get(path)
+        assert response.status_code == 404, path
+        assert response.is_json, path
+        assert response.get_json()["error"]["code"], path
 
 
 # --- startup checks ---------------------------------------------------------

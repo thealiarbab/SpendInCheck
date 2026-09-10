@@ -3,7 +3,7 @@
 Every function here opens its own connection, runs one or more parameterized
 queries, and returns plain Python data (tuples, lists of tuples, dictionaries).
 Nothing in this package prints anything -- formatting is the caller's job.
-That split is what lets the Jinja pages and the JSON API share one copy of
+That split is what let the console app and the web API share one copy of
 every query instead of each growing their own.
 
 The functions used to live in a single 745-line module. They are grouped by

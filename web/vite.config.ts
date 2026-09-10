@@ -15,6 +15,17 @@ export default defineConfig({
       "/api": { target: "http://127.0.0.1:5000", changeOrigin: false },
     },
   },
+  // `vite preview` serves web/dist the way Vercel will: static files, and
+  // index.html for any path that is not one. The proxy is what makes it a
+  // rehearsal rather than a demonstration -- without it the built bundle
+  // has no API to talk to, and the only place the build gets exercised is
+  // production.
+  preview: {
+    port: 4173,
+    proxy: {
+      "/api": { target: "http://127.0.0.1:5000", changeOrigin: false },
+    },
+  },
   build: {
     outDir: "dist",
     sourcemap: true,

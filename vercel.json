@@ -6,18 +6,23 @@
       "use": "@vercel/python",
       "config": {
         "includeFiles": [
-          "server/**",
-          "templates/**",
-          "static/**"
+          "server/**"
         ]
+      }
+    },
+    {
+      "src": "web/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
       }
     }
   ],
   "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "app.py"
-    }
+    { "src": "/api/(.*)", "dest": "app.py" },
+    { "src": "/assets/(.*)", "dest": "/web/assets/$1" },
+    { "src": "/(.+[.][A-Za-z0-9]+)$", "dest": "/web/$1" },
+    { "src": "/(.*)", "dest": "/web/index.html" }
   ],
   "crons": [
     {

@@ -6,9 +6,9 @@ the cookie does not already do -- and a token readable by script is a
 credential any cross-site scripting flaw can steal, which an HttpOnly cookie
 is not.
 
-The Jinja pages and the JSON API share these same session keys deliberately.
-That is what lets both run at once while screens are ported one at a time:
-sign in through either, and the other already knows who you are.
+One set of session keys, read by every endpoint. Nothing here is specific
+to a screen: the session says who is signed in and whether this is a
+demonstration account, and the API decides the rest.
 """
 
 import hmac
