@@ -1,0 +1,5 @@
+# Development only. Not installed in production -- Vercel reads
+# requirements.txt, and a test runner has no business in a serverless
+# bundle that is billed by size and cold-start time.
+-r requirements.txt
+pytest
