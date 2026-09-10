@@ -32,7 +32,7 @@ BASELINE = "b2c9a7c"
 # mapping rather than a range. Any commit not listed is treated as part of
 # CURRENT_PHASE, which is what keeps this accurate as new work lands without
 # anyone editing the file.
-CURRENT_PHASE = 5
+CURRENT_PHASE = 6
 
 COMMIT_PHASE = {
     0: ["5e3ab5e", "6308244", "931dabe", "490f434", "c030a97", "e166bb4", "efb70ab"],
@@ -76,11 +76,14 @@ PHASES = [
               "transaction, renaming a category, deleting one with everything "
               "filed under it reassigned, and deleting a holding.",
      "open": []},
-    {"n": 5, "name": "Search, filter, pagination, export", "state": "now",
+    {"n": 5, "name": "Search, filter, pagination, export", "state": "done",
      "blurb": "search_transactions replaces get_all_transactions. Column names come "
-              "from a whitelist; only values go through %s.",
+              "from a whitelist; only values go through %s. Filters live in the URL, "
+              "so a filtered view can be shared and the back button walks it. "
+              "The search is a UNION so the trigram index can serve it: 54ms to 4ms "
+              "on an account with 20,000 rows.",
      "open": []},
-    {"n": 6, "name": "Reporting depth and charts", "state": "next",
+    {"n": 6, "name": "Reporting depth and charts", "state": "now",
      "blurb": "dashboard_summary in one round trip, plus trend, cashflow and net worth.",
      "open": []},
     {"n": 7, "name": "Accounts through CSV import", "state": "next",
