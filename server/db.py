@@ -22,16 +22,26 @@ _REQUEST_KEY = "_spendincheck_connection"
 
 # How many connections this process may hold open at once.
 #
-# Small on purpose, and adjustable, because the right number depends on
-# where this is running. Supabase's pooler caps client connections across
-# everything that talks to it, and a serverless deployment is many processes
-# each holding their own -- so a big pool per process is how a handful of
-# containers exhausts the shared limit. A process that serves one request at
-# a time needs one; the rest is headroom for a threaded local server.
+# Three, because the shared ceiling is far lower than it looks. Measured
+# against this project's pooler: the seventeenth concurrent client
+# connection fails, so the whole budget across every process that talks to
+# this database is sixteen. A serverless deployment is many containers each
+# holding their own pool, so a generous number here is how five containers
+# exhaust everything.
+#
+# The failure mode is worth knowing because it is not the obvious one: past
+# the limit, connecting appears to succeed and the connection then dies on
+# first use with "SSL connection has been closed unexpectedly". _checkout
+# below survives that -- it uses each connection before handing it on and
+# discards the ones that fail -- but the ceiling is still real.
+#
+# A process that serves one request at a time needs one; three is headroom
+# for a threaded local server. Raise DB_MAX_CONNECTIONS if the database
+# plan changes, since this limit comes with the tier.
 #
 # Requests beyond this wait for a connection to come back, which is still
 # far cheaper than the 180ms of handshake they would otherwise each pay.
-MAX_CONNECTIONS = max(1, int(os.environ.get("DB_MAX_CONNECTIONS", "5")))
+MAX_CONNECTIONS = max(1, int(os.environ.get("DB_MAX_CONNECTIONS", "3")))
 
 _pool = None
 _pool_lock = threading.Lock()
