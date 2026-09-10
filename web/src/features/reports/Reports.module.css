@@ -1,0 +1,40 @@
+/* The month control sits in the page head, beside the title it describes. */
+.picker { min-width: 11rem; }
+
+.share { color: var(--content-secondary); }
+
+/* How much of a limit is gone, as a proportion rather than a word: "under
+   budget" reads identically at 99% spent and at 5%. */
+.gauge {
+  width: 7rem;
+  height: 4px;
+  background: var(--surface-inset);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: var(--space-2);
+}
+
+.bar {
+  height: 100%;
+  background: var(--money-credit);
+}
+
+.barOver {
+  height: 100%;
+  background: var(--money-debit);
+}
+
+.status {
+  font-size: 0.75rem;
+  color: var(--content-muted);
+  white-space: nowrap;
+}
+
+.surplus {
+  margin: var(--space-5) 0 0;
+  font-size: 0.875rem;
+  color: var(--content-secondary);
+}
+
+.surplus a { color: var(--accent-invest); text-decoration: none; }
+.surplus a:hover { text-decoration: underline; }
