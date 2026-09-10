@@ -2,7 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useState } from "rea
 import { useQueryClient } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import type { Account } from "../lib/api";
-import { readSession, signOut as endSession, startDemo } from "../lib/api";
+import { readSession, register as createAccount, signIn as authenticate,
+         signOut as endSession, startDemo } from "../lib/api";
 import { setCurrency } from "../lib/money";
 
 /**
@@ -20,6 +21,10 @@ interface SessionValue {
   /** Set when the session call itself failed, which is not the same as being signed out. */
   unreachable: boolean;
   beginDemo: () => Promise<void>;
+  /** Sign in with a username or email. Throws ApiError on a bad password. */
+  enter: (login: string, password: string) => Promise<void>;
+  /** Create an account and sign into it. Throws ApiError with field errors. */
+  join: (username: string, email: string, password: string) => Promise<void>;
   leave: () => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -55,28 +60,52 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     void refresh();
   }, [refresh]);
 
+  /**
+   * Take an account the server just handed back as the signed-in one.
+   *
+   * Shared by every way in -- sign in, register, demo -- because each of
+   * them has the same three things to do, and the one that is easy to
+   * forget is the currency: it decides how every amount on the next screen
+   * is parsed as well as shown.
+   */
+  const adopt = useCallback((user: Account) => {
+    if (user.currency) setCurrency(user.currency);
+    setAccount(user);
+    setStatus("signed-in");
+    setUnreachable(false);
+  }, []);
+
+  const enter = useCallback(async (login: string, password: string) => {
+    adopt(await authenticate(login, password));
+  }, [adopt]);
+
+  const join = useCallback(async (username: string, email: string, password: string) => {
+    adopt(await createAccount(username, email, password));
+  }, [adopt]);
+
   const beginDemo = useCallback(async () => {
     const { user, dashboard } = await startDemo();
-    if (user.currency) setCurrency(user.currency);
     // The response already carries the opening screen, so put it in the
     // cache rather than letting the dashboard ask for it again. Without
     // this the visitor waits out two further round trips staring at a
     // spinner, for rows the server had already read.
     if (dashboard) queries.setQueryData(["dashboard"], dashboard);
-    setAccount(user);
-    setStatus("signed-in");
-    setUnreachable(false);
-  }, [queries]);
+    adopt(user);
+  }, [adopt, queries]);
 
   const leave = useCallback(async () => {
     await endSession();
     setAccount(null);
     setStatus("signed-out");
-  }, []);
+    // Every cached list belongs to the account that just left. Without this
+    // the next person to sign in on this browser is shown the last one's
+    // figures until each query happens to re-fetch.
+    queries.clear();
+  }, [queries]);
 
   return (
     <SessionContext.Provider
-      value={{ status, account, unreachable, beginDemo, leave, refresh }}
+      value={{ status, account, unreachable, beginDemo, enter, join, leave, refresh }}
     >
       {children}
     </SessionContext.Provider>

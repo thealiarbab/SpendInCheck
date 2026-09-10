@@ -1,0 +1,27 @@
+/* The two screens that are not part of the app yet: sign in and register.
+
+   Narrower than every other screen on purpose. A form of three inputs laid
+   out across the full width of a desktop puts the label at one end of the
+   eye's travel and the field at the other, and there is nothing else on the
+   page to justify the width. */
+
+.frame {
+  max-width: 26rem;
+  margin: var(--space-8) auto;
+}
+
+.stack {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.footnote {
+  margin: var(--space-5) 0 0;
+  text-align: center;
+  color: var(--content-secondary);
+  font-size: var(--text-sm);
+}
+
+.footnote a {
+  color: var(--content-primary);
+}

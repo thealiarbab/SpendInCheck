@@ -123,6 +123,30 @@ export async function startDemo(): Promise<{ user: Account; dashboard: Dashboard
   return { user: body.user, dashboard: body.dashboard };
 }
 
+/**
+ * Exchange a username or email plus password for a session.
+ *
+ * The server answers 401 with one message whichever half was wrong, so this
+ * cannot be used to discover which accounts exist. Nothing here softens that
+ * into something more helpful.
+ */
+export async function signIn(login: string, password: string): Promise<Account> {
+  const body = await request<{ user: Account; csrf_token: string }>(
+    "/auth/sign-in", { method: "POST", body: { login, password } });
+  csrfToken = body.csrf_token;
+  return body.user;
+}
+
+/** Create an account and sign into it. Field errors come back per field. */
+export async function register(
+  username: string, email: string, password: string,
+): Promise<Account> {
+  const body = await request<{ user: Account; csrf_token: string }>(
+    "/auth/register", { method: "POST", body: { username, email, password } });
+  csrfToken = body.csrf_token;
+  return body.user;
+}
+
 /** Abandon the session. A demonstration account is deleted on the way out. */
 export async function signOut(): Promise<void> {
   const body = await request<{ csrf_token: string }>("/auth/sign-out", { method: "POST" });
