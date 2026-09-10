@@ -93,6 +93,7 @@ from server.routes.api import accounts  # noqa: E402,F401
 from server.routes.api import budgets  # noqa: E402,F401
 from server.routes.api import cron  # noqa: E402,F401
 from server.routes.api import categories  # noqa: E402,F401
+from server.routes.api import goals  # noqa: E402,F401
 from server.routes.api import investments  # noqa: E402,F401
 from server.routes.api import reports  # noqa: E402,F401
 from server.routes.api import sessions  # noqa: E402,F401

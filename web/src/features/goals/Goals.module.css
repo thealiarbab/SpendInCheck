@@ -1,0 +1,89 @@
+.gap { height: var(--space-5); }
+
+.explain {
+  margin: var(--space-4) 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--content-muted);
+  max-width: 68ch;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  font-size: 0.8125rem;
+  color: var(--content-secondary);
+  cursor: pointer;
+}
+
+.toggle input { accent-color: var(--accent-default); cursor: pointer; }
+
+/* A list, not a table. A goal is a name, a bar and a few figures, and a
+   table would put the bar in a column sized for the widest cell in it. */
+.list { list-style: none; margin: 0; padding: 0; }
+
+.goal {
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--line-soft);
+}
+
+.goal:first-child { border-top: 0; padding-top: 0; }
+
+.head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+
+.name { font-size: 0.9375rem; color: var(--content-primary); }
+
+.aside {
+  margin-left: var(--space-2);
+  padding: 1px 6px;
+  border: 1px solid var(--line-default);
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--content-muted);
+}
+
+.figures {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.875rem;
+}
+
+.figures strong { color: var(--content-primary); font-weight: 600; }
+.reached { color: var(--money-credit) !important; }
+.of { margin-left: var(--space-2); color: var(--content-muted); }
+
+.track {
+  height: 6px;
+  background: var(--surface-inset);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.bar { height: 100%; background: var(--accent-default); }
+.barDone { height: 100%; background: var(--money-credit); }
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-top: var(--space-3);
+  font-size: 0.75rem;
+  color: var(--content-muted);
+}
+
+/* Pushes the actions to the right without a second flex container. */
+.spacer { flex: 1 1 auto; }
+
+.overdue { color: var(--money-debit); }

@@ -189,6 +189,28 @@ export interface TagOnRow {
   name: string;
 }
 
+/** A savings target and how far along it is. `saved` is summed by the
+ *  server on every read, never stored. */
+export interface Goal {
+  id: number;
+  name: string;
+  target: string;
+  target_date: string | null;
+  account_id: number | null;
+  account: string | null;
+  saved: string;
+  contributions: number;
+  archived: boolean;
+}
+
+/** Money set aside towards a goal. A negative amount is a withdrawal. */
+export interface Contribution {
+  id: number;
+  date: string;
+  amount: string;
+  note: string | null;
+}
+
 export type AccountKind = "Bank" | "Cash" | "Card" | "Wallet" | "Other";
 
 /** An account and its balance. The balance is derived by the server on
@@ -348,6 +370,24 @@ export const api = {
     request<void>("/categories/" + id +
       (reassignTo === undefined ? "" : query({ reassign_to: String(reassignTo) })),
       { method: "DELETE" }),
+
+  goals: (includeArchived = false) =>
+    request<{ items: Goal[] }>("/goals" + (includeArchived ? "?archived=1" : "")),
+  addGoal: (body: Record<string, unknown>) =>
+    request<{ id: number }>("/goals", { method: "POST", body }),
+  editGoal: (id: number, body: Record<string, unknown>) =>
+    request<void>("/goals/" + id, { method: "PATCH", body }),
+  archiveGoal: (id: number, archived: boolean) =>
+    request<void>("/goals/" + id + "/archive",
+      { method: "POST", body: { archived: archived ? "1" : "0" } }),
+  deleteGoal: (id: number) => request<void>("/goals/" + id, { method: "DELETE" }),
+  contributions: (goalId: number) =>
+    request<{ items: Contribution[] }>("/goals/" + goalId + "/contributions"),
+  contribute: (goalId: number, body: Record<string, unknown>) =>
+    request<{ id: number }>("/goals/" + goalId + "/contributions",
+      { method: "POST", body }),
+  deleteContribution: (id: number) =>
+    request<void>("/contributions/" + id, { method: "DELETE" }),
 
   tags: () => request<{ items: Tag[] }>("/tags"),
   addTag: (name: string) => request<{ id: number }>("/tags", {

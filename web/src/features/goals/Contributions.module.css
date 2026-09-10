@@ -1,0 +1,93 @@
+/* Sits inside the goal it belongs to, indented and on a sunken surface so
+   it reads as part of that goal rather than as the next one. */
+.panel {
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  background: var(--surface-sunken);
+  border-radius: 6px;
+}
+
+.form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  margin-bottom: var(--space-3);
+}
+
+.amount, .date, .note {
+  padding: 6px 10px;
+  border: 1px solid var(--line-default);
+  border-radius: 4px;
+  background: var(--surface-inset);
+  color: var(--content-primary);
+  font: inherit;
+  font-size: 0.8125rem;
+}
+
+.amount {
+  width: 8rem;
+  font-family: var(--font-mono);
+  text-align: right;
+}
+
+.note { flex: 1 1 10rem; min-width: 0; }
+
+.amount:focus, .date:focus, .note:focus {
+  outline: 2px solid var(--line-focus);
+  outline-offset: 1px;
+}
+
+/* Flips the sign rather than being a second submit button: putting in and
+   taking out differ only by that, and two buttons would be two code paths
+   for one fact. */
+.flip {
+  width: 2rem;
+  padding: 6px 0;
+  border: 1px solid var(--line-default);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--content-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.flip:hover { border-color: var(--accent-default); color: var(--content-primary); }
+
+.list { list-style: none; margin: 0; padding: 0; }
+
+.row {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: 4px 0;
+  font-size: 0.8125rem;
+}
+
+.when, .what { color: var(--content-muted); }
+.when { font-family: var(--font-mono); }
+.what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.in, .out {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.in { color: var(--money-credit); }
+.out { color: var(--money-debit); }
+
+.drop {
+  border: 0;
+  background: transparent;
+  color: var(--content-muted);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.drop:hover:not(:disabled) { color: var(--money-debit); }
+
+.error { margin: 0 0 var(--space-3); font-size: 0.75rem; color: var(--money-debit); }

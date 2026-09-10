@@ -7,6 +7,7 @@ import {
   Button, Card, Empty, Field, Form, FormActions, Loading, Notice, PageHead, Picker,
   RowActions, Table, cell, row as rowStyle,
 } from "../../ui";
+import { Goals } from "../goals/Goals";
 import styles from "./Budgets.module.css";
 
 /** The current month as YYYY-MM, which is what <input type="month"> speaks. */
@@ -80,8 +81,9 @@ export function Budgets() {
   return (
     <>
       <PageHead
-        title="Budgets"
-        subtitle="A monthly spending limit per category. Setting one twice replaces it."
+        title="Budgets and goals"
+        subtitle={"A budget caps what you spend in a month. A goal is what you are "
+                  + "putting money aside for."}
       />
 
       <Card title={existing ? `Replacing ${existing.category}'s limit` : "Set a budget"}>
@@ -177,6 +179,10 @@ export function Budgets() {
       ) : (
         <Card><Empty>No budgets set yet.</Empty></Card>
       )}
+
+      <div style={{ height: "var(--space-5)" }} />
+
+      <Goals />
     </>
   );
 }
