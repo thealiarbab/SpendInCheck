@@ -4,15 +4,31 @@
     {
       "name": "spendincheck-spa",
       "runtimeExecutable": "C:/Users/Alig/AppData/Roaming/fnm/node-versions/v22.22.2/installation/node.exe",
-      "runtimeArgs": ["web/node_modules/vite/bin/vite.js", "web", "--port", "5173", "--strictPort"],
+      "runtimeArgs": [
+        "web/node_modules/vite/bin/vite.js",
+        "web",
+        "--port",
+        "5173",
+        "--strictPort"
+      ],
       "port": 5173,
       "url": "http://localhost:5173"
     },
     {
       "name": "spendincheck-flask",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["app.py"],
+      "runtimeArgs": [
+        "app.py"
+      ],
       "port": 5000
+    },
+    {
+      "name": "spendincheck-progress",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "scripts/progress_server.py"
+      ],
+      "port": 5099
     }
   ]
 }
