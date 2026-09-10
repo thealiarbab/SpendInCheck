@@ -4,9 +4,9 @@ import { ApiError, api } from "../../lib/api";
 import type { Category, TransactionSubmission } from "../../lib/api";
 import { formatRupees, toPaise } from "../../lib/money";
 import {
-  Button, Card, Empty, Field, Form, Loading, Notice, PageHead, Picker, Table, Tag, cell,
+  Button, Card, Confirm, Derived, Empty, Field, Form, FormActions, Loading, Notice,
+  PageHead, Picker, RowActions, Table, Tag, cell, row as rowStyle,
 } from "../../ui";
-import styles from "./Transactions.module.css";
 
 /** Today in the YYYY-MM-DD that the date input and the API both speak. */
 function today(): string {
@@ -131,9 +131,7 @@ export function Transactions() {
               <option key={one.id} value={one.id}>{one.name}</option>
             ))}
           </Picker>
-          <div className={styles.derived}>
-            {chosen ? <Tag kind={chosen.type} /> : null}
-          </div>
+          <Derived>{chosen ? <Tag kind={chosen.type} /> : null}</Derived>
           <Field
             label="Amount" name="amount" type="number" step="0.01" min="0.01" numeric
             value={draft.amount} error={fields.amount} placeholder="0.00"
@@ -144,7 +142,7 @@ export function Transactions() {
             value={draft.description} error={fields.description}
             onChange={(event) => setDraft({ ...draft, description: event.target.value })}
           />
-          <div className={styles.submit}>
+          <FormActions>
             <Button onClick={submit} disabled={!chosen || save.isPending}>
               {save.isPending ? "Saving…" : draft.id === null ? "Add" : "Save"}
             </Button>
@@ -153,7 +151,7 @@ export function Transactions() {
                 Cancel
               </Button>
             )}
-          </div>
+          </FormActions>
         </Form>
 
         {failure && !failure.isValidation && <Notice>{failure.message}</Notice>}
@@ -181,7 +179,7 @@ export function Transactions() {
             }
           >
             {rows.map((row) => (
-              <tr key={row.id} className={row.id === draft.id ? styles.editing : undefined}>
+              <tr key={row.id} className={row.id === draft.id ? rowStyle.editing : undefined}>
                 <td className={cell.numeric} style={{ textAlign: "left" }}>{row.date}</td>
                 <td className={cell.primary}>{row.category}</td>
                 <td><Tag kind={row.type} /></td>
@@ -191,26 +189,18 @@ export function Transactions() {
                 <td>{row.description || "—"}</td>
                 <td>
                   {confirming === row.id ? (
-                    // The confirmation replaces the buttons in place, rather
-                    // than a browser dialog that names the row by its id and
-                    // asks about it somewhere else entirely.
-                    <div className={styles.confirm}>
-                      <span>Delete?</span>
-                      <Button
-                        kind="danger" small disabled={remove.isPending}
-                        onClick={() => remove.mutate(row.id)}
-                      >
-                        Yes
-                      </Button>
-                      <Button kind="quiet" small onClick={() => setConfirming(null)}>No</Button>
-                    </div>
+                    <Confirm
+                      busy={remove.isPending}
+                      onYes={() => remove.mutate(row.id)}
+                      onNo={() => setConfirming(null)}
+                    />
                   ) : (
-                    <div className={styles.actions}>
+                    <RowActions>
                       <Button kind="quiet" small onClick={() => edit(row.id)}>Edit</Button>
                       <Button kind="danger" small onClick={() => setConfirming(row.id)}>
                         Delete
                       </Button>
-                    </div>
+                    </RowActions>
                   )}
                 </td>
               </tr>

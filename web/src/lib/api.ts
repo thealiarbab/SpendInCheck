@@ -173,6 +173,12 @@ export interface InvestmentRow {
   current_price: string;
 }
 
+/** How much still points at a category, so a delete can say what it moves. */
+export interface CategoryUsage {
+  transactions: number;
+  budgets: number;
+}
+
 export interface TransactionSubmission {
   date: string;
   category_id: number;
@@ -188,6 +194,16 @@ export const api = {
   categories: () => request<{ items: Category[] }>("/categories"),
   addCategory: (name: string, type: string) =>
     request<void>("/categories", { method: "POST", body: { name, type } }),
+  renameCategory: (id: number, name: string, type: string) =>
+    request<void>("/categories/" + id, { method: "PATCH", body: { name, type } }),
+  categoryUsage: (id: number) =>
+    request<CategoryUsage>("/categories/" + id + "/usage"),
+  // The target rides in the query string rather than a body: a DELETE with a
+  // body is poorly supported by enough intermediaries to be worth avoiding.
+  deleteCategory: (id: number, reassignTo?: number) =>
+    request<void>("/categories/" + id +
+      (reassignTo === undefined ? "" : query({ reassign_to: String(reassignTo) })),
+      { method: "DELETE" }),
 
   transactions: () => request<{ items: TransactionRow[] }>("/transactions"),
   transaction: (id: number) => request<TransactionSubmission & { id: number }>(
@@ -206,6 +222,8 @@ export const api = {
   investments: () => request<{ items: InvestmentRow[] }>("/investments"),
   addInvestment: (body: Record<string, string>) =>
     request<void>("/investments", { method: "POST", body }),
+  deleteInvestment: (id: number) =>
+    request<void>("/investments/" + id, { method: "DELETE" }),
   reprice: (id: number, current_price: string) =>
     request<void>("/investments/" + id + "/price",
       { method: "PATCH", body: { current_price } }),

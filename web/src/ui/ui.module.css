@@ -276,3 +276,43 @@
 @media (prefers-reduced-motion: reduce) {
   .button { transition: none; }
 }
+
+/* --- rows that can be acted on ------------------------------------------- */
+
+.rowActions {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.confirm {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: flex-end;
+  font-size: 0.8rem;
+  color: var(--content-secondary);
+  white-space: nowrap;
+}
+
+/* The row currently loaded into the form above, so it is obvious which one
+   the form is about after the page has been scrolled. */
+.editing td { background: var(--accent-wash); }
+
+/* The form's buttons sit on the grid like a field, so they line up with the
+   inputs rather than floating above them. */
+.formActions {
+  display: flex;
+  gap: var(--space-3);
+  align-items: end;
+  padding-bottom: 1px;
+}
+
+/* Where a field would be, holding something derived rather than asked for. */
+.derived {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+}

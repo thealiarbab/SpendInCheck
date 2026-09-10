@@ -189,3 +189,43 @@ export function Notice({ children, ok }: { children: ReactNode; ok?: boolean }) 
     </p>
   );
 }
+
+/* --- acting on a row ------------------------------------------------------
+   Every list screen has the same two-step delete, so it lives here rather
+   than being re-typed per screen and drifting in wording. */
+
+export function RowActions({ children }: { children: ReactNode }) {
+  return <div className={styles.rowActions}>{children}</div>;
+}
+
+/**
+ * A confirmation that replaces the buttons in the row it is about.
+ *
+ * Not window.confirm: a browser dialog can only name a record by its id,
+ * asks about it somewhere else on the screen, and cannot be styled to say
+ * what a particular delete will actually do.
+ */
+export function Confirm(
+  { question = "Delete?", busy, onYes, onNo }:
+  { question?: string; busy?: boolean; onYes: () => void; onNo: () => void },
+) {
+  return (
+    <div className={styles.confirm}>
+      <span>{question}</span>
+      <Button kind="danger" small disabled={busy} onClick={onYes}>Yes</Button>
+      <Button kind="quiet" small onClick={onNo}>No</Button>
+    </div>
+  );
+}
+
+/** The buttons that submit a Form, sitting on its grid like a field. */
+export function FormActions({ children }: { children: ReactNode }) {
+  return <div className={styles.formActions}>{children}</div>;
+}
+
+/** A slot on the form grid holding something derived rather than asked for. */
+export function Derived({ children }: { children: ReactNode }) {
+  return <div className={styles.derived}>{children}</div>;
+}
+
+export const row = { editing: styles.editing };
