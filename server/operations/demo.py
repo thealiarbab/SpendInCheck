@@ -149,32 +149,30 @@ def _seed(cursor, user_id):
         (user_id, "Transfer"))
     transfer_category = cursor.fetchone()[0]
 
-    # One statement per transfer rather than one for all three: each needs
-    # its own group id, and gen_random_uuid() called once per statement is
-    # what guarantees the two legs of a pair share one and no two pairs do.
-    for transfer_date, transfer_amount, transfer_note in DEMO_TRANSFERS:
-        cursor.execute(
-            "WITH pair AS (SELECT gen_random_uuid() AS group_id) "
-            "INSERT INTO transactions (user_id, txn_date, category_id, amount, "
-            "                          txn_type, description, account_id, "
-            "                          transfer_group_id) "
-            "SELECT %s, %s, %s, %s, leg.txn_type, %s, leg.account_id, pair.group_id "
-            "  FROM pair, (VALUES ('Expense', %s::int), ('Income', %s::int)) "
-            "         AS leg(txn_type, account_id)",
-            (user_id, transfer_date, transfer_category, transfer_amount,
-             transfer_note, account_ids["Current"], account_ids["Cash"]))
-
-    description, category, amount, txn_type, cadence, day = DEMO_RULE
+    # All three transfers in one statement. Each pair needs its own group
+    # id and both legs of a pair need the same one, which is what the CTE
+    # buys: gen_random_uuid() is volatile, so it is called once per row of
+    # `pairs` -- once per transfer -- and the join to `leg` then hands that
+    # single id to both of its legs.
+    #
+    # Three separate statements worked and cost three round trips on the
+    # path a visitor waits through before seeing anything.
     cursor.execute(
-        "INSERT INTO recurring_rules (user_id, description, category_id, "
-        "        account_id, amount, txn_type, cadence, day_of_month, next_run_on) "
-        # date_trunc to the first of next month, computed in the database so
-        # the demo is never seeded with a rule that is already overdue on a
-        # machine whose clock disagrees with the server's.
-        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, "
-        "        (date_trunc('month', CURRENT_DATE) + interval '1 month')::date)",
-        (user_id, description, category_ids[category], account_ids["Current"],
-         amount, txn_type, cadence, day))
+        "WITH pairs AS ("
+        "  SELECT gen_random_uuid() AS group_id, t.txn_date, t.amount, t.note "
+        "    FROM (VALUES " + ", ".join(["(%s::date, %s::numeric, %s::text)"]
+                                        * len(DEMO_TRANSFERS)) + ") "
+        "         AS t(txn_date, amount, note)) "
+        "INSERT INTO transactions (user_id, txn_date, category_id, amount, "
+        "                          txn_type, description, account_id, "
+        "                          transfer_group_id) "
+        "SELECT %s, p.txn_date, %s, p.amount, leg.txn_type, p.note, "
+        "       leg.account_id, p.group_id "
+        "  FROM pairs p, (VALUES ('Expense', %s::int), ('Income', %s::int)) "
+        "         AS leg(txn_type, account_id)",
+        [value for transfer in DEMO_TRANSFERS for value in transfer]
+        + [user_id, transfer_category,
+           account_ids["Current"], account_ids["Cash"]])
 
     execute_values(
         cursor,
