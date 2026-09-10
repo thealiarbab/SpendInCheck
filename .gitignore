@@ -3,3 +3,10 @@ __pycache__/
 CLAUDE.md
 submission/
 .env
+
+# local archive of the retired CBSE submission artifacts
+archive/
+
+# node
+node_modules/
+web/dist/
