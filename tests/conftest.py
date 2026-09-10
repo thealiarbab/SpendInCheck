@@ -85,3 +85,34 @@ def api_account(client):
            "headers": {"X-CSRF-Token": body["csrf_token"]}}
 
     delete_user(body["user"]["id"])
+
+
+@pytest.fixture
+def make_api_account():
+    """Register accounts through the API, each with its own client.
+
+    Separate clients mean separate cookie jars, which is what makes it
+    possible to test that one signed-in account cannot reach another's rows.
+    """
+    app = create_app("test-key")
+    app.config["TESTING"] = True
+    created = []
+
+    def _make():
+        client = app.test_client()
+        tag = uuid.uuid4().hex[:10]
+        token = client.get("/api/v1/auth/session").get_json()["csrf_token"]
+        response = client.post("/api/v1/auth/register", headers={"X-CSRF-Token": token},
+                               json={"username": f"test_{tag}",
+                                     "email": f"test_{tag}@example.invalid",
+                                     "password": "a-long-enough-password"})
+        assert response.status_code == 201, response.get_json()
+        body = response.get_json()
+        created.append(body["user"]["id"])
+        client.headers = {"X-CSRF-Token": body["csrf_token"]}
+        return client
+
+    yield _make
+
+    for user_id in created:
+        delete_user(user_id)

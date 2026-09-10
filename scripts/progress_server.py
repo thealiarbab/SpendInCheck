@@ -12,10 +12,12 @@ Standard library only, deliberately: this is a window onto the work, and it
 should never be a reason for the project to gain a dependency.
 """
 
+import hashlib
 import json
 import re
 import subprocess
 import sys
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -99,6 +101,18 @@ def git(*args):
                               text=True, timeout=15).stdout.strip()
     except (OSError, subprocess.SubprocessError):
         return ""
+
+
+def fingerprint():
+    """A cheap signature of everything the page shows.
+
+    Called once a second per connected viewer, so it must stay far cheaper
+    than collect(): two short git commands rather than a full log walk plus
+    reading every test file.
+    """
+    head = git("rev-parse", "HEAD")
+    dirty = git("status", "--porcelain")
+    return hashlib.sha1((head + "\n" + dirty).encode("utf-8")).hexdigest()
 
 
 def collect():
@@ -244,6 +258,21 @@ h1{font-family:var(--serif);font-weight:400;font-size:50px;line-height:1.04;marg
 .kind.fix{color:var(--debit);border-color:#4a2b23}
 .kind.test{color:var(--brass-dim);border-color:#3d3018}
 .empty{color:var(--paper-mute);font-size:13px;font-style:italic}
+
+.toolbar{display:flex;gap:10px;align-items:center;margin:22px 0 0}
+.toggle{font-family:var(--mono);font-size:10.5px;letter-spacing:1.2px;text-transform:uppercase;
+        cursor:pointer;background:none;color:var(--paper-dim);border:1px solid var(--rule);
+        padding:7px 14px}
+.toggle:hover{color:var(--ink);background:var(--brass);border-color:var(--brass)}
+.toggle:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+
+.phead{cursor:pointer;user-select:none}
+.chev{font-family:var(--mono);font-size:11px;color:var(--paper-mute);
+      transition:transform .15s ease;display:inline-block;width:12px}
+.phase.open .chev{transform:rotate(90deg);color:var(--brass)}
+.phase:not(.open) .commits,.phase:not(.open) .blurb,.phase:not(.open) .open-list{display:none}
+.phase:not(.open){padding:14px 0}
+@media(prefers-reduced-motion:reduce){.chev{transition:none}}
 footer{margin-top:60px;padding-top:20px;border-top:1px solid var(--rule);
        color:var(--paper-mute);font-size:12.5px;display:flex;justify-content:space-between;
        gap:14px;flex-wrap:wrap}
@@ -259,6 +288,10 @@ footer{margin-top:60px;padding-top:20px;border-top:1px solid var(--rule);
     <div class="stat-row" id="stats"></div>
     <div class="now-strip" id="now"></div>
     <div class="ticks" id="ticks"></div>
+    <div class="toolbar">
+      <button class="toggle" id="toggle-all" type="button"></button>
+      <span class="toggle" style="border:0;padding-left:0;cursor:default">click a phase to open it</span>
+    </div>
   </header>
   <main id="phases"></main>
   <footer>
@@ -290,7 +323,41 @@ function retime() {
   });
 }
 
+// The page rewrites itself every few seconds, so which phases are open has to
+// live outside the DOM or every refresh would slam them shut.
+const state = {
+  compact: localStorage.getItem("compact") !== "0",
+  open: new Set(JSON.parse(localStorage.getItem("openPhases") || "[]")),
+};
+
+function saveState() {
+  localStorage.setItem("compact", state.compact ? "1" : "0");
+  localStorage.setItem("openPhases", JSON.stringify([...state.open]));
+}
+
+function isOpen(p) {
+  if (!state.compact) return true;
+  return state.open.has(p.n);
+}
+
+function wirePhases() {
+  document.querySelectorAll(".phead").forEach(head => {
+    head.addEventListener("click", () => {
+      const n = Number(head.dataset.phase);
+      state.open.has(n) ? state.open.delete(n) : state.open.add(n);
+      // Opening one phase by hand means the reader wants detail on demand,
+      // which is compact mode -- not the everything-expanded view.
+      state.compact = true;
+      saveState();
+      render(window.__last);
+    });
+  });
+}
+
 function render(d) {
+  window.__last = d;
+  document.getElementById("toggle-all").textContent =
+    state.compact ? "Expand all" : "Collapse all";
   document.getElementById("stats").innerHTML = [
     [d.done + " / 11", "phases complete"],
     [d.total_commits, "commits"],
@@ -310,16 +377,17 @@ function render(d) {
     d.phases.map(p => `<div class="tick ${esc(p.state)}" title="Phase ${p.n} — ${esc(p.name)}"></div>`).join("");
 
   document.getElementById("phases").innerHTML = d.phases.map(p => `
-    <section class="phase ${esc(p.state)}">
+    <section class="phase ${esc(p.state)} ${isOpen(p) ? "open" : ""}">
       <div class="pnum">${String(p.n).padStart(2, "0")}</div>
       <div>
-        <div class="phead">
+        <div class="phead" data-phase="${p.n}">
+          <span class="chev">&#9654;</span>
           <h2 class="pname">${esc(p.name)}</h2>
           <span class="tag ${esc(p.state)}">${esc({done:"Done",now:"In progress",started:"Started",next:"Pending"}[p.state])}</span>
           <span class="count">${p.count} commit${p.count === 1 ? "" : "s"}</span>
         </div>
         <p class="blurb">${esc(p.blurb)}</p>
-        ${p.open.length ? `<ul class="open">${p.open.map(o => `<li>${esc(o)}</li>`).join("")}</ul>` : ""}
+        ${p.open.length ? `<ul class="open open-list">${p.open.map(o => `<li>${esc(o)}</li>`).join("")}</ul>` : ""}
         ${p.commits.length ? `<ul class="commits">${p.commits.slice().reverse().map((c, i) => `
           <li class="${i === 0 && p.state === "now" ? "fresh" : ""}">
             <span class="kind ${esc(c.kind)}">${esc(c.kind)}</span><span class="c-sha">${esc(c.sha)}</span><span class="c-sub">${esc(c.subject.replace(/^[a-z]+(\([^)]*\))?:\s*/, ""))}</span><span class="c-when" data-at="${c.at}"></span>
@@ -328,32 +396,105 @@ function render(d) {
       </div>
     </section>`).join("");
 
-  document.getElementById("stamp").textContent =
-    "updated " + new Date().toLocaleTimeString();
+  wirePhases();
 }
 
-async function tick() {
-  const beat = document.getElementById("beat");
+const beat = () => document.getElementById("beat");
+let lastPush = Date.now();
+
+function receive(data) {
+  render(data);
+  retime();
+  lastPush = Date.now();
+  beat().textContent = "live";
+}
+
+// Server-sent events: the page changes the moment a commit lands, rather than
+// whenever the next poll happens to come round.
+function connect() {
+  const source = new EventSource("/stream");
+  source.onmessage = e => receive(JSON.parse(e.data));
+  source.onerror = () => {
+    beat().textContent = "reconnecting";
+    // EventSource retries on its own; this only reports the gap.
+  };
+}
+
+async function pollOnce() {
   try {
-    const r = await fetch("/progress.json", { cache: "no-store" });
-    render(await r.json());
-    retime();
-    beat.textContent = "live";
+    receive(await (await fetch("/progress.json", { cache: "no-store" })).json());
   } catch (e) {
-    beat.textContent = "server stopped";
+    beat().textContent = "server stopped";
   }
 }
-tick();
-setInterval(tick, 4000);
-// The clock runs independently of the data, so times stay honest between polls.
-setInterval(retime, 1000);
+document.getElementById("toggle-all").addEventListener("click", () => {
+  state.compact = !state.compact;
+  // Expanding everything clears the hand-picked set, so collapsing again
+  // returns to a clean slate rather than whatever was open before.
+  if (!state.compact) state.open.clear();
+  saveState();
+  render(window.__last);
+});
+
+// One paint immediately so the page is never blank, then live updates.
+pollOnce().then(connect);
+
+// The clock runs on its own, so every relative label counts up smoothly
+// whether or not anything has changed.
+setInterval(() => {
+  retime();
+  const idle = Math.round((Date.now() - lastPush) / 1000);
+  const stamp = document.getElementById("stamp");
+  if (stamp) {
+    stamp.textContent = idle < 2 ? "just updated"
+      : `no change for ${idle < 60 ? idle + "s" : Math.floor(idle / 60) + "m " + (idle % 60) + "s"}`;
+  }
+}, 1000);
 </script>
 </body></html>
 """
 
 
 class Handler(BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+
+    def stream(self):
+        """Push a fresh payload the moment the repository changes.
+
+        Server-sent events rather than polling: the page updates when a commit
+        lands instead of up to four seconds later, and an unchanged repository
+        costs one hash per second rather than a full rebuild.
+        """
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Connection", "keep-alive")
+        self.end_headers()
+
+        last = None
+        beat = 0.0
+        try:
+            while True:
+                current = fingerprint()
+                if current != last:
+                    last = current
+                    payload = json.dumps(collect())
+                    self.wfile.write(("data: " + payload + "\n\n").encode("utf-8"))
+                    self.wfile.flush()
+                    beat = time.time()
+                elif time.time() - beat > 15:
+                    # A comment keeps proxies and the browser from deciding the
+                    # idle connection is dead.
+                    self.wfile.write(b": keep-alive\n\n")
+                    self.wfile.flush()
+                    beat = time.time()
+                time.sleep(1)
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            return  # the tab was closed; nothing to clean up
+
     def do_GET(self):
+        if self.path.startswith("/stream"):
+            return self.stream()
         if self.path.startswith("/progress.json"):
             payload = json.dumps(collect()).encode("utf-8")
             self.send_response(200)
