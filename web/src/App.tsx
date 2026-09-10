@@ -6,6 +6,7 @@ import { Dashboard } from "./features/dashboard/Dashboard";
 import { Transactions } from "./features/transactions/Transactions";
 import { Accounts } from "./features/accounts/Accounts";
 import { Categories } from "./features/categories/Categories";
+import { Import } from "./features/importing/Import";
 import { Budgets } from "./features/budgets/Budgets";
 import { Holdings } from "./features/holdings/Holdings";
 import { Reports } from "./features/reports/Reports";
@@ -49,6 +50,7 @@ export default function App() {
         <Route path="budgets" element={<Private><Budgets /></Private>} />
         <Route path="investments" element={<Private><Holdings /></Private>} />
         <Route path="reports" element={<Private><Reports /></Private>} />
+        <Route path="import" element={<Private><Import /></Private>} />
         <Route path="settings" element={<Private><Settings /></Private>} />
         {/* Development-only: the brass/paper comparison. Tree-shaken from
             production builds by the import.meta.env.DEV guard below. */}

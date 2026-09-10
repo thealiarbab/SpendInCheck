@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import type { AccountRow, Category, Tag, TransactionFilters } from "../../lib/api";
 import { Button } from "../../ui";
 import styles from "./FilterBar.module.css";
@@ -158,6 +159,9 @@ export function FilterBar(
           <a className={styles.download} href={exportHref} download>
             Export CSV
           </a>
+          {/* Beside the export, because the two are the same thought in
+              opposite directions and this is where somebody looks for it. */}
+          <Link className={styles.download} to="/import">Import</Link>
         </div>
       </div>
     </div>

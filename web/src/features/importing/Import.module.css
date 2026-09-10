@@ -1,0 +1,95 @@
+.pick { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+
+.file { font-size: 0.8125rem; color: var(--content-secondary); }
+
+.filename { font-size: 0.8125rem; color: var(--content-muted); }
+
+/* Pasting and choosing a file both end up here, so there is one path to
+   test and one thing to look at before reading. */
+.paste {
+  width: 100%;
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--line-default);
+  border-radius: 4px;
+  background: var(--surface-inset);
+  color: var(--content-primary);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1.6;
+  resize: vertical;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.paste:focus { outline: 2px solid var(--line-focus); outline-offset: 1px; }
+
+.options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-top: var(--space-4);
+}
+
+.note {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.6;
+  color: var(--content-muted);
+  max-width: 56ch;
+}
+
+.gap { height: var(--space-5); }
+
+.problems { padding: var(--space-4) var(--space-5) 0; }
+
+.summary {
+  margin: 0;
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 0.875rem;
+  color: var(--content-secondary);
+}
+
+.summary strong { color: var(--content-primary); }
+
+.columns {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.6875rem;
+  color: var(--content-muted);
+}
+
+.line { color: var(--content-muted); font-size: 0.75rem; }
+
+/* A skipped row is dimmed rather than hidden: the reader is deciding
+   whether to import, and what will not import is part of that decision. */
+.skippedRow { opacity: 0.6; }
+
+.reason { color: var(--money-debit); font-size: 0.8125rem; }
+
+.fallback { font-style: italic; color: var(--content-muted); font-size: 0.8125rem; }
+
+.more {
+  margin: 0;
+  padding: var(--space-3) var(--space-5);
+  font-size: 0.8125rem;
+  color: var(--content-muted);
+}
+
+.confirm {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--line-soft);
+}
