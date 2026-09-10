@@ -11,9 +11,14 @@ from .. import db
 def set_budget(user_id, category_id, month_year, budget_limit):
     """Create or update the budget limit for a category in a given month.
 
-    Uses INSERT ... ON CONFLICT ... DO UPDATE against the uniq_cat_month
-    constraint, so calling this twice for the same category/month simply
-    overwrites the limit instead of raising a duplicate-key error.
+    Uses INSERT ... ON CONFLICT ... DO UPDATE against uniq_user_cat_month,
+    so calling this twice for the same category and month overwrites the
+    limit instead of raising a duplicate-key error.
+
+    The conflict target must name that constraint's columns exactly. Naming
+    a set Postgres has no unique index for is not a no-op -- the statement
+    fails outright, which is how this silently stopped saving budgets when
+    the constraint gained user_id.
     """
     connection = None
     try:
@@ -28,7 +33,7 @@ def set_budget(user_id, category_id, month_year, budget_limit):
             WHERE EXISTS (
                 SELECT 1 FROM categories WHERE category_id = %s AND user_id = %s
             )
-            ON CONFLICT (category_id, month_year)
+            ON CONFLICT (user_id, category_id, month_year)
             DO UPDATE SET budget_limit = EXCLUDED.budget_limit
         """
         cursor.execute(query, (user_id, category_id, month_year, budget_limit,
