@@ -32,7 +32,7 @@ BASELINE = "b2c9a7c"
 # mapping rather than a range. Any commit not listed is treated as part of
 # CURRENT_PHASE, which is what keeps this accurate as new work lands without
 # anyone editing the file.
-CURRENT_PHASE = 4
+CURRENT_PHASE = 5
 
 COMMIT_PHASE = {
     0: ["5e3ab5e", "6308244", "931dabe", "490f434", "c030a97", "e166bb4", "efb70ab"],
@@ -70,11 +70,13 @@ PHASES = [
               "Decided: ship both, toggleable. Every primitive reads semantic tokens, "
               "so a screen is correct in brass and paper at once.",
      "open": []},
-    {"n": 4, "name": "Port the six existing screens", "state": "now",
-     "blurb": "Parity with the Jinja pages, plus Indian rupee grouping and field-level "
-              "errors. Adds the CRUD the old pages never had.",
-     "open": ["Categories", "Budgets", "Holdings", "Reports"]},
-    {"n": 5, "name": "Search, filter, pagination, export", "state": "next",
+    {"n": 4, "name": "Port the six existing screens", "state": "done",
+     "blurb": "Parity with the Jinja pages, plus rupee grouping and field-level "
+              "errors. Added the CRUD the old pages never had: editing a "
+              "transaction, renaming a category, deleting one with everything "
+              "filed under it reassigned, and deleting a holding.",
+     "open": []},
+    {"n": 5, "name": "Search, filter, pagination, export", "state": "now",
      "blurb": "search_transactions replaces get_all_transactions. Column names come "
               "from a whitelist; only values go through %s.",
      "open": []},
