@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "./app/ThemeProvider";
+import { SessionProvider } from "./app/SessionProvider";
 import { ErrorBoundary } from "./app/ErrorBoundary";
 import App from "./App";
 import "./styles/index.css";
@@ -26,7 +27,9 @@ createRoot(document.getElementById("root")!).render(
         <QueryClientProvider client={queryClient}>
           {/* basename matches vite's base. Phase 8 flips both to "/". */}
           <BrowserRouter basename="/app">
-            <App />
+            <SessionProvider>
+              <App />
+            </SessionProvider>
           </BrowserRouter>
         </QueryClientProvider>
       </ThemeProvider>

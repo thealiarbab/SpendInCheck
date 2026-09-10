@@ -1,5 +1,9 @@
 import { Route, Routes } from "react-router-dom";
 import { Shell } from "./app/Shell";
+import { SignedOut } from "./app/SignedOut";
+import { useSession } from "./app/SessionProvider";
+import { Dashboard } from "./features/dashboard/Dashboard";
+import { Loading } from "./ui";
 import { ThemeLab } from "./features/themelab/ThemeLab";
 
 function Placeholder({ title }: { title: string }) {
@@ -13,11 +17,25 @@ function Placeholder({ title }: { title: string }) {
   );
 }
 
+/**
+ * Screens that need an account.
+ *
+ * "Checking" renders as loading rather than as the signed-out screen -- the
+ * difference is what stops the app flashing a sign-in prompt at somebody who
+ * is already signed in, on every load.
+ */
+function Private({ children }: { children: React.ReactNode }) {
+  const { status } = useSession();
+  if (status === "checking") return <Loading what="your ledger" />;
+  if (status === "signed-out") return <SignedOut />;
+  return <>{children}</>;
+}
+
 export default function App() {
   return (
     <Routes>
       <Route element={<Shell />}>
-        <Route index element={<Placeholder title="Dashboard" />} />
+        <Route index element={<Private><Dashboard /></Private>} />
         <Route path="transactions" element={<Placeholder title="Transactions" />} />
         <Route path="budgets" element={<Placeholder title="Budgets" />} />
         <Route path="investments" element={<Placeholder title="Holdings" />} />
