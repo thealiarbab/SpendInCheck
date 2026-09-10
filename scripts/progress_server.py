@@ -150,11 +150,23 @@ def collect():
     dirty = [line[3:] for line in git("status", "--porcelain").splitlines() if line]
     unpushed = git("rev-list", "--count", "origin/main..HEAD") or "?"
 
-    # Counting test functions by reading the files is instant; running pytest
-    # here would make every page refresh wait on the database.
+    # Counting the def lines is instant; asking pytest would make every page
+    # refresh wait on the database. It undercounts, because a parametrised
+    # function is one def and several cases -- hence the label below.
     tests = 0
     for path in (REPO / "tests").glob("test_*.py"):
         tests += len(re.findall(r"^def test_", path.read_text(encoding="utf-8"), re.M))
+
+    # Recorded by scripts/benchmark.py rather than measured here: a real
+    # measurement talks to Supabase five times per entry, which is not
+    # something a page refresh should do.
+    speed = None
+    bench = REPO / "docs" / "benchmarks.json"
+    if bench.exists():
+        try:
+            speed = json.loads(bench.read_text(encoding="utf-8"))
+        except ValueError:
+            speed = None
 
     phases = []
     for phase in PHASES:
@@ -168,6 +180,7 @@ def collect():
         "unpushed": unpushed,
         "dirty": dirty,
         "latest": commits[-1] if commits else None,
+        "speed": speed,
         "done": sum(1 for p in PHASES if p["state"] == "done"),
     }
 
@@ -260,6 +273,26 @@ h1{font-family:var(--serif);font-weight:400;font-size:50px;line-height:1.04;marg
 .kind.test{color:var(--brass-dim);border-color:#3d3018}
 .empty{color:var(--paper-mute);font-size:13px;font-style:italic}
 
+.speed{border-top:1px solid var(--rule);margin-top:30px;padding-top:22px}
+.speedHead{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+           flex-wrap:wrap;margin-bottom:14px}
+.speedTitle{font-family:var(--serif);font-size:20px;font-weight:400;margin:0}
+.speedWhen{font-family:var(--mono);font-size:10.5px;letter-spacing:1.1px;
+           text-transform:uppercase;color:var(--paper-mute)}
+.bench{display:grid;grid-template-columns:1fr 74px;gap:6px 14px;align-items:center;
+       padding:9px 0;border-bottom:1px solid var(--rule-soft)}
+.bench:last-child{border-bottom:0}
+.benchLabel{font-size:13.5px;color:var(--paper-dim)}
+.benchNote{font-size:11.5px;color:var(--paper-mute);grid-column:1/-1;margin-top:-4px}
+.benchNow{font-family:var(--mono);font-size:13.5px;color:var(--paper);text-align:right;
+          font-variant-numeric:tabular-nums}
+.benchBar{grid-column:1/-1;height:5px;background:var(--rule-soft);position:relative;
+          margin-top:2px}
+.benchFill{position:absolute;inset:0 auto 0 0;background:var(--credit)}
+.benchWas{position:absolute;top:-1px;bottom:-1px;width:2px;background:var(--debit)}
+.benchDelta{font-family:var(--mono);font-size:11px;color:var(--credit);grid-column:1/-1}
+.benchDelta.flat{color:var(--paper-mute)}
+
 .toolbar{display:flex;gap:10px;align-items:center;margin:22px 0 0}
 .toggle{font-family:var(--mono);font-size:10.5px;letter-spacing:1.2px;text-transform:uppercase;
         cursor:pointer;background:none;color:var(--paper-dim);border:1px solid var(--rule);
@@ -289,6 +322,7 @@ footer{margin-top:60px;padding-top:20px;border-top:1px solid var(--rule);
     <div class="stat-row" id="stats"></div>
     <div class="now-strip" id="now"></div>
     <div class="ticks" id="ticks"></div>
+    <div class="speed" id="speed"></div>
     <div class="toolbar">
       <button class="toggle" id="toggle-all" type="button"></button>
       <span class="toggle" style="border:0;padding-left:0;cursor:default">click a phase to open it</span>
@@ -362,7 +396,7 @@ function render(d) {
   document.getElementById("stats").innerHTML = [
     [d.done + " / 11", "phases complete"],
     [d.total_commits, "commits"],
-    [d.tests, "tests"],
+    [d.tests, "test functions"],
     [d.unpushed, "unpushed"],
   ].map(([n, l]) => `<div class="stat"><span class="n">${esc(n)}</span><span class="l">${esc(l)}</span></div>`).join("");
 
@@ -373,6 +407,36 @@ function render(d) {
     ${latest.why ? `<div class="why">${esc(latest.why)}</div>` : ""}
     ${d.dirty.length ? `<div class="dirty">${d.dirty.length} file${d.dirty.length > 1 ? "s" : ""} changed but not committed &mdash; ${d.dirty.slice(0, 4).map(esc).join(", ")}${d.dirty.length > 4 ? " …" : ""}</div>` : ""}
   ` : `<span class="k">Waiting for the first commit</span>`;
+
+  const speed = d.speed;
+  const speedEl = document.getElementById("speed");
+  if (!speed) {
+    speedEl.innerHTML = "";
+  } else {
+    // Bars are scaled against the slowest baseline, so every row shares one
+    // scale and the shortest bar really is the fastest path.
+    const scale = Math.max(...speed.entries.map(e => Math.max(e.baseline, e.best)));
+    speedEl.innerHTML = `
+      <div class="speedHead">
+        <h2 class="speedTitle">Speed</h2>
+        <span class="speedWhen">measured <span data-at="${speed.measured_at}"></span> &middot; best of ${speed.runs}</span>
+      </div>
+      ${speed.entries.map(e => {
+        const faster = e.baseline > 0 ? Math.round((1 - e.best / e.baseline) * 100) : 0;
+        return `<div class="bench">
+          <span class="benchLabel">${esc(e.label)}</span>
+          <span class="benchNow">${e.best} ms</span>
+          <span class="benchNote">${esc(e.note)}</span>
+          <span class="benchBar">
+            <span class="benchFill" style="width:${Math.max(1, (e.best / scale) * 100)}%"></span>
+            <span class="benchWas" style="left:${Math.min(99.6, (e.baseline / scale) * 100)}%" title="was ${e.baseline} ms"></span>
+          </span>
+          <span class="benchDelta${faster > 0 ? "" : " flat"}">${
+            faster > 0 ? faster + "% faster — was " + e.baseline + " ms" : "unchanged"
+          }</span>
+        </div>`;
+      }).join("")}`;
+  }
 
   document.getElementById("ticks").innerHTML =
     d.phases.map(p => `<div class="tick ${esc(p.state)}" title="Phase ${p.n} — ${esc(p.name)}"></div>`).join("");

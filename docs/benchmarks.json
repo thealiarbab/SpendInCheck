@@ -1,0 +1,41 @@
+{
+  "measured_at": 1789018880,
+  "runs": 5,
+  "entries": [
+    {
+      "label": "Open the demo, to a screen with figures",
+      "best": 516,
+      "median": 546,
+      "baseline": 3100,
+      "note": "Session, account creation, seeding and the dashboard payload."
+    },
+    {
+      "label": "Dashboard, already signed in",
+      "best": 298,
+      "median": 304,
+      "baseline": 489,
+      "note": "Holdings and recent rows together, sharing one connection."
+    },
+    {
+      "label": "Transactions list",
+      "best": 255,
+      "median": 269,
+      "baseline": 234,
+      "note": "A single query."
+    },
+    {
+      "label": "Budget vs actual report",
+      "best": 257,
+      "median": 280,
+      "baseline": 312,
+      "note": "Joins budgets to transactions."
+    },
+    {
+      "label": "Session check, touches no database",
+      "best": 2,
+      "median": 2,
+      "baseline": 6,
+      "note": "The floor: what a request costs with no query in it."
+    }
+  ]
+}
