@@ -82,11 +82,27 @@ class Handler(BaseHTTPRequestHandler):
 
     def handle_request(self):
         path = self.path
+
+        # The root goes to the client being built, not the pages being
+        # replaced. Opening the mirror should show the work in progress --
+        # landing on the old site instead made the mirror look frozen.
+        # Every Jinja page is still there at its own address, which is what
+        # makes the two comparable: /transactions beside /app/transactions.
+        if path in ("", "/"):
+            return self.redirect("/app/")
+
         target = self.target_for(path)
 
         if target is VITE and not reachable(VITE):
             return self.serve_built(path)
         return self.proxy(target, path)
+
+    def redirect(self, where):
+        """Send the reader somewhere else on this same origin."""
+        self.send_response(302)
+        self.send_header("Location", where)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     # --- proxying -----------------------------------------------------------
 
@@ -197,9 +213,12 @@ if __name__ == "__main__":
     flask_up = reachable(FLASK)
     vite_up = reachable(VITE)
     print(f"SpendInCheck mirror -> http://localhost:{PORT}")
-    print(f"  /       -> Flask on {FLASK[1]}   {'up' if flask_up else 'DOWN'}")
-    print(f"  /app    -> Vite on {VITE[1]}    "
+    print(f"  /        -> the React client being built")
+    print(f"  /app/*   -> Vite on {VITE[1]}    "
           f"{'up' if vite_up else 'down, will serve web/dist'}")
+    print(f"  anything else -> Flask on {FLASK[1]}   "
+          f"{'up' if flask_up else 'DOWN'}")
+    print(f"  compare: /transactions is the old page, /app/transactions the new")
     print("  ctrl-c to stop\n")
     try:
         ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()

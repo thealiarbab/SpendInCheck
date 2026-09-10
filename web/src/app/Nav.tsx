@@ -6,6 +6,7 @@ import styles from "./Nav.module.css";
 const PAGES = [
   { to: "/", label: "Dashboard", end: true },
   { to: "/transactions", label: "Transactions" },
+  { to: "/categories", label: "Categories" },
   { to: "/budgets", label: "Budgets" },
   { to: "/investments", label: "Holdings" },
   { to: "/reports", label: "Reports" },

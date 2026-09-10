@@ -4,6 +4,7 @@ import { SignedOut } from "./app/SignedOut";
 import { useSession } from "./app/SessionProvider";
 import { Dashboard } from "./features/dashboard/Dashboard";
 import { Transactions } from "./features/transactions/Transactions";
+import { Categories } from "./features/categories/Categories";
 import { Loading } from "./ui";
 import { ThemeLab } from "./features/themelab/ThemeLab";
 
@@ -38,6 +39,7 @@ export default function App() {
       <Route element={<Shell />}>
         <Route index element={<Private><Dashboard /></Private>} />
         <Route path="transactions" element={<Private><Transactions /></Private>} />
+        <Route path="categories" element={<Private><Categories /></Private>} />
         <Route path="budgets" element={<Placeholder title="Budgets" />} />
         <Route path="investments" element={<Placeholder title="Holdings" />} />
         <Route path="reports" element={<Placeholder title="Reports" />} />
