@@ -39,7 +39,7 @@ def _keep_rollover_honest(user_id, *category_ids):
         operations.refresh_rollover(user_id, category_id)
 
 LIST_FIELDS = ["id", "date", "category", "amount", "type", "description",
-               "account", "transfer_group"]
+               "account", "transfer_group", "tags"]
 RECORD_FIELDS = ["id", "date", "category_id", "amount", "type", "description",
                  "account_id", "transfer_group"]
 TYPES = ["Income", "Expense"]
@@ -140,13 +140,9 @@ def list_transactions():
 
     rows, total = operations.search_transactions(user_id, filters, page, per_page)
 
+    # Tags arrive with the rows: the query carries them, so there is no
+    # second request and no per-row lookup here.
     items = money.rows(LIST_FIELDS, rows, money_places())
-    # One query for the whole page rather than one per row: twenty-five
-    # extra round trips to a hosted database costs more than the page does.
-    carried = operations.tags_for_transactions(
-        user_id, [item["id"] for item in items])
-    for item in items:
-        item["tags"] = carried.get(item["id"], [])
 
     return jsonify({
         "items": items,

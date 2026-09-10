@@ -278,31 +278,39 @@ def materialise_due(user_id=None, today=None):
         connection = db.get_connection()
         cursor = connection.cursor()
 
-        # FOR UPDATE SKIP LOCKED: two overlapping sweeps take different
-        # rules rather than queueing on the same ones, and neither waits.
-        # The unique index is what makes a double-write impossible; this is
-        # what stops the second run doing the work twice for nothing.
-        cursor.execute(
-            "SELECT rule_id, user_id, description, category_id, account_id, "
-            "       amount, txn_type, cadence, day_of_month, next_run_on, ends_on "
-            "  FROM recurring_rules "
-            " WHERE NOT is_paused AND next_run_on <= %s "
-            "   AND (%s IS NULL OR user_id = %s) "
-            " ORDER BY rule_id "
-            "   FOR UPDATE SKIP LOCKED",
-            (today, user_id, user_id))
-        due = cursor.fetchall()
-
-        written = 0
-        for rule in due:
-            written += _materialise_one(cursor, rule, today)
-
-        connection.commit()
-        return {"rules": len(due), "transactions": written}
+        # One transaction around the whole sweep. FOR UPDATE only holds a
+        # lock inside one, and writing a row without advancing its rule --
+        # or advancing without writing -- is exactly the split the unique
+        # index exists to make harmless. Both together, or neither.
+        with db.transaction(connection):
+            written = _sweep(cursor, user_id, today)
+        return written
     except Error as e:
-        if connection:
-            connection.rollback()
         print(f"Error materialising recurring rules: {e}")
         return {"rules": 0, "transactions": 0}
     finally:
         db.close_connection(connection)
+
+
+def _sweep(cursor, user_id, today):
+    """Select the due rules and materialise them, inside an open transaction."""
+    # FOR UPDATE SKIP LOCKED: two overlapping sweeps take different
+    # rules rather than queueing on the same ones, and neither waits.
+    # The unique index is what makes a double-write impossible; this is
+    # what stops the second run doing the work twice for nothing.
+    cursor.execute(
+        "SELECT rule_id, user_id, description, category_id, account_id, "
+        "       amount, txn_type, cadence, day_of_month, next_run_on, ends_on "
+        "  FROM recurring_rules "
+        " WHERE NOT is_paused AND next_run_on <= %s "
+        "   AND (%s IS NULL OR user_id = %s) "
+        " ORDER BY rule_id "
+        "   FOR UPDATE SKIP LOCKED",
+        (today, user_id, user_id))
+    due = cursor.fetchall()
+
+    written = 0
+    for rule in due:
+        written += _materialise_one(cursor, rule, today)
+
+    return {"rules": len(due), "transactions": written}

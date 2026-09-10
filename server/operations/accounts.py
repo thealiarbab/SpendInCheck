@@ -222,27 +222,25 @@ def delete_account(user_id, account_id, reassign_to=None):
         connection = db.get_connection()
         cursor = connection.cursor()
 
-        if reassign_to is not None:
-            cursor.execute("UPDATE transactions SET account_id = %s "
-                           " WHERE user_id = %s AND account_id = %s",
-                           (reassign_to, user_id, account_id))
-            cursor.execute(
-                "UPDATE transactions SET transfer_group_id = NULL "
-                " WHERE user_id = %s AND transfer_group_id IN ("
-                "       SELECT transfer_group_id FROM transactions "
-                "        WHERE user_id = %s AND transfer_group_id IS NOT NULL "
-                "        GROUP BY transfer_group_id "
-                "       HAVING COUNT(DISTINCT account_id) < 2)",
-                (user_id, user_id))
+        with db.transaction(connection):
+            if reassign_to is not None:
+                cursor.execute("UPDATE transactions SET account_id = %s "
+                               " WHERE user_id = %s AND account_id = %s",
+                               (reassign_to, user_id, account_id))
+                cursor.execute(
+                    "UPDATE transactions SET transfer_group_id = NULL "
+                    " WHERE user_id = %s AND transfer_group_id IN ("
+                    "       SELECT transfer_group_id FROM transactions "
+                    "        WHERE user_id = %s AND transfer_group_id IS NOT NULL "
+                    "        GROUP BY transfer_group_id "
+                    "       HAVING COUNT(DISTINCT account_id) < 2)",
+                    (user_id, user_id))
 
-        cursor.execute("DELETE FROM accounts WHERE account_id = %s AND user_id = %s",
-                       (account_id, user_id))
-        deleted = cursor.rowcount > 0
-        connection.commit()
+            cursor.execute("DELETE FROM accounts WHERE account_id = %s AND user_id = %s",
+                           (account_id, user_id))
+            deleted = cursor.rowcount > 0
         return deleted
     except Error as e:
-        if connection:
-            connection.rollback()
         print(f"Error deleting account: {e}")
         return False
     finally:
@@ -280,6 +278,14 @@ def _transfer_category_id(cursor, user_id):
     return None
 
 
+class _NoTransferCategory(Exception):
+    """Raised inside the transaction to undo a transfer that cannot stand.
+
+    A return would commit what had already been written; raising is what
+    makes db.transaction roll it back. Private, and caught immediately.
+    """
+
+
 def transfer(user_id, from_account_id, to_account_id, amount, txn_date,
              description=None):
     """Move money between two of this user's accounts.
@@ -303,36 +309,39 @@ def transfer(user_id, from_account_id, to_account_id, amount, txn_date,
         connection = db.get_connection()
         cursor = connection.cursor()
 
-        category_id = _transfer_category_id(cursor, user_id)
-        if category_id is None:
-            connection.rollback()
-            return None
+        # The category may have to be created, and the two legs must not
+        # exist without each other, so the lot is one transaction.
+        with db.transaction(connection):
+            category_id = _transfer_category_id(cursor, user_id)
+            if category_id is None:
+                raise _NoTransferCategory()
 
-        cursor.execute(
-            "WITH pair AS (SELECT gen_random_uuid() AS group_id) "
-            "INSERT INTO transactions (user_id, txn_date, category_id, amount, "
-            "                          txn_type, description, account_id, "
-            "                          transfer_group_id) "
-            "SELECT %s, %s, %s, %s, leg.txn_type, %s, leg.account_id, pair.group_id "
-            "  FROM pair, (VALUES ('Expense', %s::int), ('Income', %s::int)) "
-            "         AS leg(txn_type, account_id) "
-            "  JOIN accounts a ON a.account_id = leg.account_id AND a.user_id = %s "
-            "RETURNING transfer_group_id",
-            (user_id, txn_date, category_id, amount, description,
-             from_account_id, to_account_id, user_id))
-        rows = cursor.fetchall()
-        # The join to accounts drops a leg whose account is not this user's,
-        # so anything other than two rows means the transfer was not what it
-        # claimed to be.
-        if len(rows) != 2:
-            connection.rollback()
-            return None
+            cursor.execute(
+                "WITH pair AS (SELECT gen_random_uuid() AS group_id) "
+                "INSERT INTO transactions (user_id, txn_date, category_id, amount, "
+                "                          txn_type, description, account_id, "
+                "                          transfer_group_id) "
+                "SELECT %s, %s, %s, %s, leg.txn_type, %s, leg.account_id, "
+                "       pair.group_id "
+                "  FROM pair, (VALUES ('Expense', %s::int), ('Income', %s::int)) "
+                "         AS leg(txn_type, account_id) "
+                "  JOIN accounts a ON a.account_id = leg.account_id "
+                "                 AND a.user_id = %s "
+                "RETURNING transfer_group_id",
+                (user_id, txn_date, category_id, amount, description,
+                 from_account_id, to_account_id, user_id))
+            rows = cursor.fetchall()
+            # The join to accounts drops a leg whose account is not this
+            # user's, so anything other than two rows means the transfer was
+            # not what it claimed to be -- and raising is what undoes the
+            # leg that did land.
+            if len(rows) != 2:
+                raise _NoTransferCategory()
 
-        connection.commit()
         return str(rows[0][0])
+    except _NoTransferCategory:
+        return None
     except Error as e:
-        if connection:
-            connection.rollback()
         print(f"Error transferring between accounts: {e}")
         return None
     finally:

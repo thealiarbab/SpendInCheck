@@ -82,7 +82,7 @@ def test_a_signed_out_visitor_is_sent_to_the_front(client):
 
 EXPECTED_COLUMNS = {
     # operation                     columns  what the last change added
-    "get_all_transactions": (8, "account_name and transfer_group"),
+    "get_all_transactions": (9, "tags, carried with the row"),
     "get_all_budgets": (7, "rollover, rollover_in and category_id"),
     "portfolio_pnl": (9, "investment_id and buy_date"),
     "get_all_categories": (3, ""),

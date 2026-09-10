@@ -8,6 +8,7 @@ would flash the sign-in screen at someone who is already signed in.
 from flask import jsonify, request, session
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from server import currency as currencies
 from server import operations
 from server.auth import (csrf_token, current_currency, current_user_id,
                          demo_account_is_gone, is_demo, money_places,
@@ -90,6 +91,7 @@ def register():
         raise ApiError("Could not create that account.", code="create_failed")
 
     token = sign_in(user_id, username)
+    remember_currency(currencies.DEFAULT)
     return jsonify({"user": _account_body(), "csrf_token": token}), 201
 
 
@@ -132,6 +134,9 @@ def start_demo():
                        code="demo_unavailable", status=503)
 
     token = sign_in(user_id, username, demo=True)
+    # A new account is in the default currency; saying so here saves reading
+    # it back from the row that was just written.
+    remember_currency(currencies.DEFAULT)
     # The dashboard rides along. This request already holds an open
     # connection, so reading the seeded rows costs a few milliseconds here
     # against a further two hundred for a separate round trip -- and the

@@ -67,7 +67,14 @@ def current_currency():
 
 
 def remember_currency(code):
-    """Update the cached currency after it has been changed."""
+    """Update the cached currency after it has been changed.
+
+    Also called the moment an account is created. A brand new account keeps
+    its ledger in the default currency by definition, so reading that back
+    out of the row that was just written is a round trip to Mumbai to learn
+    something already known -- and it landed on the demo path, where a
+    visitor is watching a button.
+    """
     session["currency"] = code
 
 

@@ -27,14 +27,18 @@ def dashboard_payload(user_id, places=2):
 
     Both queries run against the request's own connection, so asking for all
     of it at once costs one trip to the database rather than two. Adds no SQL
-    -- these are the same operations the separate endpoints call.
+    -- these are the same operations the separate endpoints call, and the
+    ledger one is asked for exactly the rows the screen shows.
 
     `places` is the account currency's scale, passed in rather than read
     here so this stays a plain function of a user id and can be called
     outside a request.
     """
     holdings = operations.portfolio_pnl(user_id)
-    recent = operations.get_all_transactions(user_id)[:RECENT_LIMIT]
+    # Asked for eight, not asked for two hundred and sliced to eight. The
+    # ledger query carries a tag lookup per row, so the slice was paying for
+    # 192 rows of work and wire that nothing ever read.
+    recent, _ = operations.search_transactions(user_id, per_page=RECENT_LIMIT)
 
     return {
         "portfolio": {

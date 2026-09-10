@@ -47,7 +47,7 @@
       <th>ID</th><th>Date</th><th>Account</th><th>Category</th><th>Type</th>
       <th class="num">Amount</th><th>Description</th><th></th>
     </tr>
-    {% for id, date, category, amount, type, description, account, transfer in transactions %}
+    {% for id, date, category, amount, type, description, account, transfer, tags in transactions %}
     <tr>
       <td>{{ id }}</td>
       <td>{{ date }}</td>
@@ -55,7 +55,10 @@
       <td>{{ category }}</td>
       <td><span class="pill pill-{{ type|lower }}">{{ type }}</span></td>
       <td class="num">{{ "%.2f"|format(amount) }}</td>
-      <td>{{ description or "" }}</td>
+      <td>
+        {{ description or "" }}
+        {% for tag in tags %}<span class="pill">{{ tag.name }}</span>{% endfor %}
+      </td>
       <td class="num">
         <form method="post" action="{{ url_for('delete_transaction', transaction_id=id) }}"
               onsubmit="return confirm('Delete transaction {{ id }}?');">

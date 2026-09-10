@@ -196,24 +196,25 @@ def set_transaction_tags(user_id, transaction_id, tag_ids):
         if cursor.fetchone() is None:
             return False
 
-        cursor.execute("DELETE FROM transaction_tags WHERE transaction_id = %s",
-                       (transaction_id,))
+        # The delete and the insert are one unit: between them the row has
+        # no tags at all, and a failure in the middle would leave it that
+        # way rather than as it was.
+        with db.transaction(connection):
+            cursor.execute("DELETE FROM transaction_tags WHERE transaction_id = %s",
+                           (transaction_id,))
 
-        if tag_ids:
-            # One statement, and the ownership filter lives inside it: a tag
-            # id that is not this user's simply matches no row, so a hostile
-            # or stale id is dropped rather than attached or raised over.
-            cursor.execute(
-                "INSERT INTO transaction_tags (transaction_id, tag_id) "
-                "SELECT %s, tag_id FROM tags "
-                " WHERE user_id = %s AND tag_id = ANY(%s)",
-                (transaction_id, user_id, list(tag_ids)))
-
-        connection.commit()
+            if tag_ids:
+                # One statement, and the ownership filter lives inside it: a
+                # tag id that is not this user's simply matches no row, so a
+                # hostile or stale id is dropped rather than attached or
+                # raised over.
+                cursor.execute(
+                    "INSERT INTO transaction_tags (transaction_id, tag_id) "
+                    "SELECT %s, tag_id FROM tags "
+                    " WHERE user_id = %s AND tag_id = ANY(%s)",
+                    (transaction_id, user_id, list(tag_ids)))
         return True
     except Error as e:
-        if connection:
-            connection.rollback()
         print(f"Error setting transaction tags: {e}")
         return False
     finally:

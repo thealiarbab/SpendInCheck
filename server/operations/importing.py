@@ -273,17 +273,17 @@ def commit(user_id, rows, account_id=None):
         if not values:
             return 0
 
-        execute_values(
-            cursor,
-            "INSERT INTO transactions (user_id, txn_date, category_id, amount, "
-            "        txn_type, description, account_id) VALUES %s",
-            values)
-        written = cursor.rowcount
-        connection.commit()
+        # execute_values sends the rows in pages, so a large file is
+        # several statements. Half an imported file is worse than none.
+        with db.transaction(connection):
+            execute_values(
+                cursor,
+                "INSERT INTO transactions (user_id, txn_date, category_id, amount, "
+                "        txn_type, description, account_id) VALUES %s",
+                values)
+            written = cursor.rowcount
         return written
     except Error as e:
-        if connection:
-            connection.rollback()
         print(f"Error importing transactions: {e}")
         return 0
     finally:

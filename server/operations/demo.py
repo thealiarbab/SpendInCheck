@@ -11,6 +11,7 @@ from psycopg2 import Error
 from psycopg2.extras import execute_values
 from .. import db
 
+from .accounts import TRANSFER_CATEGORY
 from .users import create_user
 
 # A shared, public account. Anything a visitor does to it is wiped and rebuilt
@@ -102,24 +103,29 @@ DEMO_INVESTMENTS = [
 def _seed(cursor, user_id):
     """Write the demonstration rows for one account, on an open cursor.
 
-    Takes a cursor rather than opening its own connection so that creating a
-    demo account and filling it happen in one transaction and one round trip
-    budget. Reaching Supabase costs about 200ms per connection, which is the
-    single biggest cost in setting a demo up.
+    Four statements, and the shape is dictated by what depends on what.
+    Categories and accounts have to come back with their ids before anything
+    can point at them; everything after that can go in together.
 
-    Each table is written with one execute_values call rather than a loop of
-    execute: forty-three separate INSERTs meant forty-three round trips, and
-    that alone was most of the wait.
+    The count matters more than the size. Against Supabase in Mumbai a
+    statement costs about 27ms whatever it carries, so nine statements was a
+    quarter of a second of waiting on the one path where a visitor is
+    watching a button. Each table is still written with one execute_values
+    rather than a loop -- forty-three inserts was the version before that.
     """
-    # RETURNING on a multi-row insert gives the ids back in the order the rows
-    # were sent, which is what lets the later tables refer to them by name.
+    # RETURNING on a multi-row insert gives the ids back in the order the
+    # rows were sent, which is what lets the later tables refer to them by
+    # name. The system Transfer category goes in with the rest rather than
+    # in a statement of its own.
+    seeded_categories = DEMO_CATEGORIES + [(TRANSFER_CATEGORY, "Transfer")]
     category_ids = dict(zip(
-        [name for name, _ in DEMO_CATEGORIES],
+        [name for name, _ in seeded_categories],
         [row[0] for row in execute_values(
             cursor,
-            "INSERT INTO categories (user_id, category_name, category_type) "
-            "VALUES %s RETURNING category_id",
-            [(user_id, name, kind) for name, kind in DEMO_CATEGORIES],
+            "INSERT INTO categories (user_id, category_name, category_type, "
+            "is_system) VALUES %s RETURNING category_id",
+            [(user_id, name, kind, kind == "Transfer")
+             for name, kind in seeded_categories],
             fetch=True)]))
 
     account_ids = dict(zip(
@@ -132,60 +138,74 @@ def _seed(cursor, user_id):
              for name, kind, opening in DEMO_ACCOUNTS],
             fetch=True)]))
 
-    execute_values(
-        cursor,
-        "INSERT INTO transactions (user_id, txn_date, category_id, amount, "
-        "txn_type, description, account_id) VALUES %s",
-        [(user_id, txn_date, category_ids[name], amount, kind, description,
-          account_ids[DEMO_ACCOUNT_FOR.get(name, "Current")])
-         for txn_date, name, amount, kind, description in DEMO_TRANSACTIONS])
+    _seed_transactions(cursor, user_id, category_ids, account_ids)
+    _seed_the_rest(cursor, user_id, category_ids, account_ids)
 
-    # The transfer, and the system category it is filed under. Both legs go
-    # in with one statement so they cannot disagree about the group id --
-    # the same reason operations.accounts.transfer() writes them that way.
-    cursor.execute(
-        "INSERT INTO categories (user_id, category_name, category_type, is_system) "
-        "VALUES (%s, %s, 'Transfer', true) RETURNING category_id",
-        (user_id, "Transfer"))
-    transfer_category = cursor.fetchone()[0]
 
-    # All three transfers in one statement. Each pair needs its own group
-    # id and both legs of a pair need the same one, which is what the CTE
-    # buys: gen_random_uuid() is volatile, so it is called once per row of
-    # `pairs` -- once per transfer -- and the join to `leg` then hands that
-    # single id to both of its legs.
-    #
-    # Three separate statements worked and cost three round trips on the
-    # path a visitor waits through before seeing anything.
+def _seed_transactions(cursor, user_id, category_ids, account_ids):
+    """The ordinary rows and the transfer pairs, in one statement.
+
+    Both write to `transactions`, so one is a data-modifying CTE and the
+    other the statement proper. gen_random_uuid() is volatile and so is
+    called once per row of `pairs` -- once per transfer -- and the join to
+    `leg` hands that single id to both of its legs.
+    """
+    ordinary = [(user_id, txn_date, category_ids[name], amount, kind, description,
+                 account_ids[DEMO_ACCOUNT_FOR.get(name, "Current")])
+                for txn_date, name, amount, kind, description in DEMO_TRANSACTIONS]
+
+    columns = ("user_id, txn_date, category_id, amount, txn_type, description, "
+               "account_id")
+    transfer_values = ", ".join(["(%s::date, %s::numeric, %s::text)"]
+                                * len(DEMO_TRANSFERS))
+    ordinary_values = ", ".join(["(%s, %s, %s, %s, %s, %s, %s)"] * len(ordinary))
+
     cursor.execute(
         "WITH pairs AS ("
         "  SELECT gen_random_uuid() AS group_id, t.txn_date, t.amount, t.note "
-        "    FROM (VALUES " + ", ".join(["(%s::date, %s::numeric, %s::text)"]
-                                        * len(DEMO_TRANSFERS)) + ") "
-        "         AS t(txn_date, amount, note)) "
-        "INSERT INTO transactions (user_id, txn_date, category_id, amount, "
-        "                          txn_type, description, account_id, "
-        "                          transfer_group_id) "
-        "SELECT %s, p.txn_date, %s, p.amount, leg.txn_type, p.note, "
-        "       leg.account_id, p.group_id "
-        "  FROM pairs p, (VALUES ('Expense', %s::int), ('Income', %s::int)) "
-        "         AS leg(txn_type, account_id)",
+        f"   FROM (VALUES {transfer_values}) AS t(txn_date, amount, note)), "
+        f"legs AS (INSERT INTO transactions ({columns}, transfer_group_id) "
+        "  SELECT %s, p.txn_date, %s, p.amount, leg.txn_type, p.note, "
+        "         leg.account_id, p.group_id "
+        "    FROM pairs p, (VALUES ('Expense', %s::int), ('Income', %s::int)) "
+        "           AS leg(txn_type, account_id)) "
+        f"INSERT INTO transactions ({columns}) VALUES {ordinary_values}",
         [value for transfer in DEMO_TRANSFERS for value in transfer]
-        + [user_id, transfer_category,
-           account_ids["Current"], account_ids["Cash"]])
+        + [user_id, category_ids[TRANSFER_CATEGORY],
+           account_ids["Current"], account_ids["Cash"]]
+        + [value for row in ordinary for value in row])
 
-    execute_values(
-        cursor,
-        "INSERT INTO budgets (user_id, category_id, month_year, budget_limit) "
-        "VALUES %s",
-        [(user_id, category_ids[name], month_year, limit)
-         for name, month_year, limit in DEMO_BUDGETS])
 
-    execute_values(
-        cursor,
+def _seed_the_rest(cursor, user_id, category_ids, account_ids):
+    """The rule, the budgets and the holdings -- nothing here needs anything
+    from the others, so all three go in one statement."""
+    description, category, amount, txn_type, cadence, day = DEMO_RULE
+    budgets = ", ".join(["(%s, %s, %s, %s)"] * len(DEMO_BUDGETS))
+    investments = ", ".join(["(%s, %s, %s, %s, %s, %s, %s)"]
+                            * len(DEMO_INVESTMENTS))
+
+    cursor.execute(
+        "WITH rule AS ("
+        "  INSERT INTO recurring_rules (user_id, description, category_id, "
+        "          account_id, amount, txn_type, cadence, day_of_month, "
+        "          next_run_on) "
+        # The first of next month, computed in the database so the demo is
+        # never seeded with a rule already overdue on a machine whose clock
+        # disagrees with the server's.
+        "  VALUES (%s, %s, %s, %s, %s, %s, %s, %s, "
+        "          (date_trunc('month', CURRENT_DATE) + interval '1 month')::date)"
+        "), "
+        "budget AS ("
+        "  INSERT INTO budgets (user_id, category_id, month_year, budget_limit) "
+        f" VALUES {budgets}"
+        ") "
         "INSERT INTO investments (user_id, asset_name, asset_type, buy_date, "
-        "buy_price, quantity, current_price) VALUES %s",
-        [(user_id,) + row for row in DEMO_INVESTMENTS])
+        f"        buy_price, quantity, current_price) VALUES {investments}",
+        [user_id, description, category_ids[category], account_ids["Current"],
+         amount, txn_type, cadence, day]
+        + [value for name, month_year, limit in DEMO_BUDGETS
+           for value in (user_id, category_ids[name], month_year, limit)]
+        + [value for row in DEMO_INVESTMENTS for value in (user_id,) + row])
 
 
 def reset_demo_data(user_id):
@@ -198,34 +218,37 @@ def reset_demo_data(user_id):
     try:
         connection = db.get_connection()
         cursor = connection.cursor()
-        # Children first, and the order matters: transactions point at
-        # categories and accounts, and recurring rules point at categories
-        # too. Both of those foreign keys are RESTRICT, so anything a
-        # visitor made in the demo has to go before the things it
-        # references -- a demo that grew a recurring rule would otherwise
-        # refuse to reset, which is exactly when it needs to.
-        #
-        # tags, transaction_tags and goal_contributions are not listed
-        # because they cascade: from transactions, and from goals.
-        cursor.execute("DELETE FROM transactions WHERE user_id = %s", (user_id,))
-        cursor.execute("DELETE FROM recurring_rules WHERE user_id = %s", (user_id,))
-        cursor.execute("DELETE FROM goals WHERE user_id = %s", (user_id,))
-        cursor.execute("DELETE FROM tags WHERE user_id = %s", (user_id,))
-        cursor.execute("DELETE FROM budgets WHERE user_id = %s", (user_id,))
-        cursor.execute("DELETE FROM investments WHERE user_id = %s", (user_id,))
-        cursor.execute("DELETE FROM categories WHERE user_id = %s", (user_id,))
-        cursor.execute("DELETE FROM accounts WHERE user_id = %s", (user_id,))
-
-        _seed(cursor, user_id)
-        connection.commit()
+        with db.transaction(connection):
+            _wipe_and_reseed(cursor, user_id)
         return True
     except Error as e:
-        if connection:
-            connection.rollback()
         print(f"Error resetting demo data: {e}")
         return False
     finally:
         db.close_connection(connection)
+
+
+def _wipe_and_reseed(cursor, user_id):
+    """Empty this account and rebuild the demonstration rows, on one cursor."""
+    # Children first, and the order matters: transactions point at
+    # categories and accounts, and recurring rules point at categories
+    # too. Both of those foreign keys are RESTRICT, so anything a
+    # visitor made in the demo has to go before the things it
+    # references -- a demo that grew a recurring rule would otherwise
+    # refuse to reset, which is exactly when it needs to.
+    #
+    # tags, transaction_tags and goal_contributions are not listed
+    # because they cascade: from transactions, and from goals.
+    cursor.execute("DELETE FROM transactions WHERE user_id = %s", (user_id,))
+    cursor.execute("DELETE FROM recurring_rules WHERE user_id = %s", (user_id,))
+    cursor.execute("DELETE FROM goals WHERE user_id = %s", (user_id,))
+    cursor.execute("DELETE FROM tags WHERE user_id = %s", (user_id,))
+    cursor.execute("DELETE FROM budgets WHERE user_id = %s", (user_id,))
+    cursor.execute("DELETE FROM investments WHERE user_id = %s", (user_id,))
+    cursor.execute("DELETE FROM categories WHERE user_id = %s", (user_id,))
+    cursor.execute("DELETE FROM accounts WHERE user_id = %s", (user_id,))
+
+    _seed(cursor, user_id)
 
 
 # A stored value no password can ever hash to, so check_password_hash always
@@ -265,18 +288,15 @@ def create_demo_user(password_hash=UNUSABLE_PASSWORD):
 
         connection = db.get_connection()
         cursor = connection.cursor()
-        cursor.execute(
-            "INSERT INTO users (username, email, password_hash, is_demo) "
-            "VALUES (%s, %s, %s, TRUE) RETURNING user_id",
-            (username, email, password_hash))
-        user_id = cursor.fetchone()[0]
-
-        _seed(cursor, user_id)
-        connection.commit()
+        with db.transaction(connection):
+            cursor.execute(
+                "INSERT INTO users (username, email, password_hash, is_demo) "
+                "VALUES (%s, %s, %s, TRUE) RETURNING user_id",
+                (username, email, password_hash))
+            user_id = cursor.fetchone()[0]
+            _seed(cursor, user_id)
         return user_id, username
     except Error as e:
-        if connection:
-            connection.rollback()
         print(f"Error creating demo account: {e}")
         return None, None
     finally:

@@ -39,36 +39,40 @@ def create_user(username, email, password_hash):
     connection = None
     try:
         connection = db.get_connection()
-        cursor = connection.cursor()
-        cursor.execute(
-            "INSERT INTO users (username, email, password_hash) "
-            "VALUES (%s, %s, %s) RETURNING user_id",
-            (username, email, password_hash),
-        )
-        user_id = cursor.fetchone()[0]
-        for name, kind in STARTER_CATEGORIES:
-            cursor.execute(
-                "INSERT INTO categories (user_id, category_name, category_type) "
-                "VALUES (%s, %s, %s)",
-                (user_id, name, kind),
-            )
-        # And somewhere to put the money. Every transaction belongs to an
-        # account, so a new user with none would be unable to write their
-        # first row -- the one moment a ledger must not fail.
-        cursor.execute(
-            "INSERT INTO accounts (user_id, account_name, account_kind) "
-            "VALUES (%s, %s, %s)",
-            (user_id, STARTER_ACCOUNT, "Bank"),
-        )
-        connection.commit()
+        with db.transaction(connection):
+            cursor = connection.cursor()
+            user_id = _create_user_rows(cursor, username, email, password_hash)
         return user_id
     except Error as e:
-        if connection:
-            connection.rollback()
         print(f"Error creating user: {e}")
         return None
     finally:
         db.close_connection(connection)
+
+
+def _create_user_rows(cursor, username, email, password_hash):
+    """The three inserts a new account needs, on an open cursor."""
+    cursor.execute(
+            "INSERT INTO users (username, email, password_hash) "
+        "VALUES (%s, %s, %s) RETURNING user_id",
+        (username, email, password_hash),
+    )
+    user_id = cursor.fetchone()[0]
+    for name, kind in STARTER_CATEGORIES:
+        cursor.execute(
+            "INSERT INTO categories (user_id, category_name, category_type) "
+            "VALUES (%s, %s, %s)",
+            (user_id, name, kind),
+        )
+    # And somewhere to put the money. Every transaction belongs to an
+    # account, so a new user with none would be unable to write their
+    # first row -- the one moment a ledger must not fail.
+    cursor.execute(
+        "INSERT INTO accounts (user_id, account_name, account_kind) "
+        "VALUES (%s, %s, %s)",
+        (user_id, STARTER_ACCOUNT, "Bank"),
+    )
+    return user_id
 
 
 def get_user_by_login(login):

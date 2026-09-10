@@ -66,6 +66,23 @@ def add_transaction(user_id, txn_date, category_id, amount, txn_type, descriptio
 # The columns the result carries, named once so the sort can refer to them
 # by output name rather than by which table they came from -- the search
 # below is a UNION, and inside one a column has no table any more.
+# The tags on one row, as a column.
+#
+# Applied to the page rather than inside the search, for two reasons. A
+# json value has no equality operator, so it cannot appear in a UNION -- and
+# the search is a UNION. And correlated per page means twenty-five lookups
+# rather than one per matching row, which on a large account is the whole
+# ledger.
+#
+# COALESCE, so a row with no tags is [] rather than null.
+TAGS = ("COALESCE((SELECT json_agg(json_build_object('id', g.tag_id, "
+        "                                            'name', g.tag_name) "
+        "                          ORDER BY lower(g.tag_name)) "
+        "            FROM transaction_tags tt "
+        "            JOIN tags g ON g.tag_id = tt.tag_id "
+        "           WHERE tt.transaction_id = page.transaction_id), '[]'::json)"
+        " AS tags")
+
 COLUMNS = ("t.transaction_id, t.txn_date, c.category_name AS category_name, "
            "t.amount, t.txn_type, t.description, "
            "a.account_name AS account_name, "
@@ -187,14 +204,15 @@ def search_transactions(user_id, filters=None, page=1, per_page=DEFAULT_PER_PAGE
 
     Replaces get_all_transactions, which is now this with no filters.
 
-    Returns (rows, total), where each row is
-    (transaction_id, txn_date, category_name, amount, txn_type, description)
-    and total is how many rows match before paging -- the client needs it to
-    know whether there is another page.
+    Returns (rows, total), where total is how many rows match before paging
+    -- the client needs it to know whether there is another page.
 
-    The count runs as a second statement on the same connection rather than
-    a window function, so the row query stays the plain readable JOIN it was
-    and neither statement pays for the other's work.
+    One statement, not two. The count used to run separately so that each
+    query stayed simple and neither paid for the other's work, which was the
+    right trade when a round trip looked free. It is not: a trip to Mumbai
+    is about 29ms and these queries take single figures, so the second
+    statement cost more than the work it saved. COUNT(*) OVER () is computed
+    before LIMIT, so it counts every match rather than the page.
     """
     filters = filters or {}
     connection = None
@@ -207,18 +225,26 @@ def search_transactions(user_id, filters=None, page=1, per_page=DEFAULT_PER_PAGE
         column = SORT_COLUMNS.get(filters.get("sort"), SORT_COLUMNS["date"])
         direction = SORT_DIRECTIONS.get(filters.get("direction"), "DESC")
 
-        cursor.execute(f"SELECT COUNT(*) FROM ({inner}) AS matched", values)
-        total = cursor.fetchone()[0]
-
         per_page = max(1, min(int(per_page), MAX_PER_PAGE))
         page = max(1, int(page))
 
+        # Innermost: what matches. Then the page, with the total riding
+        # along on every row of it. Then the tags, which are looked up only
+        # for the rows that survived the LIMIT.
         cursor.execute(
-            f"SELECT * FROM ({inner}) AS matched "
-            f"ORDER BY {column} {direction}, {TIEBREAK} "
-            f"LIMIT %s OFFSET %s",
+            f"SELECT page.*, {TAGS} FROM ("
+            f"    SELECT *, COUNT(*) OVER () AS matching FROM ({inner}) AS matched "
+            f"    ORDER BY {column} {direction}, {TIEBREAK} "
+            f"    LIMIT %s OFFSET %s"
+            f") AS page "
+            f"ORDER BY page.{column} {direction}, page.{TIEBREAK}",
             values + [per_page, (page - 1) * per_page])
-        return cursor.fetchall(), total
+        rows = cursor.fetchall()
+
+        # Each row is the columns, then the total, then the tags. The count
+        # rides on every row; no rows means nothing matched.
+        total = rows[0][-2] if rows else 0
+        return [row[:-2] + (row[-1],) for row in rows], total
     except Error as e:
         print(f"Error searching transactions: {e}")
         return [], 0

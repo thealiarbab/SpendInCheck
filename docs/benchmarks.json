@@ -1,46 +1,46 @@
 {
-  "measured_at": 1789069705,
+  "measured_at": 1789071135,
   "runs": 5,
   "entries": [
     {
       "label": "Open the demo, to a screen with figures",
-      "best": 643,
-      "median": 649,
+      "best": 276,
+      "median": 277,
       "baseline": 3100,
       "note": "Session, account creation, seeding and the dashboard payload."
     },
     {
       "label": "Dashboard, already signed in",
-      "best": 299,
-      "median": 331,
+      "best": 62,
+      "median": 62,
       "baseline": 489,
       "note": "Holdings and recent rows together, sharing one connection."
     },
     {
       "label": "Transactions list",
-      "best": 304,
-      "median": 350,
+      "best": 32,
+      "median": 33,
       "baseline": 234,
       "note": "A single query."
     },
     {
       "label": "Budget vs actual report",
-      "best": 263,
-      "median": 286,
+      "best": 32,
+      "median": 33,
       "baseline": 312,
       "note": "Joins budgets to transactions."
     },
     {
       "label": "Reports screen, a year of every series",
-      "best": 459,
-      "median": 553,
+      "best": 34,
+      "median": 35,
       "baseline": 1496,
       "note": "Seven queries on one connection. The baseline is the same figures asked for as four separate requests."
     },
     {
       "label": "Session check, touches no database",
-      "best": 2,
-      "median": 2,
+      "best": 1,
+      "median": 1,
       "baseline": 6,
       "note": "The floor: what a request costs with no query in it."
     }

@@ -151,28 +151,26 @@ def delete_category(user_id, category_id, reassign_to=None):
         connection = db.get_connection()
         cursor = connection.cursor()
 
-        if reassign_to is not None:
-            cursor.execute(
-                "INSERT INTO budgets (user_id, category_id, month_year, budget_limit) "
-                "SELECT user_id, %s, month_year, budget_limit FROM budgets "
-                " WHERE user_id = %s AND category_id = %s "
-                "ON CONFLICT (user_id, category_id, month_year) "
-                "DO UPDATE SET budget_limit = budgets.budget_limit + EXCLUDED.budget_limit",
-                (reassign_to, user_id, category_id))
-            cursor.execute("DELETE FROM budgets WHERE user_id = %s AND category_id = %s",
-                           (user_id, category_id))
-            cursor.execute("UPDATE transactions SET category_id = %s "
-                           "WHERE user_id = %s AND category_id = %s",
-                           (reassign_to, user_id, category_id))
+        with db.transaction(connection):
+            if reassign_to is not None:
+                cursor.execute(
+                    "INSERT INTO budgets (user_id, category_id, month_year, budget_limit) "
+                    "SELECT user_id, %s, month_year, budget_limit FROM budgets "
+                    " WHERE user_id = %s AND category_id = %s "
+                    "ON CONFLICT (user_id, category_id, month_year) "
+                    "DO UPDATE SET budget_limit = budgets.budget_limit + EXCLUDED.budget_limit",
+                    (reassign_to, user_id, category_id))
+                cursor.execute("DELETE FROM budgets WHERE user_id = %s AND category_id = %s",
+                               (user_id, category_id))
+                cursor.execute("UPDATE transactions SET category_id = %s "
+                               "WHERE user_id = %s AND category_id = %s",
+                               (reassign_to, user_id, category_id))
 
-        cursor.execute("DELETE FROM categories WHERE category_id = %s AND user_id = %s",
-                       (category_id, user_id))
-        deleted = cursor.rowcount > 0
-        connection.commit()
+            cursor.execute("DELETE FROM categories WHERE category_id = %s AND user_id = %s",
+                           (category_id, user_id))
+            deleted = cursor.rowcount > 0
         return deleted
     except Error as e:
-        if connection:
-            connection.rollback()
         print(f"Error deleting category: {e}")
         return False
     finally:

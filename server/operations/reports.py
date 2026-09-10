@@ -14,6 +14,8 @@ that never entered or left, and the payee list would rank your own savings
 account among the places your money goes.
 """
 
+from decimal import Decimal
+
 from psycopg2 import Error
 from .. import db
 
@@ -184,7 +186,14 @@ def cashflow_series(user_id, months=SERIES_MONTHS):
         db.close_connection(connection)
 
 
-def top_merchants(user_id, months=3, limit=8):
+# How far back the payee list looks, and how many payees it shows. Named
+# because the combined summary statement uses the same two numbers, and two
+# copies of a window is two answers to "last three months".
+MERCHANT_MONTHS = 3
+MERCHANT_LIMIT = 8
+
+
+def top_merchants(user_id, months=MERCHANT_MONTHS, limit=MERCHANT_LIMIT):
     """What the money actually went to, by description.
 
     Returns (description, times, total), biggest total first.
@@ -278,45 +287,154 @@ def net_worth_series(user_id, months=SERIES_MONTHS):
         db.close_connection(connection)
 
 
+# Every series the reporting screen needs, in one statement.
+#
+# Each of these exists on its own above, and asked separately they are seven
+# round trips. Against Supabase in Mumbai a round trip is about 29ms whatever
+# it carries, so seven of them is 200ms of waiting for queries that take
+# single-digit milliseconds to run. As one statement it is 29ms.
+#
+# The money comes back as text, not as JSON numbers. json_build_array would
+# render a numeric as a JSON float, and a float is exactly what money must
+# never be -- 1200.50 is not representable and the error is silent. ::text
+# keeps the digits, and _rows() below turns them back into Decimals so the
+# result is shaped exactly as the seven separate queries were.
+_SUMMARY = """
+WITH span AS (
+    SELECT date_trunc('month', CURRENT_DATE) AS this_month,
+           date_trunc('month', CURRENT_DATE)
+               - make_interval(months => %(months_back)s) AS series_from,
+           date_trunc('month', CURRENT_DATE)
+               - make_interval(months => %(merchant_months)s) AS merchants_from
+),
+-- The user's own rows, with transfers already excluded, written once
+-- rather than repeated in five places.
+ledger AS (
+    SELECT t.* FROM transactions t
+     WHERE t.user_id = %(user_id)s AND t.transfer_group_id IS NULL
+),
+this_month AS (
+    SELECT COALESCE(SUM(amount) FILTER (WHERE txn_type = 'Income'), 0) AS income,
+           COALESCE(SUM(amount) FILTER (WHERE txn_type = 'Expense'), 0) AS expense,
+           COUNT(*) AS rows_this_month
+      FROM ledger, span
+     WHERE txn_date >= span.this_month
+),
+trend AS (
+    SELECT to_char(date_trunc('month', txn_date), 'YYYY-MM') AS month,
+           COALESCE(SUM(amount) FILTER (WHERE txn_type = 'Income'), 0) AS income,
+           COALESCE(SUM(amount) FILTER (WHERE txn_type = 'Expense'), 0) AS expense,
+           date_trunc('month', txn_date) AS sort_key
+      FROM ledger, span
+     WHERE txn_date >= span.series_from
+     GROUP BY date_trunc('month', txn_date)
+),
+cashflow AS (
+    SELECT month, income - expense AS net,
+           SUM(income - expense) OVER (ORDER BY sort_key) AS cumulative,
+           sort_key
+      FROM trend
+),
+calendar AS (
+    SELECT generate_series(span.series_from, span.this_month,
+                           interval '1 month') AS month_start
+      FROM span
+),
+net_worth AS (
+    SELECT to_char(c.month_start, 'YYYY-MM') AS month,
+           COALESCE((SELECT SUM(i.current_price * i.quantity)
+                       FROM investments i
+                      WHERE i.user_id = %(user_id)s
+                        AND i.buy_date < c.month_start + interval '1 month'), 0)
+               AS holdings,
+           COALESCE((SELECT SUM(CASE WHEN l.txn_type = 'Income'
+                                     THEN l.amount ELSE -l.amount END)
+                       FROM ledger l
+                      WHERE l.txn_date < c.month_start + interval '1 month'), 0)
+               AS cash,
+           c.month_start
+      FROM calendar c
+),
+merchants AS (
+    SELECT lower(trim(description)) AS payee, COUNT(*) AS times,
+           SUM(amount) AS total
+      FROM ledger, span
+     WHERE txn_type = 'Expense' AND description IS NOT NULL
+       AND trim(description) <> '' AND txn_date >= span.merchants_from
+     GROUP BY lower(trim(description))
+     ORDER BY total DESC
+     LIMIT %(merchant_limit)s
+),
+spend AS (
+    SELECT c.category_name, SUM(l.amount) AS total
+      FROM ledger l JOIN categories c ON c.category_id = l.category_id, span
+     WHERE l.txn_type = 'Expense' AND l.txn_date >= span.this_month
+     GROUP BY c.category_name
+     ORDER BY total DESC
+)
+SELECT
+    (SELECT json_build_array(income::text, expense::text,
+                             (income - expense)::text, rows_this_month)
+       FROM this_month),
+    (SELECT json_agg(json_build_array(month, income::text, expense::text)
+                     ORDER BY sort_key) FROM trend),
+    (SELECT json_agg(json_build_array(month, net::text, cumulative::text)
+                     ORDER BY sort_key) FROM cashflow),
+    (SELECT json_agg(json_build_array(month, holdings::text, cash::text,
+                                      (holdings + cash)::text)
+                     ORDER BY month_start) FROM net_worth),
+    (SELECT json_agg(json_build_array(payee, times, total::text)) FROM merchants),
+    (SELECT json_agg(json_build_array(category_name, total::text)) FROM spend)
+"""
+
+
+def _rows(carried, money_columns):
+    """Turn one JSON array-of-arrays back into the tuples callers expect.
+
+    The text columns that hold money become Decimals again, so a row from
+    here is indistinguishable from a row the separate queries returned and
+    nothing downstream has to know where it came from.
+    """
+    if not carried:
+        return []
+    return [tuple(Decimal(value) if index in money_columns and value is not None
+                  else value
+                  for index, value in enumerate(row))
+            for row in carried]
+
+
 def dashboard_summary(user_id, months=SERIES_MONTHS):
     """Everything the opening screen and the reporting screen need, at once.
 
-    Returns a dictionary of the five series and figures below.
+    Returns a dictionary of the five series and figures below, in exactly
+    the shape the individual functions above return -- they remain the
+    readable definition of each one, and each has its own endpoint.
 
-    The point is the connection, not the SQL. Each query here is quick --
-    single-digit milliseconds against tables this size -- while reaching
-    Supabase at all costs roughly two hundred. Asked separately these are
-    seven round trips and most of a second and a half; sharing one
-    connection they are one trip and the queries are almost free.
-
-    db.get_connection() returns the request's own connection, so the
-    functions called below reuse it rather than opening their own.
+    One round trip rather than seven. Each query is single-digit
+    milliseconds; reaching Mumbai is 29ms whatever it carries, so the trips
+    were 85% of the wait.
     """
     connection = None
     try:
         connection = db.get_connection()
         cursor = connection.cursor()
+        cursor.execute(_SUMMARY, {
+            "user_id": user_id,
+            "months_back": months - 1,
+            "merchant_months": MERCHANT_MONTHS - 1,
+            "merchant_limit": MERCHANT_LIMIT,
+        })
+        month, trend, cashflow, net_worth, merchants, spend = cursor.fetchone()
 
-        # This month's income and expense, for the headline figures.
-        cursor.execute("""
-            SELECT COALESCE(SUM(amount) FILTER (WHERE txn_type = 'Income'), 0),
-                   COALESCE(SUM(amount) FILTER (WHERE txn_type = 'Expense'), 0),
-                   COUNT(*)
-            FROM transactions
-            WHERE user_id = %s AND transfer_group_id IS NULL
-              AND txn_date >= date_trunc('month', CURRENT_DATE)
-        """, (user_id,))
-        income, expense, count = cursor.fetchone()
-
+        income, expense, net, count = month
         return {
-            "this_month": {"income": income, "expense": expense,
-                           "net": income - expense, "transactions": count},
-            "trend": monthly_trend(user_id, months),
-            "cashflow": cashflow_series(user_id, months),
-            "net_worth": net_worth_series(user_id, months),
-            "merchants": top_merchants(user_id),
-            "spend_by_category": category_wise_spend(
-                user_id, _current_month(cursor)),
+            "this_month": {"income": Decimal(income), "expense": Decimal(expense),
+                           "net": Decimal(net), "transactions": count},
+            "trend": _rows(trend, {1, 2}),
+            "cashflow": _rows(cashflow, {1, 2}),
+            "net_worth": _rows(net_worth, {1, 2, 3}),
+            "merchants": _rows(merchants, {2}),
+            "spend_by_category": _rows(spend, {1}),
         }
     except Error as e:
         print(f"Error generating the dashboard summary: {e}")

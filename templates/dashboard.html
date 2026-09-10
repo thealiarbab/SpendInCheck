@@ -53,7 +53,7 @@
   {% if recent_transactions %}
   <table>
     <tr><th>Date</th><th>Category</th><th>Type</th><th class="num">Amount</th><th>Description</th></tr>
-    {% for id, date, category, amount, type, description, account, transfer in recent_transactions %}
+    {% for id, date, category, amount, type, description, account, transfer, tags in recent_transactions %}
     <tr>
       <td>{{ date }}</td>
       <td>{{ category }}</td>

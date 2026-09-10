@@ -6,14 +6,176 @@ queries live under server/operations/, keeping this file small: it is the
 one place that knows how to reach the database.
 """
 
+import atexit
+import os
+import threading
+from contextlib import contextmanager
+
 import psycopg2
-from psycopg2 import Error
+from psycopg2 import Error, pool as psycopg2_pool
 
 from . import config
 
 # Key under which the current request's connection is cached. Flask's g is
 # per request and per thread, so two requests never share one.
 _REQUEST_KEY = "_spendincheck_connection"
+
+# How many connections this process may hold open at once.
+#
+# Small on purpose, and adjustable, because the right number depends on
+# where this is running. Supabase's pooler caps client connections across
+# everything that talks to it, and a serverless deployment is many processes
+# each holding their own -- so a big pool per process is how a handful of
+# containers exhausts the shared limit. A process that serves one request at
+# a time needs one; the rest is headroom for a threaded local server.
+#
+# Requests beyond this wait for a connection to come back, which is still
+# far cheaper than the 180ms of handshake they would otherwise each pay.
+MAX_CONNECTIONS = max(1, int(os.environ.get("DB_MAX_CONNECTIONS", "5")))
+
+_pool = None
+_pool_lock = threading.Lock()
+
+
+def _connection_settings():
+    """The keyword arguments psycopg2 needs to reach the database.
+
+    Prefers config.DATABASE_URL when set, since that is the single value
+    Supabase hands out; falls back to the individual DB_* settings.
+    """
+    if config.DATABASE_URL:
+        # sslmode inside the URL wins; this only supplies a default.
+        return {"dsn": config.DATABASE_URL, "sslmode": "require"}
+
+    settings = {
+        "host": config.DB_HOST,
+        "port": config.DB_PORT,
+        "user": config.DB_USER,
+        "password": config.DB_PASSWORD,
+        "dbname": config.DB_NAME,
+    }
+    if config.DB_USE_SSL:
+        settings["sslmode"] = "require"
+    return settings
+
+
+def _get_pool():
+    """The process-wide connection pool, opened on first use.
+
+    Reaching the database costs about 180ms of TLS handshake and
+    authentication, measured against the Mumbai pooler. Without a pool that
+    is paid on every single request, and it dwarfs the queries -- a
+    four-query dashboard is 180ms of handshake and 108ms of actual work.
+
+    Double-checked locking, because two threads can arrive here at once on a
+    cold process and one pool is the entire point.
+    """
+    global _pool
+    if _pool is None:
+        with _pool_lock:
+            if _pool is None:
+                _pool = psycopg2_pool.ThreadedConnectionPool(
+                    minconn=1, maxconn=MAX_CONNECTIONS, **_connection_settings())
+    return _pool
+
+
+def _checkout():
+    """A usable connection from the pool, in autocommit mode.
+
+    A pooled connection can have died while it sat idle -- the pooler drops
+    them, networks drop them -- and psycopg2 does not notice until the next
+    statement fails. So a connection that comes back closed is thrown away
+    and another taken, and anything left in a failed or open transaction is
+    rolled back before it is handed on. Without that, one request's aborted
+    transaction becomes the next request's mysterious InternalError.
+
+    Autocommit, because otherwise psycopg2 opens a transaction on the first
+    statement of every request -- including a read -- and that transaction
+    then has to be closed with a ROLLBACK, which is a full round trip to
+    Mumbai. Measured: 28ms, on every request that reads anything, purely to
+    end a transaction nothing asked for. Under autocommit a read leaves the
+    connection idle and the rollback costs nothing at all.
+
+    Anything that needs several statements to succeed or fail together says
+    so explicitly, with transaction() below.
+    """
+    pool = _get_pool()
+    for _ in range(MAX_CONNECTIONS):
+        connection = pool.getconn()
+        if connection.closed:
+            pool.putconn(connection, close=True)
+            continue
+        try:
+            connection.rollback()
+            connection.autocommit = True
+        except Error:
+            pool.putconn(connection, close=True)
+            continue
+        return connection
+    # Every pooled connection was dead, which means the database is
+    # unreachable rather than the pool being unlucky.
+    return _open()
+
+
+def _release(connection):
+    """Give a connection back to the pool, or close it if it is not ours."""
+    if connection is None or connection.closed:
+        return
+    pool = _pool
+    if pool is None:
+        connection.close()
+        return
+    try:
+        pool.putconn(connection)
+    except (KeyError, psycopg2_pool.PoolError):
+        # Not a pooled connection -- something opened it with _open().
+        connection.close()
+
+
+@contextmanager
+def transaction(connection):
+    """Run several statements so that they all happen or none of them do.
+
+    Connections are in autocommit mode, so each statement stands alone --
+    which is right for a read and for a single insert, and wrong for
+    anything that has to move rows before deleting what they pointed at.
+
+    Turning autocommit off costs nothing: it is a client-side flag, and the
+    transaction itself begins on the next statement. The only round trip
+    added is the COMMIT, which such an operation had to pay anyway.
+
+        with db.transaction(connection):
+            cursor.execute(...)
+            cursor.execute(...)
+
+    Leaving the block commits. Raising rolls back and re-raises, so a
+    failure cannot leave half the work behind.
+    """
+    connection.autocommit = False
+    try:
+        yield connection
+    except BaseException:
+        connection.rollback()
+        raise
+    else:
+        connection.commit()
+    finally:
+        # Safe here: both paths above end the transaction, so the connection
+        # is idle and psycopg2 will accept the flag.
+        if not connection.closed:
+            connection.autocommit = True
+
+
+@atexit.register
+def _close_pool():
+    """Close every pooled connection when the process ends."""
+    global _pool
+    if _pool is not None:
+        try:
+            _pool.closeall()
+        except Error:
+            pass
+        _pool = None
 
 
 def _request_store():
@@ -38,16 +200,13 @@ def get_connection():
     connection and every later one gets the same object back, so a route that
     reads two tables pays that cost once instead of twice.
 
-    Outside a request -- the migration runner, the tests, a script -- this
-    opens a fresh connection exactly as it always did.
+    Outside a request -- the migration runner, the tests, a script -- a
+    connection still comes from the pool; it is simply released as soon as
+    the caller is done with it rather than at the end of a request.
 
     One consequence worth knowing: callers within a single request now share
     a transaction, so a rollback in one undoes uncommitted work from another.
     Every route performs at most one write, which is what makes that safe.
-
-    Prefers config.DATABASE_URL when set, since that is the single value
-    Supabase hands out. Falls back to the individual DB_* settings for a
-    local server.
 
     Returns a psycopg2 connection, or raises psycopg2.Error if the connection
     cannot be established (wrong password, database unreachable, and so on).
@@ -58,28 +217,23 @@ def get_connection():
         if existing is not None and not existing.closed:
             return existing
 
-    connection = _open()
+    connection = _checkout()
     if store is not None:
         setattr(store, _REQUEST_KEY, connection)
     return connection
 
 
 def _open():
-    """Open a genuinely new connection from the configured settings."""
-    try:
-        if config.DATABASE_URL:
-            # sslmode inside the URL wins; this only supplies a default.
-            return psycopg2.connect(config.DATABASE_URL, sslmode="require")
+    """Open a genuinely new connection, bypassing the pool.
 
-        settings = {
-            "host": config.DB_HOST,
-            "port": config.DB_PORT,
-            "user": config.DB_USER,
-            "password": config.DB_PASSWORD,
-            "dbname": config.DB_NAME,
-        }
-        if config.DB_USE_SSL:
-            settings["sslmode"] = "require"
+    Used by the pool itself and by anything that must not share -- and as
+    the last resort when every pooled connection turns out to be dead.
+    """
+    try:
+        settings = _connection_settings()
+        dsn = settings.pop("dsn", None)
+        if dsn is not None:
+            return psycopg2.connect(dsn, **settings)
         return psycopg2.connect(**settings)
     except Error as e:
         # Re-raise after a clear message so the caller decides what to do next.
@@ -102,15 +256,17 @@ def close_connection(connection):
     if store is not None and getattr(store, _REQUEST_KEY, None) is connection:
         return
 
-    connection.close()
+    _release(connection)
 
 
 def close_request_connection(_exception=None):
-    """Close the connection this request opened, if it opened one.
+    """Return this request's connection to the pool, if it took one.
 
-    Registered as a teardown hook by the application factory. Serverless
-    containers are reused, so a connection left open here would be leaked for
-    the life of the container and count against Supabase's pool.
+    Registered as a teardown hook by the application factory. It no longer
+    closes: closing is what the handshake is for, and the whole point of
+    the pool is that the next request finds the connection already open.
+    What it must still do is let go of it, so a container that is reused
+    does not hold one per request it has ever served.
     """
     store = _request_store()
     if store is None:
@@ -118,5 +274,4 @@ def close_request_connection(_exception=None):
     connection = getattr(store, _REQUEST_KEY, None)
     if connection is not None:
         setattr(store, _REQUEST_KEY, None)
-        if not connection.closed:
-            connection.close()
+        _release(connection)
