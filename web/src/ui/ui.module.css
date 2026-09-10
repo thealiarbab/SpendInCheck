@@ -1,0 +1,278 @@
+/* Shared primitives.
+   Every colour, radius and shadow here comes from a semantic token, never a
+   literal. That is the whole reason both themes can be shipped at once: the
+   difference between brass and paper lives in the token values, so a
+   component written this way is already correct in both. */
+
+.pageHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-5);
+}
+
+.pageTitle {
+  font-family: var(--font-serif);
+  font-size: 2rem;
+  font-weight: 400;
+  line-height: var(--leading-tight);
+  margin: 0;
+  color: var(--content-primary);
+}
+
+.pageSubtitle {
+  color: var(--content-secondary);
+  margin: var(--space-1) 0 0;
+  font-size: 0.9rem;
+}
+
+/* --- card ---------------------------------------------------------------- */
+
+.card {
+  background: var(--surface-raised);
+  border: 1px solid var(--line-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.cardHead {
+  padding: var(--space-4) var(--space-5) 0;
+}
+
+.cardTitle {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--content-muted);
+  margin: 0 0 var(--space-3);
+}
+
+.cardBody { padding: 0 var(--space-5) var(--space-5); }
+.cardBodyFlush { padding: 0 0 var(--space-2); }
+
+/* --- stats --------------------------------------------------------------- */
+
+.statRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1px;
+  background: var(--line-soft);
+  border: 1px solid var(--line-default);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-bottom: var(--space-5);
+}
+
+.stat {
+  background: var(--surface-raised);
+  padding: var(--space-4) var(--space-5);
+}
+
+.statLabel {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--content-muted);
+  margin: 0 0 var(--space-2);
+}
+
+.statValue {
+  font-family: var(--font-mono);
+  font-size: 1.5rem;
+  font-weight: 500;
+  margin: 0;
+  color: var(--content-primary);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.statNote {
+  font-size: 0.75rem;
+  color: var(--content-muted);
+  margin: var(--space-2) 0 0;
+}
+
+/* --- table --------------------------------------------------------------- */
+
+.scroller { overflow-x: auto; }
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.table th {
+  text-align: left;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--content-muted);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--line-default);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--content-secondary);
+  vertical-align: middle;
+}
+
+.table tbody tr:last-child td { border-bottom: 0; }
+.table tbody tr:hover td { background: var(--surface-sunken); }
+
+.numeric {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+  color: var(--content-primary);
+}
+
+.primaryCell { color: var(--content-primary); font-weight: 500; }
+
+/* --- money --------------------------------------------------------------- */
+
+.credit { color: var(--money-credit); }
+.debit { color: var(--money-debit); }
+.level { color: var(--money-level); }
+
+/* --- tag ----------------------------------------------------------------- */
+
+.tag {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid currentColor;
+}
+
+.tagCredit { color: var(--money-credit); background: var(--money-credit-wash); }
+.tagDebit { color: var(--money-debit); background: var(--money-debit-wash); }
+
+/* --- forms --------------------------------------------------------------- */
+
+.form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.field { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+
+.label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--content-muted);
+}
+
+.input {
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  color: var(--content-primary);
+  background: var(--surface-sunken);
+  border: 1px solid var(--line-default);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  width: 100%;
+  min-width: 0;
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--line-focus);
+  outline-offset: -1px;
+  border-color: var(--line-focus);
+}
+
+.inputNumeric { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* The field's own message, not a banner at the top of the page: the reader
+   should not have to work out which input a complaint refers to. */
+.invalid { border-color: var(--money-debit); }
+
+.fieldError {
+  font-size: 0.75rem;
+  color: var(--money-debit);
+  margin: 0;
+}
+
+/* --- buttons ------------------------------------------------------------- */
+
+.button {
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--accent-fill);
+  background: var(--accent-fill);
+  color: var(--content-on-accent);
+  transition: background var(--duration-fast) var(--ease-out);
+  white-space: nowrap;
+}
+
+.button:hover:not(:disabled) { background: var(--accent-fill-hover); }
+.button:disabled { opacity: 0.55; cursor: default; }
+.button:focus-visible { outline: 2px solid var(--line-focus); outline-offset: 2px; }
+
+.buttonQuiet {
+  background: none;
+  color: var(--content-secondary);
+  border-color: var(--line-default);
+}
+
+.buttonQuiet:hover:not(:disabled) {
+  background: var(--surface-sunken);
+  color: var(--content-primary);
+}
+
+.buttonDanger { background: none; color: var(--money-debit); border-color: var(--line-default); }
+.buttonDanger:hover:not(:disabled) { background: var(--money-debit-wash); }
+
+.buttonSmall { padding: var(--space-2) var(--space-3); font-size: 0.75rem; }
+
+/* --- states -------------------------------------------------------------- */
+
+.empty {
+  padding: var(--space-6) var(--space-5);
+  text-align: center;
+  color: var(--content-muted);
+  font-size: 0.9rem;
+}
+
+.notice {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-default);
+  border-left: 3px solid var(--money-debit);
+  background: var(--surface-sunken);
+  color: var(--content-secondary);
+  font-size: 0.85rem;
+  margin-bottom: var(--space-4);
+}
+
+.noticeOk { border-left-color: var(--money-credit); }
+
+.skeleton {
+  padding: var(--space-6) var(--space-5);
+  color: var(--content-muted);
+  font-size: 0.85rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button { transition: none; }
+}
