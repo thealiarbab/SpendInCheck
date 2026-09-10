@@ -31,7 +31,8 @@
       <th class="num">Buy</th><th class="num">Current</th>
       <th class="num">Qty</th><th class="num">P&amp;L</th>
     </tr>
-    {% for name, type, buy, current, qty, pnl, value in holdings %}
+    {# Nine columns since portfolio_pnl gained an id and a buy date; the two the table does not show are still unpacked so the rest line up. #}
+    {% for id, name, type, bought, buy, current, qty, pnl, value in holdings %}
     <tr>
       <td>{{ name }}</td>
       <td>{{ type }}</td>
@@ -52,7 +53,7 @@
   {% if recent_transactions %}
   <table>
     <tr><th>Date</th><th>Category</th><th>Type</th><th class="num">Amount</th><th>Description</th></tr>
-    {% for id, date, category, amount, type, description in recent_transactions %}
+    {% for id, date, category, amount, type, description, account, transfer in recent_transactions %}
     <tr>
       <td>{{ date }}</td>
       <td>{{ category }}</td>

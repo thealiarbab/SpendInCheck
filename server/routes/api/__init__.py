@@ -89,6 +89,7 @@ def handle_unknown_path(error):
 # their resource, never after a module in server/ -- `sessions` rather than
 # `auth`, because `from ... import auth` inside this package resolves to
 # server.auth and the routes then attach to nothing.
+from server.routes.api import accounts  # noqa: E402,F401
 from server.routes.api import budgets  # noqa: E402,F401
 from server.routes.api import cron  # noqa: E402,F401
 from server.routes.api import categories  # noqa: E402,F401

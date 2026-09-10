@@ -22,6 +22,25 @@ DEMO_CATEGORIES = [
     ("Utilities", "Expense"), ("Dining Out", "Expense"),
 ]
 
+# (name, kind, opening balance). Three, so the demo shows what one account
+# cannot: a balance per account, and a transfer between two of them.
+DEMO_ACCOUNTS = [
+    ("Current", "Bank", 25000.00),
+    ("Cash", "Cash", 3000.00),
+    ("Credit Card", "Card", 0.00),
+]
+
+# Which account a kind of spending comes out of. A rule rather than a column
+# on every row below, because the point is only that more than one balance
+# moves -- spelling it out twenty times would make the seed data harder to
+# read for no more realism. Anything unlisted comes from the current account.
+DEMO_ACCOUNT_FOR = {"Groceries": "Cash", "Dining Out": "Cash",
+                    "Transport": "Cash"}
+
+# (date, amount, description) for the one demonstration transfer: a cash
+# withdrawal, which is the transfer everybody actually makes.
+DEMO_TRANSFER = ("2026-08-03", 6000.00, "Cash withdrawal")
+
 # (date, category name, amount, type, description)
 DEMO_TRANSACTIONS = [
     ("2026-06-01", "Salary", 55000.00, "Income", "June salary"),
@@ -89,12 +108,44 @@ def _seed(cursor, user_id):
             [(user_id, name, kind) for name, kind in DEMO_CATEGORIES],
             fetch=True)]))
 
+    account_ids = dict(zip(
+        [name for name, _, _ in DEMO_ACCOUNTS],
+        [row[0] for row in execute_values(
+            cursor,
+            "INSERT INTO accounts (user_id, account_name, account_kind, "
+            "opening_balance) VALUES %s RETURNING account_id",
+            [(user_id, name, kind, opening)
+             for name, kind, opening in DEMO_ACCOUNTS],
+            fetch=True)]))
+
     execute_values(
         cursor,
         "INSERT INTO transactions (user_id, txn_date, category_id, amount, "
-        "txn_type, description) VALUES %s",
-        [(user_id, txn_date, category_ids[name], amount, kind, description)
+        "txn_type, description, account_id) VALUES %s",
+        [(user_id, txn_date, category_ids[name], amount, kind, description,
+          account_ids[DEMO_ACCOUNT_FOR.get(name, "Current")])
          for txn_date, name, amount, kind, description in DEMO_TRANSACTIONS])
+
+    # The transfer, and the system category it is filed under. Both legs go
+    # in with one statement so they cannot disagree about the group id --
+    # the same reason operations.accounts.transfer() writes them that way.
+    cursor.execute(
+        "INSERT INTO categories (user_id, category_name, category_type, is_system) "
+        "VALUES (%s, %s, 'Transfer', true) RETURNING category_id",
+        (user_id, "Transfer"))
+    transfer_category = cursor.fetchone()[0]
+
+    transfer_date, transfer_amount, transfer_note = DEMO_TRANSFER
+    cursor.execute(
+        "WITH pair AS (SELECT gen_random_uuid() AS group_id) "
+        "INSERT INTO transactions (user_id, txn_date, category_id, amount, "
+        "                          txn_type, description, account_id, "
+        "                          transfer_group_id) "
+        "SELECT %s, %s, %s, %s, leg.txn_type, %s, leg.account_id, pair.group_id "
+        "  FROM pair, (VALUES ('Expense', %s::int), ('Income', %s::int)) "
+        "         AS leg(txn_type, account_id)",
+        (user_id, transfer_date, transfer_category, transfer_amount, transfer_note,
+         account_ids["Current"], account_ids["Cash"]))
 
     execute_values(
         cursor,
@@ -120,11 +171,14 @@ def reset_demo_data(user_id):
     try:
         connection = db.get_connection()
         cursor = connection.cursor()
-        # Children first: transactions and budgets both point at categories.
+        # Children first: transactions point at both categories and
+        # accounts, and both foreign keys are RESTRICT, so the rows have to
+        # go before the things they reference.
         cursor.execute("DELETE FROM transactions WHERE user_id = %s", (user_id,))
         cursor.execute("DELETE FROM budgets WHERE user_id = %s", (user_id,))
         cursor.execute("DELETE FROM investments WHERE user_id = %s", (user_id,))
         cursor.execute("DELETE FROM categories WHERE user_id = %s", (user_id,))
+        cursor.execute("DELETE FROM accounts WHERE user_id = %s", (user_id,))
 
         _seed(cursor, user_id)
         connection.commit()

@@ -7,31 +7,45 @@ re-exports every name.
 
 from psycopg2 import Error
 from .. import db
+from .accounts import default_account_id
 
-def add_transaction(user_id, txn_date, category_id, amount, txn_type, description):
+def add_transaction(user_id, txn_date, category_id, amount, txn_type, description,
+                    account_id=None):
     """Insert a new transaction row.
 
     Caller (main.py) is expected to have already validated amount > 0,
     that category_id exists, and that txn_date is not in the future --
     this function focuses only on the SQL insert and error handling.
     Returns True on success, False on failure.
+
+    account_id may be omitted, in which case the row lands on the user's
+    first live account. Every caller that predates accounts relies on that,
+    and so does the quick-add form, where making somebody choose an account
+    before they can note down a coffee is a worse ledger than one that
+    assumes the obvious answer.
     """
     connection = None
     try:
         connection = db.get_connection()
         cursor = connection.cursor()
-        # Same ownership guard as set_budget: the insert only happens if the
-        # category is this user's.
+        if account_id is None:
+            account_id = default_account_id(user_id)
+        # Same ownership guard as set_budget, now covering both foreign
+        # keys: the insert only happens if the category and the account are
+        # both this user's.
         query = """
             INSERT INTO transactions (user_id, txn_date, category_id, amount,
-                                      txn_type, description)
-            SELECT %s, %s, %s, %s, %s, %s
+                                      txn_type, description, account_id)
+            SELECT %s, %s, %s, %s, %s, %s, %s
             WHERE EXISTS (
                 SELECT 1 FROM categories WHERE category_id = %s AND user_id = %s
-            )
+            ) AND (%s IS NULL OR EXISTS (
+                SELECT 1 FROM accounts WHERE account_id = %s AND user_id = %s
+            ))
         """
         cursor.execute(query, (user_id, txn_date, category_id, amount, txn_type,
-                               description, category_id, user_id))
+                               description, account_id, category_id, user_id,
+                               account_id, account_id, user_id))
         connection.commit()
         return cursor.rowcount > 0
     except Error as e:
@@ -47,10 +61,19 @@ def add_transaction(user_id, txn_date, category_id, amount, txn_type, descriptio
 # by output name rather than by which table they came from -- the search
 # below is a UNION, and inside one a column has no table any more.
 COLUMNS = ("t.transaction_id, t.txn_date, c.category_name AS category_name, "
-           "t.amount, t.txn_type, t.description")
+           "t.amount, t.txn_type, t.description, "
+           "a.account_name AS account_name, "
+           # ::text because psycopg2 hands a uuid column back as a UUID
+           # object, which json cannot serialise and which nothing on the
+           # client wants as anything but an opaque string anyway.
+           "t.transfer_group_id::text AS transfer_group")
 
+# LEFT JOIN on accounts, not an inner one. account_id is still nullable at
+# the database level until every write path supplies it, and a row that has
+# not been given an account must not vanish from the ledger because of it.
 FROM_JOIN = ("FROM transactions t "
-             "JOIN categories c ON t.category_id = c.category_id")
+             "JOIN categories c ON t.category_id = c.category_id "
+             "LEFT JOIN accounts a ON a.account_id = t.account_id")
 
 # The only places a caller may sort by, and the only directions. Both are
 # looked up here rather than interpolated, because a sort field arrives from
@@ -62,6 +85,7 @@ SORT_COLUMNS = {
     "amount": "amount",
     "category": "category_name",
     "type": "txn_type",
+    "account": "account_name",
 }
 
 SORT_DIRECTIONS = {"asc": "ASC", "desc": "DESC"}
@@ -101,6 +125,9 @@ def _where(user_id, filters):
     if filters.get("category_id"):
         clauses.append("t.category_id = %s")
         values.append(filters["category_id"])
+    if filters.get("account_id"):
+        clauses.append("t.account_id = %s")
+        values.append(filters["account_id"])
     if filters.get("min_amount") is not None:
         clauses.append("t.amount >= %s")
         values.append(filters["min_amount"])
@@ -204,7 +231,8 @@ def get_transaction_by_id(user_id, transaction_id):
         connection = db.get_connection()
         cursor = connection.cursor()
         query = """
-            SELECT transaction_id, txn_date, category_id, amount, txn_type, description
+            SELECT transaction_id, txn_date, category_id, amount, txn_type,
+                   description, account_id, transfer_group_id::text
             FROM transactions WHERE transaction_id = %s AND user_id = %s
         """
         cursor.execute(query, (transaction_id, user_id))
@@ -217,7 +245,7 @@ def get_transaction_by_id(user_id, transaction_id):
 
 
 def update_transaction(user_id, transaction_id, txn_date, category_id, amount,
-                       txn_type, description):
+                       txn_type, description, account_id=None):
     """Update every field of an existing transaction.
 
     Returns True if the transaction exists and was saved, False if no
@@ -225,6 +253,10 @@ def update_transaction(user_id, transaction_id, txn_date, category_id, amount,
 
     A rowcount of 0 is followed by an existence check so that "nothing
     needed changing" is not reported as a failure.
+
+    account_id of None leaves the row where it is rather than clearing it,
+    so a caller that knows nothing about accounts cannot move a row out of
+    one by omission.
     """
     connection = None
     try:
@@ -232,14 +264,20 @@ def update_transaction(user_id, transaction_id, txn_date, category_id, amount,
         cursor = connection.cursor()
         query = """
             UPDATE transactions
-            SET txn_date = %s, category_id = %s, amount = %s, txn_type = %s, description = %s
+            SET txn_date = %s, category_id = %s, amount = %s, txn_type = %s,
+                description = %s, account_id = COALESCE(%s, account_id)
             WHERE transaction_id = %s AND user_id = %s
               AND EXISTS (
                 SELECT 1 FROM categories WHERE category_id = %s AND user_id = %s
               )
+              AND (%s IS NULL OR EXISTS (
+                SELECT 1 FROM accounts WHERE account_id = %s AND user_id = %s
+              ))
         """
         cursor.execute(query, (txn_date, category_id, amount, txn_type, description,
-                               transaction_id, user_id, category_id, user_id))
+                               account_id, transaction_id, user_id,
+                               category_id, user_id,
+                               account_id, account_id, user_id))
         connection.commit()
         if cursor.rowcount > 0:
             return True

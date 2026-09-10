@@ -22,8 +22,14 @@ STARTER_CATEGORIES = [
 ]
 
 
+# The account a new user starts with. Named for what it is rather than for
+# a bank, because it is renamed the moment anybody cares.
+STARTER_ACCOUNT = "Main"
+
+
 def create_user(username, email, password_hash):
-    """Register a new account and give it the starter categories.
+    """Register a new account, its starter categories, and somewhere to put
+    the money.
 
     Both the user row and its categories are written in one transaction, so a
     failure part way through cannot leave an account with no categories.
@@ -46,6 +52,14 @@ def create_user(username, email, password_hash):
                 "VALUES (%s, %s, %s)",
                 (user_id, name, kind),
             )
+        # And somewhere to put the money. Every transaction belongs to an
+        # account, so a new user with none would be unable to write their
+        # first row -- the one moment a ledger must not fail.
+        cursor.execute(
+            "INSERT INTO accounts (user_id, account_name, account_kind) "
+            "VALUES (%s, %s, %s)",
+            (user_id, STARTER_ACCOUNT, "Bank"),
+        )
         connection.commit()
         return user_id
     except Error as e:

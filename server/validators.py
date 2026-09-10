@@ -91,8 +91,17 @@ class Validator:
             return self.fail(field, f"Keep this to {max_length} characters or fewer.")
         return value
 
-    def amount(self, field="amount", *, required=True, allow_zero=False, places=2):
-        """A positive money value, rounded to the currency's own places.
+    def amount(self, field="amount", *, required=True, allow_zero=False,
+               allow_negative=False, places=2):
+        """A money value, rounded to the currency's own places.
+
+        Positive by default: a transaction carries its direction in its type,
+        so a negative expense would be an income row wearing the wrong label.
+
+        allow_negative exists for the one figure that is genuinely signed --
+        an account's opening balance. A credit card opens owing money, and
+        refusing that would force people to model a card as something it is
+        not.
 
         `places` defaults to two, which is right for 156 of the 162
         currencies in use but not for the yen or the dinars, so routes
@@ -107,7 +116,7 @@ class Validator:
         value = to_decimal(raw)
         if value is None:
             return self.fail(field, "Enter a number, like 1250.00.")
-        if value < 0:
+        if value < 0 and not allow_negative:
             return self.fail(field, "Must not be negative.")
         if value == 0 and not allow_zero:
             return self.fail(field, "Must be greater than 0.")

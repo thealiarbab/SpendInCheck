@@ -18,8 +18,10 @@ from server.errors import NotFound, ValidationError
 from server.routes.api import api
 from server.validators import Validator
 
-LIST_FIELDS = ["id", "date", "category", "amount", "type", "description"]
-RECORD_FIELDS = ["id", "date", "category_id", "amount", "type", "description"]
+LIST_FIELDS = ["id", "date", "category", "amount", "type", "description",
+               "account", "transfer_group"]
+RECORD_FIELDS = ["id", "date", "category_id", "amount", "type", "description",
+                 "account_id", "transfer_group"]
 TYPES = ["Income", "Expense"]
 
 
@@ -33,6 +35,9 @@ def _read_submission(payload):
         "amount": fields.amount(places=places),
         "txn_type": fields.choice("type", TYPES),
         "description": fields.text("description", required=False, max_length=255),
+        # Optional: a client that does not know about accounts still writes
+        # a valid transaction, and the operation puts it on the default one.
+        "account_id": fields.integer("account_id", required=False, minimum=1),
     }
     fields.raise_if_invalid()
     return values
@@ -71,6 +76,7 @@ def _read_filters():
         "date_to": date("to"),
         "txn_type": kind if kind in TYPES else None,
         "category_id": whole("category_id"),
+        "account_id": whole("account_id"),
         "min_amount": decimal("min"),
         "max_amount": decimal("max"),
         # Both are looked up in a whitelist inside the operation; an unknown
@@ -128,9 +134,10 @@ def create_transaction():
     values = _read_submission(request.get_json(silent=True) or {})
     if not operations.add_transaction(user_id, values["txn_date"], values["category_id"],
                                       values["amount"], values["txn_type"],
-                                      values["description"]):
-        # add_transaction only writes when the category belongs to this user,
-        # so a false return means the id was not theirs to use.
+                                      values["description"], values["account_id"]):
+        # add_transaction only writes when both the category and the account
+        # belong to this user, so a false return means one of the ids was
+        # not theirs to use.
         raise ValidationError({"category_id": "No such category."})
     return jsonify({"ok": True}), 201
 
@@ -142,7 +149,8 @@ def edit_transaction(transaction_id):
     values = _read_submission(request.get_json(silent=True) or {})
     if not operations.update_transaction(user_id, transaction_id, values["txn_date"],
                                          values["category_id"], values["amount"],
-                                         values["txn_type"], values["description"]):
+                                         values["txn_type"], values["description"],
+                                         values["account_id"]):
         # Either the transaction is not theirs or the category is not; both
         # answer the same way, so neither confirms another account's ids.
         raise NotFound()
@@ -199,18 +207,30 @@ def export_transactions():
     # a newline is entirely ordinary, and quoting everything means never
     # having to be right about which ones needed it.
     writer = csv.writer(buffer, quoting=csv.QUOTE_ALL, lineterminator="\r\n")
-    writer.writerow(["Date", "Category", "Type", "Amount", "Currency", "Description"])
+    writer.writerow(["Date", "Account", "Category", "Type", "Amount", "Currency",
+                     "Description", "Transfer"])
 
-    for _id, txn_date, category, amount, txn_type, description in rows:
+    # By name, not by position. This loop used to unpack the tuple, and every
+    # column added to the query silently shifted what each variable meant --
+    # the same trap money.row() exists to avoid, and the one that put the
+    # wrong figures in the portfolio report in Phase 6.
+    at = {name: index for index, name in enumerate(LIST_FIELDS)}
+
+    for row in rows:
         writer.writerow([
-            txn_date.isoformat(),
-            _inert(category),
-            txn_type,
+            row[at["date"]].isoformat(),
+            _inert(row[at["account"]] or ""),
+            _inert(row[at["category"]]),
+            row[at["type"]],
             # The bare number, not the formatted one: a spreadsheet has to be
             # able to sum this column, and "₹1,400.00" is a string to it.
-            money.serialise(amount, places),
+            money.serialise(row[at["amount"]], places),
             code,
-            _inert(description),
+            _inert(row[at["description"]]),
+            # Which two rows are one movement between accounts. Without it a
+            # transfer reads in a spreadsheet as unexplained money leaving
+            # one account and arriving in another.
+            row[at["transfer_group"]] or "",
         ])
 
     stamp = datetime.now().strftime("%Y-%m-%d")

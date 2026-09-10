@@ -3,6 +3,15 @@
 Split out of the original single operations module; the SQL and the
 function bodies are unchanged. Import these through the package, which
 re-exports every name.
+
+Every query here carries `transfer_group_id IS NULL`. A transfer is written
+as two ordinary rows -- an Expense leaving one account and an Income
+arriving in another -- and both are real from their account's point of view,
+which is why balances count them. No report should. Moving 10,000 from
+savings to current is not 10,000 earned and 10,000 spent: the net is zero,
+so cashflow would survive, but the trend would grow two bars out of money
+that never entered or left, and the payee list would rank your own savings
+account among the places your money goes.
 """
 
 from psycopg2 import Error
@@ -28,6 +37,7 @@ def category_wise_spend(user_id, month_year):
             FROM transactions t
             JOIN categories c ON t.category_id = c.category_id
             WHERE t.user_id = %s AND t.txn_type = 'Expense'
+              AND t.transfer_group_id IS NULL
               AND EXTRACT(YEAR FROM t.txn_date) = %s
               AND EXTRACT(MONTH FROM t.txn_date) = %s
             GROUP BY c.category_name
@@ -69,6 +79,7 @@ def budget_vs_actual(user_id, month_year):
             LEFT JOIN transactions t
                 ON t.category_id = b.category_id
                 AND t.txn_type = 'Expense'
+                AND t.transfer_group_id IS NULL
                 AND EXTRACT(YEAR FROM t.txn_date) = %s
                 AND EXTRACT(MONTH FROM t.txn_date) = %s
             WHERE b.user_id = %s AND b.month_year = %s
@@ -112,7 +123,7 @@ def monthly_trend(user_id, months=SERIES_MONTHS):
                    COALESCE(SUM(amount) FILTER (WHERE txn_type = 'Income'), 0),
                    COALESCE(SUM(amount) FILTER (WHERE txn_type = 'Expense'), 0)
             FROM transactions
-            WHERE user_id = %s
+            WHERE user_id = %s AND transfer_group_id IS NULL
               AND txn_date >= date_trunc('month', CURRENT_DATE)
                               - make_interval(months => %s)
             GROUP BY date_trunc('month', txn_date)
@@ -149,7 +160,7 @@ def cashflow_series(user_id, months=SERIES_MONTHS):
                      - COALESCE(SUM(amount) FILTER (WHERE txn_type = 'Expense'), 0)
                        AS net
                 FROM transactions
-                WHERE user_id = %s
+                WHERE user_id = %s AND transfer_group_id IS NULL
                   AND txn_date >= date_trunc('month', CURRENT_DATE)
                                   - make_interval(months => %s)
                 GROUP BY date_trunc('month', txn_date)
@@ -188,6 +199,7 @@ def top_merchants(user_id, months=3, limit=8):
                    SUM(amount) AS total
             FROM transactions
             WHERE user_id = %s AND txn_type = 'Expense'
+              AND transfer_group_id IS NULL
               AND description IS NOT NULL AND trim(description) <> ''
               AND txn_date >= date_trunc('month', CURRENT_DATE)
                               - make_interval(months => %s)
@@ -232,6 +244,7 @@ def net_worth_series(user_id, months=SERIES_MONTHS):
                                            THEN t.amount ELSE -t.amount END)
                            FROM transactions t
                            WHERE t.user_id = %s
+                             AND t.transfer_group_id IS NULL
                              AND t.txn_date < m.month_start + interval '1 month'
                        ), 0) AS running
                 FROM months m
@@ -284,7 +297,7 @@ def dashboard_summary(user_id, months=SERIES_MONTHS):
                    COALESCE(SUM(amount) FILTER (WHERE txn_type = 'Expense'), 0),
                    COUNT(*)
             FROM transactions
-            WHERE user_id = %s
+            WHERE user_id = %s AND transfer_group_id IS NULL
               AND txn_date >= date_trunc('month', CURRENT_DATE)
         """, (user_id,))
         income, expense, count = cursor.fetchone()

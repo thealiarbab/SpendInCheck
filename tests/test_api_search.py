@@ -199,7 +199,8 @@ def test_an_unknown_sort_falls_back_instead_of_reaching_sql(make_api_account):
 def test_the_sort_whitelist_is_the_only_way_in():
     """A unit check on the dictionary itself, so adding a column later is a
     deliberate act rather than something a caller can do."""
-    assert set(operations.SORT_COLUMNS) == {"date", "amount", "category", "type"}
+    assert set(operations.SORT_COLUMNS) == {"date", "amount", "category", "type",
+                                           "account"}
     assert set(operations.SORT_DIRECTIONS) == {"asc", "desc"}
     assert all(value in ("ASC", "DESC") for value in operations.SORT_DIRECTIONS.values())
 
@@ -266,7 +267,8 @@ def test_the_export_is_a_csv_file_excel_will_open(make_api_account):
     # codepage and a rupee sign arrives as mojibake.
     assert body.startswith("﻿")
     assert body.splitlines()[0].endswith(
-        '"Date","Category","Type","Amount","Currency","Description"')
+        '"Date","Account","Category","Type","Amount","Currency","Description",'
+        '"Transfer"')
 
 
 def test_the_export_obeys_the_same_filters_as_the_list(make_api_account):
@@ -306,9 +308,12 @@ def test_the_export_amount_is_a_number_a_spreadsheet_can_add(make_api_account):
     """"₹1,400.00" is a string to a spreadsheet, not a figure."""
     client = make_api_account()
     stock(client)
-    body = csv_of(client).get_data(as_text=True)
-    first = body.splitlines()[1].split('","')
-    Decimal(first[3].strip('"'))
+    lines = csv_of(client).get_data(as_text=True).splitlines()
+    # Found by name rather than counted to, so adding a column to the export
+    # does not quietly point this at something else.
+    header = [cell.strip('"﻿') for cell in lines[0].split('","')]
+    amount = header.index("Amount")
+    Decimal(lines[1].split('","')[amount].strip('"'))
 
 
 def test_the_export_needs_a_session(client):

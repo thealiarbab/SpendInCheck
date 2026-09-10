@@ -11,11 +11,15 @@ domain now, but this package re-exports every public name, so callers still
 write `operations.add_transaction(...)` and never import the submodules.
 """
 
-from .users import (STARTER_CATEGORIES, create_user, get_currency,
+from .users import (STARTER_ACCOUNT, STARTER_CATEGORIES, create_user, get_currency,
                     get_user_by_login, set_currency, user_exists, username_taken)
 from .demo import (DEMO_BUDGETS, DEMO_CATEGORIES, DEMO_INVESTMENTS,
                    DEMO_TRANSACTIONS, create_demo_user, delete_demo_user,
                    delete_stale_demo_users, reset_demo_data)
+from .accounts import (ACCOUNT_KINDS, TRANSFER_CATEGORY, account_exists,
+                       add_account, count_account_use, default_account_id,
+                       delete_account, delete_transfer, list_accounts,
+                       set_archived, transfer, update_account)
 from .categories import (add_category, category_exists, count_category_use,
                          delete_category, get_all_categories, rename_category)
 from .transactions import (DEFAULT_PER_PAGE, MAX_PER_PAGE, SORT_COLUMNS,
@@ -34,11 +38,15 @@ from .investments import (add_investment, delete_investment, get_all_investments
 # anywhere below breaks this import loudly instead of silently shrinking
 # the public surface.
 __all__ = [
-    "STARTER_CATEGORIES", "create_user", "get_currency", "get_user_by_login",
+    "STARTER_ACCOUNT", "STARTER_CATEGORIES", "create_user", "get_currency", "get_user_by_login",
     "set_currency", "user_exists", "username_taken",
     "DEMO_BUDGETS", "DEMO_CATEGORIES", "DEMO_INVESTMENTS", "DEMO_TRANSACTIONS",
     "create_demo_user", "delete_demo_user", "delete_stale_demo_users",
     "reset_demo_data",
+    "ACCOUNT_KINDS", "TRANSFER_CATEGORY", "account_exists", "add_account",
+    "count_account_use", "default_account_id", "delete_account",
+    "delete_transfer", "list_accounts", "set_archived", "transfer",
+    "update_account",
     "add_category", "category_exists", "count_category_use", "delete_category",
     "get_all_categories", "rename_category",
     "DEFAULT_PER_PAGE", "MAX_PER_PAGE", "SORT_COLUMNS", "SORT_DIRECTIONS",
