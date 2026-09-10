@@ -11,7 +11,7 @@ from datetime import timedelta
 
 from flask import Flask
 
-from server import config
+from server import config, db
 from server.routes import web
 from server.routes.api import api, handle_unknown_path
 
@@ -45,6 +45,11 @@ def create_app(secret_key=None):
     )
 
     _check_production_config(app)
+
+    # One connection per request rather than one per query. Without the
+    # teardown the connection would outlive the request and, on a reused
+    # serverless container, never be given back to the pool.
+    app.teardown_appcontext(db.close_request_connection)
 
     web.register(app)
     app.register_blueprint(api)
