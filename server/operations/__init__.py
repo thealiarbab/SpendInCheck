@@ -18,9 +18,10 @@ from .demo import (DEMO_BUDGETS, DEMO_CATEGORIES, DEMO_INVESTMENTS,
                    delete_stale_demo_users, reset_demo_data)
 from .categories import (add_category, category_exists, count_category_use,
                          delete_category, get_all_categories, rename_category)
-from .transactions import (add_transaction, delete_transaction,
+from .transactions import (DEFAULT_PER_PAGE, MAX_PER_PAGE, SORT_COLUMNS,
+                           SORT_DIRECTIONS, add_transaction, delete_transaction,
                            get_all_transactions, get_transaction_by_id,
-                           update_transaction)
+                           search_transactions, update_transaction)
 from .budgets import get_all_budgets, set_budget
 from .reports import budget_vs_actual, category_wise_spend
 from .investments import (add_investment, delete_investment, get_all_investments,
@@ -38,8 +39,9 @@ __all__ = [
     "reset_demo_data",
     "add_category", "category_exists", "count_category_use", "delete_category",
     "get_all_categories", "rename_category",
+    "DEFAULT_PER_PAGE", "MAX_PER_PAGE", "SORT_COLUMNS", "SORT_DIRECTIONS",
     "add_transaction", "delete_transaction", "get_all_transactions",
-    "get_transaction_by_id", "update_transaction",
+    "get_transaction_by_id", "search_transactions", "update_transaction",
     "get_all_budgets", "set_budget",
     "budget_vs_actual", "category_wise_spend",
     "add_investment", "delete_investment", "get_all_investments",
