@@ -137,6 +137,10 @@ def main():
                lambda: client.get("/api/v1/transactions"))
         record("Budget vs actual report", 312, "Joins budgets to transactions.",
                lambda: client.get("/api/v1/reports/budget-vs-actual?month=2026-08"))
+        record("Reports screen, a year of every series", 1496,
+               "Seven queries on one connection. The baseline is the same "
+               "figures asked for as four separate requests.",
+               lambda: client.get("/api/v1/reports/summary?months=12"))
         record("Session check, touches no database", 6,
                "The floor: what a request costs with no query in it.",
                lambda: client.get("/api/v1/auth/session"))
