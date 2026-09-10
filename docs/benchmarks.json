@@ -1,41 +1,57 @@
 {
-  "measured_at": 1789018880,
+  "measured_at": 1789019566,
   "runs": 5,
   "entries": [
     {
       "label": "Open the demo, to a screen with figures",
-      "best": 516,
-      "median": 546,
+      "best": 484,
+      "median": 547,
       "baseline": 3100,
       "note": "Session, account creation, seeding and the dashboard payload."
     },
     {
       "label": "Dashboard, already signed in",
-      "best": 298,
-      "median": 304,
+      "best": 275,
+      "median": 287,
       "baseline": 489,
       "note": "Holdings and recent rows together, sharing one connection."
     },
     {
       "label": "Transactions list",
-      "best": 255,
-      "median": 269,
+      "best": 238,
+      "median": 279,
       "baseline": 234,
       "note": "A single query."
     },
     {
       "label": "Budget vs actual report",
-      "best": 257,
-      "median": 280,
+      "best": 250,
+      "median": 268,
       "baseline": 312,
       "note": "Joins budgets to transactions."
     },
     {
       "label": "Session check, touches no database",
-      "best": 2,
-      "median": 2,
+      "best": 1,
+      "median": 1,
       "baseline": 6,
       "note": "The floor: what a request costs with no query in it."
+    }
+  ],
+  "live": [
+    {
+      "label": "Open the demo, on the live site",
+      "best": 335,
+      "median": 367,
+      "baseline": 14527,
+      "note": "Was 14.5s with the function in Washington and the database in Mumbai."
+    },
+    {
+      "label": "Front page, on the live site",
+      "best": 117,
+      "median": 121,
+      "baseline": 300,
+      "note": "Touches no database. The floor for a request from here."
     }
   ]
 }

@@ -11,9 +11,28 @@
           "static/**"
         ]
       }
+    },
+    {
+      "src": "web/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
     }
   ],
   "routes": [
+    {
+      "src": "/app/assets/(.*)",
+      "dest": "/web/assets/$1"
+    },
+    {
+      "src": "/app/([^/]+\\.[a-z0-9]+)",
+      "dest": "/web/$1"
+    },
+    {
+      "src": "/app(?:/.*)?",
+      "dest": "/web/index.html"
+    },
     {
       "src": "/(.*)",
       "dest": "app.py"

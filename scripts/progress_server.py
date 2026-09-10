@@ -43,9 +43,13 @@ COMMIT_PHASE = {
         "2fddf8d", "44e2272", "f2b37c8", "269ea6a", "a56f0fd", "f7c0cf4",
         "5f13215", "29ca7b1", "2ff172d", "c0b8098", "f3e57b2", "e40f64e",
         "cd7f9d8"],
+    # 1d97254 and 9b45dc7 are the API client and the UI primitives: both were
+    # on Phase 3's checklist and both were written after the marker had moved
+    # to Phase 4, so they are counted where they belong rather than where they
+    # happened to land.
     3: ["e3edb16", "5167880", "0078b12", "d5faeb9", "d722367", "58fbd03",
         "8f2bae6", "514eb37", "8e97c8f", "c32e02b", "357a022", "d027ab7",
-        "4685dcd", "21a21de"],
+        "4685dcd", "21a21de", "1d97254", "9b45dc7"],
 }
 
 PHASES = [
@@ -292,6 +296,8 @@ h1{font-family:var(--serif);font-weight:400;font-size:50px;line-height:1.04;marg
 .benchWas{position:absolute;top:-1px;bottom:-1px;width:2px;background:var(--debit)}
 .benchDelta{font-family:var(--mono);font-size:11px;color:var(--credit);grid-column:1/-1}
 .benchDelta.flat{color:var(--paper-mute)}
+.speedGroup{font-family:var(--mono);font-size:10.5px;letter-spacing:1.1px;
+            text-transform:uppercase;color:var(--brass-dim);margin:20px 0 2px}
 
 .toolbar{display:flex;gap:10px;align-items:center;margin:22px 0 0}
 .toggle{font-family:var(--mono);font-size:10.5px;letter-spacing:1.2px;text-transform:uppercase;
@@ -389,6 +395,26 @@ function wirePhases() {
   });
 }
 
+// Both groups render the same way; only the scale differs, so that a group's
+// bars are comparable within itself.
+function benchRows(entries, scale) {
+  return entries.map(e => {
+    const faster = e.baseline > 0 ? Math.round((1 - e.best / e.baseline) * 100) : 0;
+    return `<div class="bench">
+      <span class="benchLabel">${esc(e.label)}</span>
+      <span class="benchNow">${e.best} ms</span>
+      <span class="benchNote">${esc(e.note)}</span>
+      <span class="benchBar">
+        <span class="benchFill" style="width:${Math.max(1, (e.best / scale) * 100)}%"></span>
+        <span class="benchWas" style="left:${Math.min(99.6, (e.baseline / scale) * 100)}%" title="was ${e.baseline} ms"></span>
+      </span>
+      <span class="benchDelta${faster > 0 ? "" : " flat"}">${
+        faster > 0 ? faster + "% faster, was " + e.baseline + " ms" : "unchanged"
+      }</span>
+    </div>`;
+  }).join("");
+}
+
 function render(d) {
   window.__last = d;
   document.getElementById("toggle-all").textContent =
@@ -421,21 +447,10 @@ function render(d) {
         <h2 class="speedTitle">Speed</h2>
         <span class="speedWhen">measured <span data-at="${speed.measured_at}"></span> &middot; best of ${speed.runs}</span>
       </div>
-      ${speed.entries.map(e => {
-        const faster = e.baseline > 0 ? Math.round((1 - e.best / e.baseline) * 100) : 0;
-        return `<div class="bench">
-          <span class="benchLabel">${esc(e.label)}</span>
-          <span class="benchNow">${e.best} ms</span>
-          <span class="benchNote">${esc(e.note)}</span>
-          <span class="benchBar">
-            <span class="benchFill" style="width:${Math.max(1, (e.best / scale) * 100)}%"></span>
-            <span class="benchWas" style="left:${Math.min(99.6, (e.baseline / scale) * 100)}%" title="was ${e.baseline} ms"></span>
-          </span>
-          <span class="benchDelta${faster > 0 ? "" : " flat"}">${
-            faster > 0 ? faster + "% faster — was " + e.baseline + " ms" : "unchanged"
-          }</span>
-        </div>`;
-      }).join("")}`;
+      ${benchRows(speed.entries, scale)}
+      ${(speed.live && speed.live.length) ? `
+        <p class="speedGroup">On the deployed site &mdash; spendincheck.com</p>
+        ${benchRows(speed.live, Math.max(...speed.live.map(e => Math.max(e.baseline, e.best))))}` : ""}`;
   }
 
   document.getElementById("ticks").innerHTML =

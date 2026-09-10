@@ -11,10 +11,12 @@ Each entry carries the figure it started from, so the page can show what
 changed rather than a number with no scale.
 """
 
+import http.cookiejar
 import json
 import statistics
 import sys
 import time
+import urllib.request
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -45,6 +47,55 @@ def measure(fn, runs=RUNS, after=None):
         if after is not None:
             after(result)
     return round(min(times)), round(statistics.median(times))
+
+
+LIVE = "https://spendincheck.com"
+
+
+def measure_live():
+    """Time the same paths against the deployed site.
+
+    Worth recording separately: the local figures describe this machine's
+    distance from Supabase, and the deployed ones describe the function's.
+    Those were an order of magnitude apart until the function was moved to
+    the database's region, which is exactly the sort of gap that stays
+    invisible if only one of them is ever measured.
+    """
+    def fetch(op, path, headers=None, method="GET"):
+        request = urllib.request.Request(
+            LIVE + path, method=method,
+            data=b"" if method == "POST" else None,
+            headers={"User-Agent": "spendincheck-benchmark", **(headers or {})})
+        return op.open(request, timeout=60).read().decode()
+
+    def open_the_demo():
+        op = urllib.request.build_opener(
+            urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+        token = json.loads(fetch(op, "/api/v1/auth/session"))["csrf_token"]
+        fetch(op, "/api/v1/auth/demo", {"X-CSRF-Token": token}, method="POST")
+
+    entries = []
+    try:
+        # A cold function pays a start-up cost that is not what is being
+        # measured here, so the first calls are thrown away.
+        for _ in range(2):
+            open_the_demo()
+
+        best, median = measure(open_the_demo)
+        entries.append({"label": "Open the demo, on the live site", "best": best,
+                        "median": median, "baseline": 14527,
+                        "note": "Was 14.5s with the function in Washington and the database in Mumbai."})
+        print(f"  {'Open the demo, live':44} {best:5} ms best   {median:5} ms median")
+
+        op = urllib.request.build_opener()
+        best, median = measure(lambda: fetch(op, "/"))
+        entries.append({"label": "Front page, on the live site", "best": best,
+                        "median": median, "baseline": 300,
+                        "note": "Touches no database. The floor for a request from here."})
+        print(f"  {'Front page, live':44} {best:5} ms best   {median:5} ms median")
+    except Exception as error:
+        print(f"  live probe skipped: {error}")
+    return entries
 
 
 def main():
@@ -92,10 +143,25 @@ def main():
     finally:
         operations.delete_demo_user(user_id)
 
+    live = []
+    if "--live" in sys.argv:
+        print()
+        print("Against the deployed site:")
+        print()
+        live = measure_live()
+
     OUTPUT.parent.mkdir(exist_ok=True)
-    OUTPUT.write_text(json.dumps(
-        {"measured_at": int(time.time()), "runs": RUNS, "entries": entries},
-        indent=2), encoding="utf-8")
+    payload = {"measured_at": int(time.time()), "runs": RUNS, "entries": entries}
+    if live:
+        payload["live"] = live
+    elif OUTPUT.exists():
+        # Keep whatever was recorded last time rather than dropping it just
+        # because this run was local only.
+        try:
+            payload["live"] = json.loads(OUTPUT.read_text(encoding="utf-8")).get("live", [])
+        except ValueError:
+            pass
+    OUTPUT.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     print(f"\nWritten to {OUTPUT.relative_to(REPO)}")
 
 
