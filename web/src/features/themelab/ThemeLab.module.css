@@ -1,0 +1,294 @@
+.page {
+  display: grid;
+  gap: var(--space-8);
+}
+
+.panes {
+  display: grid;
+  /* min() rather than a bare 360px: auto-fit will not shrink a column below
+     its minimum, so a bare value wider than the viewport overflows the page. */
+  grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr));
+  gap: var(--space-5);
+}
+
+/* Each pane re-declares the semantic tokens for its own subtree, because the
+   theme blocks in tokens.css are attribute selectors rather than :root rules.
+   That is what lets both themes render live, side by side, at once. */
+.pane {
+  background: var(--surface-page);
+  color: var(--content-primary);
+  border: 1px solid var(--line-default);
+  padding: var(--space-5);
+  font-family: var(--font-sans);
+}
+
+.paneLabel {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--content-muted);
+  margin-bottom: var(--space-4);
+}
+
+.card {
+  background: var(--surface-raised);
+  border: 1px solid var(--line-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.statRow {
+  display: grid;
+  /* Wraps to two rows on a narrow pane rather than clipping the last cell. */
+  grid-template-columns: repeat(auto-fit, minmax(min(110px, 100%), 1fr));
+  border: 1px solid var(--line-default);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
+}
+
+.stat {
+  padding: var(--space-3) var(--space-4);
+  border-right: 1px solid var(--line-default);
+  min-width: 0;
+}
+.stat:last-child { border-right: 0; }
+
+.statLabel {
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--content-muted);
+}
+
+.statValue {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-lg);
+  margin-top: var(--space-1);
+  white-space: nowrap;
+}
+
+.statValueCredit {
+  composes: statValue;
+  color: var(--money-credit);
+}
+
+.statValueDebit {
+  composes: statValue;
+  color: var(--money-debit);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.table th {
+  text-align: left;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--content-muted);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--line-default);
+}
+
+.table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.table tbody tr:hover { background: var(--surface-hover); }
+
+.right {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.rightCredit {
+  composes: right;
+  color: var(--money-credit);
+}
+
+.rightDebit {
+  composes: right;
+  color: var(--money-debit);
+}
+
+.meter {
+  height: 6px;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  margin-top: var(--space-2);
+}
+
+.meterFill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+}
+
+.field { margin-bottom: var(--space-3); }
+
+.label {
+  display: block;
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--content-muted);
+  margin-bottom: var(--space-1);
+}
+
+.input {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-inset);
+  color: var(--content-primary);
+  border: 1px solid var(--line-default);
+  border-radius: var(--radius-sm);
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--line-focus);
+  outline-offset: 1px;
+}
+
+.inputError {
+  composes: input;
+  border-color: var(--state-error);
+}
+
+.errorText {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--state-error);
+}
+
+.buttons { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+
+.btn {
+  padding: var(--space-2) var(--space-4);
+  background: var(--accent-default);
+  color: var(--content-on-accent);
+  border: 1px solid var(--accent-default);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.btn:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+
+.btnGhost {
+  composes: btn;
+  background: transparent;
+  color: var(--content-primary);
+  border-color: var(--line-strong);
+}
+.btnGhost:hover { background: var(--surface-hover); }
+
+.btnDanger {
+  composes: btn;
+  background: transparent;
+  color: var(--state-error);
+  border-color: var(--state-error);
+}
+
+.pill {
+  display: inline-block;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  letter-spacing: 0.03em;
+}
+.pillOver {
+  composes: pill;
+  background: var(--money-debit-wash);
+  color: var(--money-debit);
+}
+
+.pillUnder {
+  composes: pill;
+  background: var(--money-credit-wash);
+  color: var(--money-credit);
+}
+
+.invest {
+  color: var(--accent-invest);
+  font-size: var(--text-sm);
+  /* The arrow belongs to the ticker; wrapping it alone reads as a stray glyph. */
+  white-space: nowrap;
+}
+
+.tokenTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.tokenTable th,
+.tokenTable td {
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--line-soft);
+}
+.tokenTable th {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--content-muted);
+  border-bottom-color: var(--line-default);
+}
+.mono { font-family: var(--font-mono); font-size: var(--text-xs); }
+
+.swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--line-default);
+  vertical-align: -2px;
+  margin-right: var(--space-2);
+}
+
+.fail { color: var(--state-error); font-family: var(--font-mono); }
+.pass { color: var(--money-credit); font-family: var(--font-mono); }
+
+/* --- budget rows -------------------------------------------------------- */
+
+.budgetRow { margin-top: var(--space-3); }
+
+.budgetHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.budgetName { font-size: var(--text-sm); }
+
+.budgetFigures {
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm);
+}
+
+/* The meter colour is data-driven rather than inline, so the three budget
+   states stay defined next to the tokens they use. */
+.meterFill[data-state="under"] { background: var(--money-credit); }
+.meterFill[data-state="level"] { background: var(--money-level); }
+.meterFill[data-state="over"] { background: var(--money-debit); }
+
+.lede {
+  color: var(--content-secondary);
+  margin-top: var(--space-2);
+  margin-bottom: var(--space-4);
+  max-width: 70ch;
+}
