@@ -32,7 +32,7 @@ BASELINE = "b2c9a7c"
 # mapping rather than a range. Any commit not listed is treated as part of
 # CURRENT_PHASE, which is what keeps this accurate as new work lands without
 # anyone editing the file.
-CURRENT_PHASE = 6
+CURRENT_PHASE = 7
 
 COMMIT_PHASE = {
     0: ["5e3ab5e", "6308244", "931dabe", "490f434", "c030a97", "e166bb4", "efb70ab"],
@@ -50,6 +50,14 @@ COMMIT_PHASE = {
     3: ["e3edb16", "5167880", "0078b12", "d5faeb9", "d722367", "58fbd03",
         "8f2bae6", "514eb37", "8e97c8f", "c32e02b", "357a022", "d027ab7",
         "4685dcd", "21a21de", "1d97254", "9b45dc7"],
+    4: ["8fea2a8", "3ba5ce1", "ad91a58", "8badd28", "13349ce", "b6f017b",
+        "85967fe", "93f07e8", "844d19a", "9547882", "2042268", "1daa6a1",
+        "9853982", "d21f6d8", "1ec8d5c", "9bca8be", "28aa2a2", "cad44e5",
+        "fa32013", "a7a3e6c", "0e53a7c", "50b6476", "869b4de"],
+    5: ["8f7b3bf", "9334d49", "ffbf9aa", "f238733", "58a5f52", "2d9bd7b",
+        "1b0d9db", "2e9f861"],
+    6: ["902adef", "6b24584", "a97b8d6", "0d0d297", "1dc9e02", "97c4872",
+        "d8a490e", "9ea6003", "1c52356"],
 }
 
 PHASES = [
@@ -83,10 +91,15 @@ PHASES = [
               "The search is a UNION so the trigram index can serve it: 54ms to 4ms "
               "on an account with 20,000 rows.",
      "open": []},
-    {"n": 6, "name": "Reporting depth and charts", "state": "now",
-     "blurb": "dashboard_summary in one round trip, plus trend, cashflow and net worth.",
+    {"n": 6, "name": "Reporting depth and charts", "state": "done",
+     "blurb": "dashboard_summary answers seven queries in one round trip. The charts "
+              "are hand-written SVG on the --chart-* tokens, so both themes are right "
+              "at once, and they pick a narrower viewBox on a phone because an SVG "
+              "scales its axis labels along with everything else. Months with no rows "
+              "are lined up against the net-worth calendar rather than dropped, and a "
+              "running total carries an empty month forward instead of falling to zero.",
      "open": []},
-    {"n": 7, "name": "Accounts through CSV import", "state": "next",
+    {"n": 7, "name": "Accounts through CSV import", "state": "now",
      "blurb": "Migrations 002-006 in order. Import lands last, because it is the "
               "feature that can create hundreds of wrong rows at once.",
      "open": []},
@@ -156,7 +169,11 @@ def collect():
     for commit in commits:
         by_phase.setdefault(commit["phase"], []).append(commit)
 
-    dirty = [line[3:] for line in git("status", "--porcelain").splitlines() if line]
+    # Split off the status rather than slicing a fixed three characters:
+    # git() strips its output, which eats the leading space of the first line
+    # and was quietly turning "docs/x" into "ocs/x" on the page.
+    dirty = [line.split(maxsplit=1)[-1]
+             for line in git("status", "--porcelain").splitlines() if line.strip()]
     unpushed = git("rev-list", "--count", "origin/main..HEAD") or "?"
 
     # Counting the def lines is instant; asking pytest would make every page

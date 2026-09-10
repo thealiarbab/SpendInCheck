@@ -86,16 +86,13 @@ figures from it rather than reasoning about them.
   changing currency relabels and re-rounds, and the settings screen says so
   before the control.
 
-## 7. Where Phase 6 stopped
+## 7. Where Phase 7 starts
 
-Backend done and tested (17 tests): `monthly_trend`, `cashflow_series`,
-`net_worth_series`, `top_merchants`, and `dashboard_summary`, which returns
-all of them in one round trip — 449ms against 1496ms asked separately.
+Phase 6 is closed: the reporting backend, the chart primitives and the
+reports screen that draws them, verified in both themes at desktop and
+mobile widths.
 
-Chart primitives done: `web/src/ui/charts.tsx`, hand-drawn SVG on the
-`--chart-*` tokens.
-
-**Left to do:** render them. Nothing imports `charts.tsx` yet. The reports
-screen (`web/src/features/reports/Reports.tsx`) is where they go, fed by
-`GET /api/v1/reports/summary`. The phase's verify step is *every chart in
-both themes, mobile and desktop*.
+Phase 7 is accounts through CSV import. The plan says migrations 002-006 go
+in order and import lands last, because it is the one feature that can
+create hundreds of wrong rows at once. 002 is already applied -- it is the
+one that widened the money columns.
