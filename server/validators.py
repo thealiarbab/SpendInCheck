@@ -70,11 +70,15 @@ class Validator:
     def text(self, field, *, required=True, max_length=None, label=None):
         """A trimmed, non-empty string."""
         name = label or field.replace("_", " ")
+        # "Enter an email" rather than "Enter a email". The article depends on
+        # the sound, not the letter, so "u" is excluded: every u-word used as a
+        # field label here ("username") is pronounced "yoo" and takes "a".
+        article = "an" if name[:1].lower() in "aeio" else "a"
         raw = self.payload.get(field)
 
         if raw is None or str(raw).strip() == "":
             if required:
-                return self.fail(field, f"Enter a {name}.")
+                return self.fail(field, f"Enter {article} {name}.")
             return None
 
         value = str(raw).strip()
