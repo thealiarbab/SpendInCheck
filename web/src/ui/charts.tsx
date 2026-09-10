@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useSyncExternalStore, type ReactNode } from "react";
 import { formatCompact, formatMoney } from "../lib/money";
 import styles from "./charts.module.css";
 
@@ -10,20 +10,62 @@ import styles from "./charts.module.css";
  * problem, because these have to be correct in brass and paper at once.
  * Reading --chart-* directly is what makes that automatic.
  *
- * They draw into a viewBox and scale to their container, so "mobile" is not
- * a separate code path: the same SVG is simply narrower.
+ * They draw into a viewBox and scale to their container. The only thing a
+ * narrow screen changes is which viewBox -- see the note on WIDE and NARROW.
  */
 
-/** The plot area inside the viewBox, leaving room for the axis labels. */
-const BOX = { width: 640, height: 220 };
-const PAD = { top: 12, right: 8, bottom: 26, left: 52 };
-
-const plot = {
-  x: PAD.left,
-  y: PAD.top,
-  width: BOX.width - PAD.left - PAD.right,
-  height: BOX.height - PAD.top - PAD.bottom,
+/* The plot area inside the viewBox, leaving room for the axis labels.
+ *
+ * There are two of these because an SVG scales its text along with
+ * everything else. A 640-unit viewBox drawn 325 pixels wide on a phone
+ * halves the axis labels to about five pixels, which is not small type, it
+ * is decoration. Drawing the same chart into a narrower viewBox instead
+ * means it barely scales at all, so ten units stays roughly ten pixels --
+ * the labels keep their size and the chart loses width, which is the right
+ * thing to give up.
+ */
+const WIDE = {
+  width: 640, height: 220,
+  pad: { top: 12, right: 8, bottom: 26, left: 52 },
 };
+const NARROW = {
+  width: 360, height: 200,
+  pad: { top: 10, right: 6, bottom: 24, left: 46 },
+};
+
+/* Below this the single-column layout has taken over and the charts are as
+ * wide as they will get, so it is the point where scaling starts to bite. */
+const NARROW_SCREEN = "(max-width: 40rem)";
+
+function watchWidth(onChange: () => void) {
+  const query = window.matchMedia(NARROW_SCREEN);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+
+type Shape = typeof WIDE & {
+  plot: { x: number; y: number; width: number; height: number };
+};
+
+/** Which viewBox this chart should draw into, kept current as the window
+ *  is resized. */
+function useShape(): Shape {
+  const narrow = useSyncExternalStore(
+    watchWidth,
+    () => window.matchMedia(NARROW_SCREEN).matches,
+    () => false,
+  );
+  const box = narrow ? NARROW : WIDE;
+  return {
+    ...box,
+    plot: {
+      x: box.pad.left,
+      y: box.pad.top,
+      width: box.width - box.pad.left - box.pad.right,
+      height: box.height - box.pad.top - box.pad.bottom,
+    },
+  };
+}
 
 /** "2026-08" as "Aug", which is all that fits under a tick. */
 function shortMonth(month: string): string {
@@ -33,7 +75,7 @@ function shortMonth(month: string): string {
 }
 
 /** A scale from data values to pixels, with a little headroom. */
-function scaleFor(values: number[]) {
+function scaleFor(values: number[], plot: Shape["plot"]) {
   const highest = Math.max(0, ...values);
   const lowest = Math.min(0, ...values);
   // A flat series of zeros would divide by zero and draw nothing; give it a
@@ -63,7 +105,9 @@ export function ChartFrame(
 }
 
 /** Horizontal guide lines and the figures that label them. */
-function Gridlines({ scale }: { scale: ReturnType<typeof scaleFor> }) {
+function Gridlines(
+  { scale, plot }: { scale: ReturnType<typeof scaleFor>; plot: Shape["plot"] },
+) {
   const steps = [0, 0.25, 0.5, 0.75, 1];
   return (
     <g>
@@ -86,7 +130,8 @@ function Gridlines({ scale }: { scale: ReturnType<typeof scaleFor> }) {
 }
 
 /** The month labels along the bottom, thinned so they never collide. */
-function MonthAxis({ months }: { months: string[] }) {
+function MonthAxis({ months, shape }: { months: string[]; shape: Shape }) {
+  const { plot } = shape;
   // At twelve points on a phone every label would overlap, so only every
   // other one is drawn once there are more than eight.
   const every = months.length > 8 ? 2 : 1;
@@ -98,7 +143,7 @@ function MonthAxis({ months }: { months: string[] }) {
           <text
             key={month} className={styles.axis}
             x={plot.x + step * index + step / 2}
-            y={BOX.height - 8} textAnchor="middle"
+            y={shape.height - 8} textAnchor="middle"
           >
             {shortMonth(month)}
           </text>
@@ -124,17 +169,22 @@ export function PairedBars(
   { months, income, expense }:
   { months: string[]; income: number[]; expense: number[] },
 ) {
-  const scale = scaleFor([...income, ...expense]);
+  const shape = useShape();
+  const { plot } = shape;
+  const scale = scaleFor([...income, ...expense], plot);
   const step = plot.width / Math.max(months.length, 1);
-  const barWidth = Math.max(2, (step - 6) / 2);
+  // A gutter of a fifth of the slot, so neighbouring months stay separate
+  // pairs rather than reading as one wide block.
+  const gutter = step / 5;
+  const barWidth = Math.max(1, (step - gutter) / 2);
   const zero = scale.y(0);
 
   return (
-    <svg className={styles.svg} viewBox={`0 0 ${BOX.width} ${BOX.height}`}
+    <svg className={styles.svg} viewBox={`0 0 ${shape.width} ${shape.height}`}
          role="img" aria-label="Income and expense for each month">
-      <Gridlines scale={scale} />
+      <Gridlines scale={scale} plot={plot} />
       {months.map((month, index) => {
-        const left = plot.x + step * index + 3;
+        const left = plot.x + step * index + gutter / 2;
         return (
           <g key={month}>
             <rect className={styles.income} x={left} width={barWidth}
@@ -150,7 +200,7 @@ export function PairedBars(
           </g>
         );
       })}
-      <MonthAxis months={months} />
+      <MonthAxis months={months} shape={shape} />
     </svg>
   );
 }
@@ -166,7 +216,9 @@ export function LineChart(
   { months, values, label, fill }:
   { months: string[]; values: number[]; label: string; fill?: boolean },
 ) {
-  const scale = scaleFor(values);
+  const shape = useShape();
+  const { plot } = shape;
+  const scale = scaleFor(values, plot);
   const step = plot.width / Math.max(values.length, 1);
   const at = (index: number) => plot.x + step * index + step / 2;
 
@@ -178,9 +230,9 @@ export function LineChart(
     : "";
 
   return (
-    <svg className={styles.svg} viewBox={`0 0 ${BOX.width} ${BOX.height}`}
+    <svg className={styles.svg} viewBox={`0 0 ${shape.width} ${shape.height}`}
          role="img" aria-label={label}>
-      <Gridlines scale={scale} />
+      <Gridlines scale={scale} plot={plot} />
       {fill && area && <path className={styles.area} d={area} />}
       <path className={styles.line} d={line} />
       {values.map((value, index) => (
@@ -193,7 +245,7 @@ export function LineChart(
         <line className={styles.zero} x1={plot.x} x2={plot.x + plot.width}
               y1={scale.y(0)} y2={scale.y(0)} />
       )}
-      <MonthAxis months={months} />
+      <MonthAxis months={months} shape={shape} />
     </svg>
   );
 }
@@ -228,13 +280,24 @@ export function RankedBars(
   );
 }
 
+/* A swatch is an HTML span, not an SVG shape, so it takes a background and
+ * not a fill -- reusing the chart classes here would have produced three
+ * invisible squares. */
+const SWATCH = {
+  income: styles.swatchIncome,
+  expense: styles.swatchExpense,
+  line: styles.swatchLine,
+};
+
 /** A key, so the colours in a chart mean something without hovering. */
-export function Legend({ items }: { items: { label: string; kind: string }[] }) {
+export function Legend(
+  { items }: { items: { label: string; kind: keyof typeof SWATCH }[] },
+) {
   return (
     <ul className={styles.legend}>
       {items.map((item) => (
         <li key={item.label}>
-          <span className={`${styles.swatch} ${styles[item.kind]}`} aria-hidden="true" />
+          <span className={`${styles.swatch} ${SWATCH[item.kind]}`} aria-hidden="true" />
           {item.label}
         </li>
       ))}

@@ -6,7 +6,14 @@ import { externalLinkProps, surplusHref } from "../../lib/links";
 import {
   Card, Empty, Field, Loading, Notice, PageHead, Stat, StatRow, Table, cell,
 } from "../../ui";
+import {
+  ChartFrame, Legend, LineChart, PairedBars, RankedBars,
+} from "../../ui/charts";
+import { alignRunning, alignTo } from "./align";
 import styles from "./Reports.module.css";
+
+/** How much history the charts show. A year, so seasons are visible. */
+const HISTORY = 12;
 
 function thisMonth(): string {
   const now = new Date();
@@ -42,8 +49,27 @@ export function Reports() {
     queryFn: () => api.budgetVsActual(month),
   });
 
+  // Not keyed by month: these are the last twelve months whichever month is
+  // being read below, so changing the picker must not refetch them.
+  const summary = useQuery({
+    queryKey: ["report", "summary", HISTORY],
+    queryFn: () => api.summary(HISTORY),
+  });
+
   const spendRows = spend.data?.items ?? [];
   const budgetRows = budget.data?.items ?? [];
+
+  const months = (summary.data?.net_worth ?? []).map((row) => row.month);
+  const income = alignTo(months, summary.data?.trend ?? [], (row) => row.income);
+  const expense = alignTo(months, summary.data?.trend ?? [], (row) => row.expense);
+  const running = alignRunning(months, summary.data?.cashflow ?? [],
+                               (row) => row.cumulative);
+  const worth = alignTo(months, summary.data?.net_worth ?? [],
+                        (row) => row.net_worth);
+  const merchants = summary.data?.merchants ?? [];
+  // A year of nothing draws twelve flat zeros and says less than a sentence.
+  const nothingYet = income.every((value, index) =>
+    value === 0 && expense[index] === 0);
 
   const spent = spendRows.reduce((sum, row) => sum + toMinor(row.total), 0);
   const budgeted = budgetRows.reduce((sum, row) => sum + toMinor(row.limit), 0);
@@ -54,7 +80,7 @@ export function Reports() {
 
   return (
     <>
-      <PageHead title="Reports" subtitle={`Showing ${monthName(month)}.`}>
+      <PageHead title="Reports" subtitle={`The last twelve months, and ${monthName(month)} in detail.`}>
         <div className={styles.picker}>
           <Field
             label="Month" name="month" type="month" value={month}
@@ -76,6 +102,52 @@ export function Reports() {
                 : difference < 0 ? "debit" : "level"}
         />
       </StatRow>
+
+      {summary.error ? (
+        <Notice>{(summary.error as Error).message}</Notice>
+      ) : summary.isPending ? (
+        <Card><Loading what="the last twelve months" /></Card>
+      ) : (
+        <div className={styles.charts}>
+          <Card>
+            <ChartFrame title="Income and expense" note="last 12 months"
+                        empty={nothingYet}>
+              <PairedBars months={months} income={income} expense={expense} />
+              <Legend items={[{ label: "In", kind: "income" },
+                              { label: "Out", kind: "expense" }]} />
+            </ChartFrame>
+          </Card>
+
+          <Card>
+            <ChartFrame title="Cashflow, running total" note="income less expense"
+                        empty={nothingYet}>
+              <LineChart months={months} values={running} fill
+                         label="Cumulative cashflow by month" />
+            </ChartFrame>
+          </Card>
+
+          <Card>
+            <ChartFrame title="Net worth" note="holdings at today's prices, plus cash"
+                        empty={nothingYet && worth.every((value) => value === 0)}>
+              <LineChart months={months} values={worth}
+                         label="Net worth at the end of each month" />
+            </ChartFrame>
+          </Card>
+
+          <Card>
+            <ChartFrame title="Where the money goes" note="last 3 months"
+                        empty={merchants.length === 0}>
+              <RankedBars rows={merchants.map((row) => ({
+                label: row.payee,
+                value: toMinor(row.total),
+                caption: row.times > 1 ? `${row.times}×` : undefined,
+              }))} />
+            </ChartFrame>
+          </Card>
+        </div>
+      )}
+
+      <div className={styles.gap} />
 
       <Card title="Category-wise spend" flush>
         {spend.isPending && !spend.data ? (
@@ -110,7 +182,7 @@ export function Reports() {
         )}
       </Card>
 
-      <div style={{ height: "var(--space-5)" }} />
+      <div className={styles.gap} />
 
       <Card title="Budget vs actual" flush>
         {budget.isPending && !budget.data ? (

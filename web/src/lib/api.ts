@@ -181,6 +181,35 @@ export interface BudgetVsActualRow {
   difference: string;
 }
 
+/* The reporting series. Each is a month plus figures, oldest first, because
+ * a chart draws left to right and sorting in the client would be sorting
+ * something the database already ordered. */
+
+export interface TrendRow { month: string; income: string; expense: string }
+export interface CashflowRow { month: string; net: string; cumulative: string }
+export interface NetWorthRow {
+  month: string;
+  holdings: string;
+  cash: string;
+  net_worth: string;
+}
+export interface MerchantRow { payee: string; times: number; total: string }
+
+/** Every series the reporting screen draws, from one request. */
+export interface ReportSummary {
+  this_month: {
+    income: string;
+    expense: string;
+    net: string;
+    transactions: number;
+  };
+  trend: TrendRow[];
+  cashflow: CashflowRow[];
+  net_worth: NetWorthRow[];
+  merchants: MerchantRow[];
+  spend_by_category: { category: string; total: string }[];
+}
+
 export interface InvestmentRow {
   id: number;
   asset_name: string;
@@ -299,6 +328,11 @@ export const api = {
   /** The opening screen in one request rather than two. */
   dashboard: () => request<DashboardPayload>("/reports/dashboard"),
   portfolio: () => request<PortfolioReport>("/reports/portfolio"),
+  /* Seven queries behind one request. Splitting them into four calls the
+     charts could each own would be tidier code and about a second slower,
+     because what costs here is reaching the database at all. */
+  summary: (months = 12) =>
+    request<ReportSummary>("/reports/summary" + query({ months: String(months) })),
   categorySpend: (month: string) =>
     request<{ items: { category: string; total: string }[] }>(
       "/reports/category-spend" + query({ month })),

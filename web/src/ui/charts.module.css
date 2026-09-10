@@ -107,3 +107,7 @@
 .legend li { display: flex; align-items: center; gap: var(--space-2); }
 
 .swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
+.swatchIncome { background: var(--chart-2); }
+.swatchExpense { background: var(--chart-3); }
+.swatchLine { background: var(--chart-1); }

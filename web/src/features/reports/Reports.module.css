@@ -38,3 +38,20 @@
 
 .surplus a { color: var(--accent-invest); text-decoration: none; }
 .surplus a:hover { text-decoration: underline; }
+
+/* One chart per row on a phone, two abreast on a desktop, and never three:
+   these plot twelve months, and a third column buys narrower months rather
+   than more of them. The SVGs scale to whatever column they land in, so the
+   only thing this rule changes is how many columns there are. */
+.charts {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+@media (min-width: 60rem) {
+  .charts { grid-template-columns: 1fr 1fr; }
+}
+
+.gap { height: var(--space-5); }
