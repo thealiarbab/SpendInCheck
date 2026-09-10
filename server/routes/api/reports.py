@@ -8,6 +8,7 @@ from flask import jsonify, request
 
 from server import money, operations
 from server.auth import money_places, require_user
+from server.errors import ApiError
 from server.routes.api import api
 from server.routes.api.dashboard_payload import dashboard_payload
 from server.validators import Validator
@@ -77,3 +78,75 @@ def portfolio():
             "holdings": len(items),
         },
     })
+
+
+TREND_FIELDS = ["month", "income", "expense"]
+CASHFLOW_FIELDS = ["month", "net", "cumulative"]
+NET_WORTH_FIELDS = ["month", "holdings", "cash", "net_worth"]
+MERCHANT_FIELDS = ["payee", "times", "total"]
+
+
+def _months():
+    """The 'months' query parameter, bounded to something drawable.
+
+    Out of range is clamped rather than refused: this only decides how much
+    history a chart shows, and a chart is a poor place to answer a typo with
+    an error message.
+    """
+    raw = (request.args.get("months") or "").strip()
+    months = int(raw) if raw.isdigit() else operations.SERIES_MONTHS
+    return max(1, min(months, 60))
+
+
+@api.get("/reports/summary")
+def summary():
+    """Every figure the reporting screen draws, in one request.
+
+    Seven queries, one connection, one round trip. Each query is quick;
+    reaching Supabase at all is what costs, so asking separately would be
+    most of a second and a half of waiting for the same answer.
+    """
+    user_id = require_user()
+    places = money_places()
+    found = operations.dashboard_summary(user_id, _months())
+    if not found:
+        raise ApiError("Could not build the summary.", code="summary_failed")
+
+    return jsonify({
+        "this_month": {
+            "income": money.serialise(found["this_month"]["income"], places),
+            "expense": money.serialise(found["this_month"]["expense"], places),
+            "net": money.serialise(found["this_month"]["net"], places),
+            "transactions": found["this_month"]["transactions"],
+        },
+        "trend": money.rows(TREND_FIELDS, found["trend"], places),
+        "cashflow": money.rows(CASHFLOW_FIELDS, found["cashflow"], places),
+        "net_worth": money.rows(NET_WORTH_FIELDS, found["net_worth"], places),
+        "merchants": money.rows(MERCHANT_FIELDS, found["merchants"], places),
+        "spend_by_category": money.rows(SPEND_FIELDS, found["spend_by_category"],
+                                        places),
+    })
+
+
+@api.get("/reports/trend")
+def trend():
+    """Income against expense, month by month."""
+    user_id = require_user()
+    rows = operations.monthly_trend(user_id, _months())
+    return jsonify({"items": money.rows(TREND_FIELDS, rows, money_places())})
+
+
+@api.get("/reports/cashflow")
+def cashflow():
+    """What was left over each month, and the running total of it."""
+    user_id = require_user()
+    rows = operations.cashflow_series(user_id, _months())
+    return jsonify({"items": money.rows(CASHFLOW_FIELDS, rows, money_places())})
+
+
+@api.get("/reports/net-worth")
+def net_worth():
+    """Holdings plus accumulated cash, at the end of each month."""
+    user_id = require_user()
+    rows = operations.net_worth_series(user_id, _months())
+    return jsonify({"items": money.rows(NET_WORTH_FIELDS, rows, money_places())})

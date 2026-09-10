@@ -23,7 +23,9 @@ from .transactions import (DEFAULT_PER_PAGE, MAX_PER_PAGE, SORT_COLUMNS,
                            get_all_transactions, get_transaction_by_id,
                            search_transactions, update_transaction)
 from .budgets import get_all_budgets, set_budget
-from .reports import budget_vs_actual, category_wise_spend
+from .reports import (SERIES_MONTHS, budget_vs_actual, cashflow_series,
+                      category_wise_spend, dashboard_summary, monthly_trend,
+                      net_worth_series, top_merchants)
 from .investments import (add_investment, delete_investment, get_all_investments,
                           investment_exists, portfolio_pnl,
                           update_investment_price)
@@ -43,7 +45,9 @@ __all__ = [
     "add_transaction", "delete_transaction", "get_all_transactions",
     "get_transaction_by_id", "search_transactions", "update_transaction",
     "get_all_budgets", "set_budget",
-    "budget_vs_actual", "category_wise_spend",
+    "SERIES_MONTHS", "budget_vs_actual", "cashflow_series",
+    "category_wise_spend", "dashboard_summary", "monthly_trend",
+    "net_worth_series", "top_merchants",
     "add_investment", "delete_investment", "get_all_investments",
     "investment_exists", "portfolio_pnl", "update_investment_price",
 ]
