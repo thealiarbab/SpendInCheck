@@ -5,6 +5,8 @@ under test is the whole path: CSRF gate, validation, session, and the shape
 of the body that comes back.
 """
 
+from server import operations
+
 
 def test_session_reports_a_signed_out_visitor_without_failing(client):
     """200 with a null user, not 401.
@@ -107,3 +109,17 @@ def test_the_pages_still_redirect_rather_than_returning_json(client):
     response = client.get("/dashboard")
     assert response.status_code == 302
     assert "/sign-in" in response.headers["Location"]
+
+
+def test_a_session_whose_demo_account_was_swept_reports_signed_out(client):
+    """Demonstration accounts are deleted on a schedule, but the cookie in
+    somebody's browser knows nothing about that. Reporting them as signed
+    in and then showing an empty ledger reads as data loss."""
+    token = client.get("/api/v1/auth/session").get_json()["csrf_token"]
+    body = client.post("/api/v1/auth/demo",
+                       headers={"X-CSRF-Token": token}).get_json()
+    assert client.get("/api/v1/auth/session").get_json()["user"] is not None
+
+    operations.delete_demo_user(body["user"]["id"])
+
+    assert client.get("/api/v1/auth/session").get_json()["user"] is None

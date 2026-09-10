@@ -12,7 +12,7 @@ write `operations.add_transaction(...)` and never import the submodules.
 """
 
 from .users import (STARTER_CATEGORIES, create_user, get_currency,
-                    get_user_by_login, set_currency, username_taken)
+                    get_user_by_login, set_currency, user_exists, username_taken)
 from .demo import (DEMO_BUDGETS, DEMO_CATEGORIES, DEMO_INVESTMENTS,
                    DEMO_TRANSACTIONS, create_demo_user, delete_demo_user,
                    delete_stale_demo_users, reset_demo_data)
@@ -33,7 +33,7 @@ from .investments import (add_investment, delete_investment, get_all_investments
 # the public surface.
 __all__ = [
     "STARTER_CATEGORIES", "create_user", "get_currency", "get_user_by_login",
-    "set_currency", "username_taken",
+    "set_currency", "user_exists", "username_taken",
     "DEMO_BUDGETS", "DEMO_CATEGORIES", "DEMO_INVESTMENTS", "DEMO_TRANSACTIONS",
     "create_demo_user", "delete_demo_user", "delete_stale_demo_users",
     "reset_demo_data",

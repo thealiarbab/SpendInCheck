@@ -28,6 +28,16 @@ def _account_body():
     user_id = current_user_id()
     if user_id is None:
         return None
+
+    # A session outlives the row it points at. Demonstration accounts are
+    # swept on a schedule, so a browser left open overnight holds a cookie
+    # for an account that no longer exists -- and without this it is told
+    # it is signed in and then shown an empty ledger, which reads as data
+    # loss rather than as a demo having expired.
+    if is_demo() and not operations.user_exists(user_id):
+        sign_out()
+        return None
+
     return {"id": user_id, "username": session.get("username"),
             "is_demo": is_demo(), "currency": current_currency()}
 

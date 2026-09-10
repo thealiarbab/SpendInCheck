@@ -140,3 +140,26 @@ def set_currency(user_id, code):
         return False
     finally:
         db.close_connection(connection)
+
+
+def user_exists(user_id):
+    """True if this account is still there.
+
+    Cheap enough to call on a session read: a primary key lookup returning
+    one column. Needed because a session outlives the row it points at --
+    demonstration accounts are swept on a schedule, and the cookie in
+    somebody's browser knows nothing about that.
+    """
+    connection = None
+    try:
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        cursor.execute("SELECT 1 FROM users WHERE user_id = %s", (user_id,))
+        return cursor.fetchone() is not None
+    except Error as e:
+        # A database failure must not read as "your account is gone" and sign
+        # someone out; assume it is still there and let the real query fail.
+        print(f"Error checking user: {e}")
+        return True
+    finally:
+        db.close_connection(connection)

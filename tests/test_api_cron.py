@@ -7,7 +7,7 @@ a stranger and a delete is the shared secret.
 
 import pytest
 
-from server import config, operations
+from server import config, db, operations
 
 
 @pytest.fixture
@@ -65,17 +65,55 @@ def test_the_job_needs_no_csrf_token(client, cron_secret):
                        headers={"X-Cron-Secret": cron_secret}).status_code == 200
 
 
+def _age_by_hours(user_id, hours):
+    """Backdate an account's created_at, so staleness can be tested without
+    waiting a day for it."""
+    connection = db.get_connection()
+    try:
+        cursor = connection.cursor()
+        cursor.execute(
+            "UPDATE users SET created_at = NOW() - make_interval(hours => %s) "
+            "WHERE user_id = %s", (hours, user_id))
+        connection.commit()
+    finally:
+        db.close_connection(connection)
+
+
 def test_only_stale_demo_accounts_are_removed(make_user):
-    """A real account, and a demo someone is still using, must both survive."""
+    """A real account, and a demo someone is still using, must both survive.
+
+    The stale one is backdated rather than the sweep being widened to zero
+    hours. A zero-hour sweep means "everything older than this instant",
+    which deletes every demonstration account in the database -- including
+    the one belonging to whoever happens to be looking at the site while
+    the tests run. This shares a database with the deployed app, so a test
+    that reaches beyond its own fixtures reaches real visitors.
+    """
     real_user = make_user()
     fresh_demo, _ = operations.create_demo_user("not-a-real-hash")
+    stale_demo, _ = operations.create_demo_user("not-a-real-hash")
+    _age_by_hours(stale_demo, 48)
+
     try:
-        # Zero hours means "everything older than now", which is the harshest
-        # sweep the job could ever make -- and it still must not touch either.
-        operations.delete_stale_demo_users(0)
+        removed = operations.delete_stale_demo_users(24)
+        assert removed >= 1
+
         assert operations.get_all_categories(real_user), "a real account was deleted"
+        assert _exists(fresh_demo), "a demo someone is still using was deleted"
+        assert not _exists(stale_demo), "the stale demo was not swept"
     finally:
         operations.delete_demo_user(fresh_demo)
+        operations.delete_demo_user(stale_demo)
+
+
+def _exists(user_id):
+    connection = db.get_connection()
+    try:
+        cursor = connection.cursor()
+        cursor.execute("SELECT 1 FROM users WHERE user_id = %s", (user_id,))
+        return cursor.fetchone() is not None
+    finally:
+        db.close_connection(connection)
 
 
 def test_a_real_account_cannot_be_deleted_through_the_demo_path(make_user):
