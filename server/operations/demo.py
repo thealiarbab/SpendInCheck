@@ -8,6 +8,7 @@ re-exports every name.
 import secrets
 
 from psycopg2 import Error
+from psycopg2.extras import execute_values
 from .. import db
 
 from .users import create_user
@@ -65,6 +66,50 @@ DEMO_INVESTMENTS = [
 ]
 
 
+def _seed(cursor, user_id):
+    """Write the demonstration rows for one account, on an open cursor.
+
+    Takes a cursor rather than opening its own connection so that creating a
+    demo account and filling it happen in one transaction and one round trip
+    budget. Reaching Supabase costs about 200ms per connection, which is the
+    single biggest cost in setting a demo up.
+
+    Each table is written with one execute_values call rather than a loop of
+    execute: forty-three separate INSERTs meant forty-three round trips, and
+    that alone was most of the wait.
+    """
+    # RETURNING on a multi-row insert gives the ids back in the order the rows
+    # were sent, which is what lets the later tables refer to them by name.
+    category_ids = dict(zip(
+        [name for name, _ in DEMO_CATEGORIES],
+        [row[0] for row in execute_values(
+            cursor,
+            "INSERT INTO categories (user_id, category_name, category_type) "
+            "VALUES %s RETURNING category_id",
+            [(user_id, name, kind) for name, kind in DEMO_CATEGORIES],
+            fetch=True)]))
+
+    execute_values(
+        cursor,
+        "INSERT INTO transactions (user_id, txn_date, category_id, amount, "
+        "txn_type, description) VALUES %s",
+        [(user_id, txn_date, category_ids[name], amount, kind, description)
+         for txn_date, name, amount, kind, description in DEMO_TRANSACTIONS])
+
+    execute_values(
+        cursor,
+        "INSERT INTO budgets (user_id, category_id, month_year, budget_limit) "
+        "VALUES %s",
+        [(user_id, category_ids[name], month_year, limit)
+         for name, month_year, limit in DEMO_BUDGETS])
+
+    execute_values(
+        cursor,
+        "INSERT INTO investments (user_id, asset_name, asset_type, buy_date, "
+        "buy_price, quantity, current_price) VALUES %s",
+        [(user_id,) + row for row in DEMO_INVESTMENTS])
+
+
 def reset_demo_data(user_id):
     """Wipe this account's rows and rebuild the demonstration data.
 
@@ -81,32 +126,7 @@ def reset_demo_data(user_id):
         cursor.execute("DELETE FROM investments WHERE user_id = %s", (user_id,))
         cursor.execute("DELETE FROM categories WHERE user_id = %s", (user_id,))
 
-        category_ids = {}
-        for name, kind in DEMO_CATEGORIES:
-            cursor.execute(
-                "INSERT INTO categories (user_id, category_name, category_type) "
-                "VALUES (%s, %s, %s) RETURNING category_id",
-                (user_id, name, kind))
-            category_ids[name] = cursor.fetchone()[0]
-
-        for txn_date, name, amount, kind, description in DEMO_TRANSACTIONS:
-            cursor.execute(
-                "INSERT INTO transactions (user_id, txn_date, category_id, amount, "
-                "txn_type, description) VALUES (%s, %s, %s, %s, %s, %s)",
-                (user_id, txn_date, category_ids[name], amount, kind, description))
-
-        for name, month_year, limit in DEMO_BUDGETS:
-            cursor.execute(
-                "INSERT INTO budgets (user_id, category_id, month_year, budget_limit) "
-                "VALUES (%s, %s, %s, %s)",
-                (user_id, category_ids[name], month_year, limit))
-
-        for row in DEMO_INVESTMENTS:
-            cursor.execute(
-                "INSERT INTO investments (user_id, asset_name, asset_type, buy_date, "
-                "buy_price, quantity, current_price) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                (user_id,) + row)
-
+        _seed(cursor, user_id)
         connection.commit()
         return True
     except Error as e:
@@ -130,8 +150,14 @@ def create_demo_user(password_hash):
     the name carries a random suffix rather than a counter so it cannot be
     guessed or enumerated.
 
-    Returns (user_id, username), or (None, None) if the account could not
-    be created.
+    All of it runs on one connection. This is on the path a visitor waits
+    through before seeing anything, and reaching Supabase costs roughly 200ms
+    each time, so the account row and every seeded row are written together
+    rather than across three separate connections. It also does not call
+    create_user: those starter categories would be deleted moments later by
+    the demonstration set that replaces them.
+
+    Returns (user_id, username), or (None, None) if it could not be created.
     """
     connection = None
     try:
@@ -140,18 +166,16 @@ def create_demo_user(password_hash):
         username = "demo_" + secrets.token_hex(6)
         email = f"{username}@demo.invalid"
 
-        user_id = create_user(username, email, password_hash)
-        if user_id is None:
-            return None, None
-
         connection = db.get_connection()
         cursor = connection.cursor()
-        cursor.execute("UPDATE users SET is_demo = TRUE WHERE user_id = %s", (user_id,))
-        connection.commit()
+        cursor.execute(
+            "INSERT INTO users (username, email, password_hash, is_demo) "
+            "VALUES (%s, %s, %s, TRUE) RETURNING user_id",
+            (username, email, password_hash))
+        user_id = cursor.fetchone()[0]
 
-        # Seeded separately so the demonstration data and the starter
-        # categories every account gets stay one definition each.
-        reset_demo_data(user_id)
+        _seed(cursor, user_id)
+        connection.commit()
         return user_id, username
     except Error as e:
         if connection:
