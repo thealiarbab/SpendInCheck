@@ -1,0 +1,84 @@
+.bar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.control,
+.search,
+.number {
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  color: var(--content-primary);
+  background: var(--surface-sunken);
+  border: 1px solid var(--line-default);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  min-width: 0;
+}
+
+.search { flex: 1; min-width: 14rem; }
+
+.number {
+  width: 6rem;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.control:focus-visible,
+.search:focus-visible,
+.number:focus-visible {
+  outline: 2px solid var(--line-focus);
+  outline-offset: -1px;
+}
+
+/* A label and its input read as one control, so they stay together when
+   the row wraps. */
+.pair { display: flex; align-items: center; gap: var(--space-2); }
+
+.tag {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--content-muted);
+}
+
+.right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.count {
+  font-size: 0.75rem;
+  color: var(--content-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.download {
+  font-size: 0.75rem;
+  color: var(--content-secondary);
+  text-decoration: none;
+  border: 1px solid var(--line-default);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  white-space: nowrap;
+}
+
+.download:hover {
+  color: var(--content-primary);
+  background: var(--surface-hover);
+}

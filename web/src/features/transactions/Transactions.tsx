@@ -1,7 +1,11 @@
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, api } from "../../lib/api";
-import type { Category, TransactionSubmission } from "../../lib/api";
+import type { Category, TransactionFilters, TransactionSubmission } from "../../lib/api";
+import { FilterBar } from "./FilterBar";
+import { Pager } from "./Pager";
+import styles from "./Transactions.module.css";
 import { formatMoney, toMinor } from "../../lib/money";
 import {
   Button, Card, Confirm, Derived, Empty, Field, Form, FormActions, Loading, Notice,
@@ -30,6 +34,12 @@ const blank = (): Draft => ({
   id: null, date: today(), category_id: "", amount: "", description: "",
 });
 
+/** The filter names that live in the URL, in the order they read best. */
+const FILTER_NAMES = [
+  "q", "type", "category_id", "from", "to", "min", "max",
+  "sort", "direction", "page", "per_page",
+] as const;
+
 /**
  * The ledger: everything in and out, with the form that adds to it.
  *
@@ -41,9 +51,51 @@ export function Transactions() {
   const client = useQueryClient();
   const [draft, setDraft] = useState<Draft>(blank);
   const [confirming, setConfirming] = useState<number | null>(null);
+  const [params, setParams] = useSearchParams();
+
+  // The URL is the state, not a copy of it. A filtered view therefore has
+  // an address that can be shared and returned to, and the back button
+  // walks the filters rather than leaving the screen.
+  const filters = useMemo(() => {
+    const read: TransactionFilters = {};
+    for (const name of FILTER_NAMES) {
+      const value = params.get(name);
+      if (value) read[name] = value;
+    }
+    return read;
+  }, [params]);
+
+  const update = useCallback((next: Partial<TransactionFilters>) => {
+    setParams((current) => {
+      const updated = new URLSearchParams(current);
+      for (const [name, value] of Object.entries(next)) {
+        if (value) updated.set(name, value);
+        else updated.delete(name);
+      }
+      // Any change to what is being looked for starts again at page one.
+      // Staying on page 4 of a narrower result is how a search looks empty
+      // when it is not.
+      if (!("page" in next)) updated.delete("page");
+      return updated;
+    });
+    // Pushed, not replaced. Changing a filter is a deliberate act, so the
+    // back button should undo it rather than leave the screen entirely.
+    // The search box debounces, which is what stops this becoming one
+    // history entry per letter typed.
+  }, [setParams]);
+
+  const clear = useCallback(() => setParams(new URLSearchParams()), [setParams]);
 
   const categories = useQuery({ queryKey: ["categories"], queryFn: api.categories });
-  const transactions = useQuery({ queryKey: ["transactions"], queryFn: api.transactions });
+  // Keyed by the filters, so going back to a view already seen is instant
+  // and each distinct search is cached in its own right.
+  const transactions = useQuery({
+    queryKey: ["transactions", filters],
+    queryFn: () => api.transactions(filters),
+    // Rows stay on screen while the next page loads, rather than the table
+    // emptying and jumping on every keystroke.
+    placeholderData: (previous) => previous,
+  });
 
   const chosen: Category | undefined = categories.data?.items
     .find((one) => String(one.id) === draft.category_id);
@@ -109,6 +161,16 @@ export function Transactions() {
   const failure = save.error instanceof ApiError ? save.error : null;
   const fields = failure?.isValidation ? failure.fields : {};
   const rows = transactions.data?.items ?? [];
+  const page = transactions.data?.page;
+
+  /** Click a heading to sort by it; click it again to reverse. */
+  const sortBy = (column: string) => () => update({
+    sort: column,
+    direction: filters.sort === column && filters.direction !== "asc" ? "asc" : "desc",
+  });
+
+  const sortMark = (column: string) =>
+    filters.sort !== column ? "" : filters.direction === "asc" ? " ▲" : " ▼";
 
   return (
     <>
@@ -163,18 +225,52 @@ export function Transactions() {
       <div style={{ height: "var(--space-5)" }} />
 
       <Card title="All transactions" flush>
+        <FilterBar
+          filters={filters}
+          categories={categories.data?.items ?? []}
+          total={page?.total ?? rows.length}
+          onChange={update}
+          onClear={clear}
+          exportHref={api.exportUrl(filters)}
+        />
+
         {transactions.isPending && !transactions.data ? (
           <Loading what="transactions" />
         ) : transactions.error ? (
           <Notice>{(transactions.error as Error).message}</Notice>
         ) : rows.length ? (
+          <div className={transactions.isPlaceholderData ? styles.stale : undefined}>
           <Table
             head={
               <tr>
-                <th>Date</th>
-                <th>Category</th>
-                <th>Type</th>
-                <th className={cell.numeric}>Amount</th>
+                <th>
+                  <button className={styles.sortable + (filters.sort === "date" || !filters.sort
+                          ? " " + styles.sortedOn : "")}
+                          onClick={sortBy("date")}>
+                    Date{sortMark("date") || (!filters.sort ? " ▼" : "")}
+                  </button>
+                </th>
+                <th>
+                  <button className={styles.sortable + (filters.sort === "category"
+                          ? " " + styles.sortedOn : "")}
+                          onClick={sortBy("category")}>
+                    Category{sortMark("category")}
+                  </button>
+                </th>
+                <th>
+                  <button className={styles.sortable + (filters.sort === "type"
+                          ? " " + styles.sortedOn : "")}
+                          onClick={sortBy("type")}>
+                    Type{sortMark("type")}
+                  </button>
+                </th>
+                <th className={cell.numeric}>
+                  <button className={styles.sortable + (filters.sort === "amount"
+                          ? " " + styles.sortedOn : "")}
+                          onClick={sortBy("amount")}>
+                    Amount{sortMark("amount")}
+                  </button>
+                </th>
                 <th>Description</th>
                 <th />
               </tr>
@@ -208,9 +304,16 @@ export function Transactions() {
               </tr>
             ))}
           </Table>
+          </div>
         ) : (
-          <Empty>No transactions yet.</Empty>
+          <Empty>
+            {Object.keys(filters).length
+              ? "Nothing matches those filters."
+              : "No transactions yet."}
+          </Empty>
         )}
+
+        {page && <Pager page={page} onGo={(number) => update({ page: String(number) })} />}
         {remove.error && <Notice>{(remove.error as Error).message}</Notice>}
       </Card>
     </>

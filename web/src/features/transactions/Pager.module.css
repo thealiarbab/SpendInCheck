@@ -1,0 +1,23 @@
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--line-soft);
+  flex-wrap: wrap;
+}
+
+.range,
+.position {
+  font-size: 0.75rem;
+  color: var(--content-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.buttons {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}

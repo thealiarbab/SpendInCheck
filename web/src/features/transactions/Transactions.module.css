@@ -1,0 +1,26 @@
+/* A sortable heading is a button in a th, so it is reachable by keyboard
+   and announces itself as pressable rather than being a click target that
+   only a mouse can find. */
+.sortable {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
+
+.sortable:hover { color: var(--content-primary); }
+
+.sortable:focus-visible {
+  outline: 2px solid var(--line-focus);
+  outline-offset: 2px;
+}
+
+.sortedOn { color: var(--accent-default); }
+
+/* While a new page or search is loading the old rows stay put, dimmed, so
+   the table does not empty and jump on every keystroke. */
+.stale { opacity: 0.55; transition: opacity 120ms ease; }

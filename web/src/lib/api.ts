@@ -181,6 +181,29 @@ export interface CategoryUsage {
   budgets: number;
 }
 
+/** What the server says about the slice of results it just sent. */
+export interface PageInfo {
+  number: number;
+  per_page: number;
+  total: number;
+  pages: number;
+}
+
+/** Every way the ledger can be narrowed. All optional, all from the URL. */
+export interface TransactionFilters {
+  q?: string;
+  from?: string;
+  to?: string;
+  type?: string;
+  category_id?: string;
+  min?: string;
+  max?: string;
+  sort?: string;
+  direction?: string;
+  page?: string;
+  per_page?: string;
+}
+
 export interface TransactionSubmission {
   date: string;
   category_id: number;
@@ -191,6 +214,22 @@ export interface TransactionSubmission {
 
 const query = (params: Record<string, string>) =>
   "?" + new URLSearchParams(params).toString();
+
+/**
+ * Build a query string, dropping anything empty.
+ *
+ * An empty parameter is not the same as an absent one to a reader looking
+ * at the URL, and "?q=&type=" in a shared link says a filter is set when
+ * none is.
+ */
+function queryOf(filters: Record<string, string | undefined>): string {
+  const params = new URLSearchParams();
+  for (const [name, value] of Object.entries(filters)) {
+    if (value !== undefined && value !== "") params.set(name, value);
+  }
+  const text = params.toString();
+  return text ? "?" + text : "";
+}
 
 export const api = {
   categories: () => request<{ items: Category[] }>("/categories"),
@@ -207,7 +246,12 @@ export const api = {
       (reassignTo === undefined ? "" : query({ reassign_to: String(reassignTo) })),
       { method: "DELETE" }),
 
-  transactions: () => request<{ items: TransactionRow[] }>("/transactions"),
+  transactions: (filters: TransactionFilters = {}) =>
+    request<{ items: TransactionRow[]; page: PageInfo }>(
+      "/transactions" + queryOf(filters)),
+  /** Where the browser should be pointed to download the current view. */
+  exportUrl: (filters: TransactionFilters = {}) =>
+    BASE + "/transactions/export.csv" + queryOf(filters),
   transaction: (id: number) => request<TransactionSubmission & { id: number }>(
     "/transactions/" + id),
   addTransaction: (body: TransactionSubmission) =>
