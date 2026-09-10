@@ -32,7 +32,7 @@ BASELINE = "b2c9a7c"
 # mapping rather than a range. Any commit not listed is treated as part of
 # CURRENT_PHASE, which is what keeps this accurate as new work lands without
 # anyone editing the file.
-CURRENT_PHASE = 3
+CURRENT_PHASE = 4
 
 COMMIT_PHASE = {
     0: ["5e3ab5e", "6308244", "931dabe", "490f434", "c030a97", "e166bb4", "efb70ab"],
@@ -61,14 +61,15 @@ PHASES = [
      "blurb": "A /api/v1 blueprint reusing the existing operations, mounted beside the "
               "pages so both read the same session and screens can move one at a time.",
      "open": []},
-    {"n": 3, "name": "Design system and shell", "state": "now",
+    {"n": 3, "name": "Design system and shell", "state": "done",
      "blurb": "Tokens, both themes, the UI primitives and the side-by-side ThemeLab. "
-              "Built early, so the code exists and the decision does not.",
-     "open": ["YOUR CALL: brass, paper, or ship both — before Phase 4 builds on it"]},
-    {"n": 4, "name": "Port the six existing screens", "state": "next",
-     "blurb": "Parity with the Jinja pages, plus rupee formatting and field-level "
-              "errors. Adds the missing CRUD.",
+              "Decided: ship both, toggleable. Every primitive reads semantic tokens, "
+              "so a screen is correct in brass and paper at once.",
      "open": []},
+    {"n": 4, "name": "Port the six existing screens", "state": "now",
+     "blurb": "Parity with the Jinja pages, plus Indian rupee grouping and field-level "
+              "errors. Adds the CRUD the old pages never had.",
+     "open": ["Transactions", "Categories", "Budgets", "Holdings", "Reports"]},
     {"n": 5, "name": "Search, filter, pagination, export", "state": "next",
      "blurb": "search_transactions replaces get_all_transactions. Column names come "
               "from a whitelist; only values go through %s.",
