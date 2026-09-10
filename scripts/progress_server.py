@@ -73,7 +73,7 @@ PHASES = [
     {"n": 4, "name": "Port the six existing screens", "state": "now",
      "blurb": "Parity with the Jinja pages, plus Indian rupee grouping and field-level "
               "errors. Adds the CRUD the old pages never had.",
-     "open": ["Transactions", "Categories", "Budgets", "Holdings", "Reports"]},
+     "open": ["Categories", "Budgets", "Holdings", "Reports"]},
     {"n": 5, "name": "Search, filter, pagination, export", "state": "next",
      "blurb": "search_transactions replaces get_all_transactions. Column names come "
               "from a whitelist; only values go through %s.",
