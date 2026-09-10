@@ -691,12 +691,18 @@ def update_investment_price(user_id, investment_id, new_current_price):
 
 
 def investment_exists(user_id, investment_id):
-    """Return True if an investment with this investment_id exists."""
+    """Return True if this user owns an investment with this investment_id.
+
+    Both halves of the WHERE clause matter. Without the user_id the function
+    answers about anyone's investment, which would let a caller treat another
+    account's row as a legitimate target to act on.
+    """
     connection = None
     try:
         connection = db.get_connection()
         cursor = connection.cursor()
-        cursor.execute("SELECT investment_id FROM investments WHERE investment_id = %s", (investment_id,))
+        cursor.execute("SELECT investment_id FROM investments "
+                       "WHERE investment_id = %s AND user_id = %s", (investment_id, user_id))
         return cursor.fetchone() is not None
     except Error as e:
         print(f"Error checking investment: {e}")
