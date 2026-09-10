@@ -1,0 +1,93 @@
+"""
+Money on the way in and out of the API.
+
+The database stores DECIMAL and psycopg2 returns Decimal, which is exactly
+right and must survive the trip to the client. The tempting shortcut is
+float(), and it is where rupees go missing: 0.1 has no exact binary
+representation, so a column of amounts drifts a paisa at a time and a report
+total quietly stops matching the rows above it.
+
+So money crosses the wire as a STRING, never a JSON number. The client parses
+it to integer paise, does its arithmetic there, and formats once at render --
+see web/src/lib/money.ts, which is the other half of this contract.
+"""
+
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+
+# Two decimal places, matching DECIMAL(10,2) in the schema.
+PAISA = Decimal("0.01")
+
+
+def to_decimal(raw_value):
+    """Parse submitted input into a Decimal, or return None if unusable.
+
+    Decimal(str) rather than Decimal(float): Decimal(0.1) preserves the
+    float's error and produces 0.1000000000000000055511151231257827, which
+    defeats the point of using Decimal at all.
+
+    Accepts a rupee sign and digit grouping, since a pasted figure often
+    carries them.
+    """
+    if raw_value is None:
+        return None
+
+    text = str(raw_value).strip().replace("₹", "").replace(",", "").replace(" ", "")
+    if not text:
+        return None
+
+    try:
+        return Decimal(text)
+    except InvalidOperation:
+        return None
+
+
+def quantise(amount):
+    """Round a Decimal to two places, half away from zero.
+
+    ROUND_HALF_UP rather than Decimal's ROUND_HALF_EVEN default: bankers'
+    rounding is correct for statistics and surprising in a ledger, where a
+    person expects 0.005 to become 0.01 every time.
+    """
+    if amount is None:
+        return None
+    return amount.quantize(PAISA, rounding=ROUND_HALF_UP)
+
+
+def serialise(amount):
+    """Render a Decimal as the fixed two-place string the API sends.
+
+    None becomes None so a genuinely absent amount stays absent rather than
+    arriving as "0.00" and being read as a real zero.
+    """
+    if amount is None:
+        return None
+    return f"{quantise(Decimal(amount)):.2f}"
+
+
+def jsonify_value(value):
+    """Convert one value into something json can serialise.
+
+    Decimal becomes a string, dates become ISO-8601, and anything else is
+    returned untouched. Applied by row(), below.
+    """
+    if isinstance(value, Decimal):
+        return serialise(value)
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    return value
+
+
+def row(field_names, values):
+    """Zip a database row into a dict, converting each value for JSON.
+
+    The operations layer returns tuples, which is fine for SQL and wrong for
+    an API: a client reading result[4] breaks the moment a column is added.
+    Naming the fields at the route boundary keeps the SQL layer unchanged
+    while the JSON stays stable.
+    """
+    return {name: jsonify_value(value) for name, value in zip(field_names, values)}
+
+
+def rows(field_names, values_list):
+    """Apply row() to a list of database rows."""
+    return [row(field_names, values) for values in values_list]
