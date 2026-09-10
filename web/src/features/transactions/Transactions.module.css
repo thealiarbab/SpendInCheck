@@ -1,0 +1,39 @@
+/* Only what the shared primitives do not already cover. */
+
+.actions {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: flex-end;
+}
+
+/* The form's buttons sit on the grid like a field, so they line up with the
+   inputs' baseline rather than floating above them. */
+.submit {
+  display: flex;
+  gap: var(--space-3);
+  align-items: end;
+  padding-bottom: 1px;
+}
+
+/* The chosen category's kind, shown where a Type dropdown used to be: it is
+   decided by the category, so it is reported rather than asked for. */
+.derived {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+}
+
+.confirm {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: flex-end;
+  font-size: 0.8rem;
+  color: var(--content-secondary);
+}
+
+.editing {
+  background: var(--accent-wash);
+}
