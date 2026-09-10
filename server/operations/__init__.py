@@ -26,6 +26,8 @@ from .transactions import (DEFAULT_PER_PAGE, MAX_PER_PAGE, SORT_COLUMNS,
                            SORT_DIRECTIONS, add_transaction, delete_transaction,
                            get_all_transactions, get_transaction_by_id,
                            search_transactions, update_transaction)
+from .tags import (MAX_TAG_LENGTH, add_tag, delete_tag, list_tags, rename_tag,
+                   set_transaction_tags, tag_exists, tags_for_transactions)
 from .budgets import get_all_budgets, set_budget
 from .reports import (SERIES_MONTHS, budget_vs_actual, cashflow_series,
                       category_wise_spend, dashboard_summary, monthly_trend,
@@ -52,6 +54,8 @@ __all__ = [
     "DEFAULT_PER_PAGE", "MAX_PER_PAGE", "SORT_COLUMNS", "SORT_DIRECTIONS",
     "add_transaction", "delete_transaction", "get_all_transactions",
     "get_transaction_by_id", "search_transactions", "update_transaction",
+    "MAX_TAG_LENGTH", "add_tag", "delete_tag", "list_tags", "rename_tag",
+    "set_transaction_tags", "tag_exists", "tags_for_transactions",
     "get_all_budgets", "set_budget",
     "SERIES_MONTHS", "budget_vs_actual", "cashflow_series",
     "category_wise_spend", "dashboard_summary", "monthly_trend",

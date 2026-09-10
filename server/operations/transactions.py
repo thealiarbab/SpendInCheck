@@ -16,7 +16,11 @@ def add_transaction(user_id, txn_date, category_id, amount, txn_type, descriptio
     Caller (main.py) is expected to have already validated amount > 0,
     that category_id exists, and that txn_date is not in the future --
     this function focuses only on the SQL insert and error handling.
-    Returns True on success, False on failure.
+    Returns the new transaction_id, or None on failure. An id rather than a
+    bare success, because tagging a row needs one and asking for it back in
+    a second query would be a second round trip for something the insert
+    already knows. Callers that only care whether it worked still read it as
+    a truth value.
 
     account_id may be omitted, in which case the row lands on the user's
     first live account. Every caller that predates accounts relies on that,
@@ -42,17 +46,19 @@ def add_transaction(user_id, txn_date, category_id, amount, txn_type, descriptio
             ) AND (%s IS NULL OR EXISTS (
                 SELECT 1 FROM accounts WHERE account_id = %s AND user_id = %s
             ))
+            RETURNING transaction_id
         """
         cursor.execute(query, (user_id, txn_date, category_id, amount, txn_type,
                                description, account_id, category_id, user_id,
                                account_id, account_id, user_id))
+        row = cursor.fetchone()
         connection.commit()
-        return cursor.rowcount > 0
+        return row[0] if row else None
     except Error as e:
         if connection:
             connection.rollback()
         print(f"Error adding transaction: {e}")
-        return False
+        return None
     finally:
         db.close_connection(connection)
 
@@ -128,6 +134,14 @@ def _where(user_id, filters):
     if filters.get("account_id"):
         clauses.append("t.account_id = %s")
         values.append(filters["account_id"])
+    if filters.get("tag_id"):
+        # EXISTS rather than a join: a join to transaction_tags would
+        # multiply a row by the number of its tags, and the page would then
+        # show the same transaction three times for having three tags.
+        clauses.append("EXISTS (SELECT 1 FROM transaction_tags tt "
+                       "         WHERE tt.transaction_id = t.transaction_id "
+                       "           AND tt.tag_id = %s)")
+        values.append(filters["tag_id"])
     if filters.get("min_amount") is not None:
         clauses.append("t.amount >= %s")
         values.append(filters["min_amount"])

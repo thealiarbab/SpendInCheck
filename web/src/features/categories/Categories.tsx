@@ -6,6 +6,7 @@ import {
   Button, Card, Empty, Field, Form, FormActions, Loading, Notice, PageHead,
   Picker, RowActions, Table, Tag, row as rowStyle,
 } from "../../ui";
+import { TagList } from "../tags/TagList";
 import styles from "./Categories.module.css";
 
 interface Draft {
@@ -109,8 +110,9 @@ export function Categories() {
   return (
     <>
       <PageHead
-        title="Categories"
-        subtitle="The shared vocabulary that transactions and budgets both point at."
+        title="Categories and tags"
+        subtitle={"A category says what a transaction is, and there is exactly one. "
+                  + "Tags say everything else, and there can be none."}
       />
 
       <Card title={draft.id === null ? "Add a category" : `Renaming ${draft.name || "…"}`}>
@@ -251,6 +253,10 @@ export function Categories() {
         </Card>
         </div>
       )}
+
+      <div style={{ height: "var(--space-5)" }} />
+
+      <TagList />
     </>
   );
 }

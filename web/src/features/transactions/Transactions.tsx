@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, api } from "../../lib/api";
 import type { Category, TransactionFilters, TransactionSubmission } from "../../lib/api";
 import { FilterBar } from "./FilterBar";
+import { TagChooser } from "../tags/TagChooser";
 import { Pager } from "./Pager";
 import styles from "./Transactions.module.css";
 import { formatMoney, toMinor } from "../../lib/money";
@@ -29,16 +30,17 @@ interface Draft {
   account_id: string;
   amount: string;
   description: string;
+  tag_ids: number[];
 }
 
 const blank = (): Draft => ({
   id: null, date: today(), category_id: "", account_id: "", amount: "",
-  description: "",
+  description: "", tag_ids: [],
 });
 
 /** The filter names that live in the URL, in the order they read best. */
 const FILTER_NAMES = [
-  "q", "type", "category_id", "account_id", "from", "to", "min", "max",
+  "q", "type", "category_id", "account_id", "tag_id", "from", "to", "min", "max",
   "sort", "direction", "page", "per_page",
 ] as const;
 
@@ -96,6 +98,7 @@ export function Transactions() {
     queryKey: ["accounts", false],
     queryFn: () => api.accounts(false),
   });
+  const tags = useQuery({ queryKey: ["tags"], queryFn: api.tags });
   // Keyed by the filters, so going back to a view already seen is instant
   // and each distinct search is cached in its own right.
   const transactions = useQuery({
@@ -131,13 +134,28 @@ export function Transactions() {
   };
 
   const save = useMutation({
-    mutationFn: (body: TransactionSubmission) =>
-      draft.id === null ? api.addTransaction(body) : api.editTransaction(draft.id, body),
+    mutationFn: async (body: TransactionSubmission) => {
+      if (draft.id === null) await api.addTransaction(body);
+      else await api.editTransaction(draft.id, body);
+    },
     onSuccess: () => {
       refresh();
+      // The counts beside each tag move whenever a row is filed or refiled.
+      client.invalidateQueries({ queryKey: ["tags"] });
       // Keep the date, clear the rest: entering a day's spending is several
       // rows sharing one date, and retyping it each time is the tedious part.
       setDraft({ ...blank(), date: draft.date });
+    },
+  });
+
+  // Making a tag from inside the form ticks it straight away: somebody who
+  // just typed "Goa" plainly wants this row tagged Goa, and making them
+  // find it in the list afterwards is a step for nothing.
+  const makeTag = useMutation({
+    mutationFn: (name: string) => api.addTag(name),
+    onSuccess: (made) => {
+      client.invalidateQueries({ queryKey: ["tags"] });
+      setDraft((current) => ({ ...current, tag_ids: [...current.tag_ids, made.id] }));
     },
   });
 
@@ -162,6 +180,7 @@ export function Transactions() {
       date: record.date,
       category_id: String(record.category_id),
       account_id: record.account_id === null ? "" : String(record.account_id),
+      tag_ids: record.tags.map((tag) => tag.id),
       amount: record.amount,
       description: record.description ?? "",
     });
@@ -184,6 +203,9 @@ export function Transactions() {
       // row on the default account, which is what somebody with one account
       // means and what every row written before accounts existed did.
       account_id: draft.account_id ? Number(draft.account_id) : undefined,
+      // Always sent, including empty: the form shows the whole set, so
+      // saving with nothing ticked has to be able to clear them.
+      tag_ids: draft.tag_ids,
     });
   }
 
@@ -251,6 +273,14 @@ export function Transactions() {
             value={draft.description} error={fields.description}
             onChange={(event) => setDraft({ ...draft, description: event.target.value })}
           />
+          <TagChooser
+            tags={tags.data?.items ?? []}
+            chosen={draft.tag_ids}
+            error={fields.tag_ids}
+            creating={makeTag.isPending}
+            onChange={(tag_ids) => setDraft({ ...draft, tag_ids })}
+            onCreate={(name) => makeTag.mutate(name)}
+          />
           <FormActions>
             <Button onClick={submit} disabled={!chosen || save.isPending}>
               {save.isPending ? "Saving…" : draft.id === null ? "Add" : "Save"}
@@ -274,6 +304,7 @@ export function Transactions() {
           filters={filters}
           categories={categories.data?.items ?? []}
           accounts={accounts.data?.items ?? []}
+          tags={tags.data?.items ?? []}
           total={page?.total ?? rows.length}
           onChange={update}
           onClear={clear}
@@ -348,7 +379,25 @@ export function Transactions() {
                 <td className={cell.numeric + (row.type === "Income" ? " " + cell.credit : "")}>
                   {formatMoney(toMinor(row.amount))}
                 </td>
-                <td>{row.description || "—"}</td>
+                <td>
+                  {row.description || "—"}
+                  {/* Under the description rather than in a column of their
+                      own: a row can carry none or six, and a column sized
+                      for six is mostly empty space. */}
+                  {row.tags.length > 0 && (
+                    <span className={styles.tags}>
+                      {row.tags.map((tag) => (
+                        <button
+                          key={tag.id} type="button" className={styles.tagChip}
+                          title={`Show only ${tag.name}`}
+                          onClick={() => update({ tag_id: String(tag.id) })}
+                        >
+                          {tag.name}
+                        </button>
+                      ))}
+                    </span>
+                  )}
+                </td>
                 <td>
                   {confirming === row.id ? (
                     <Confirm

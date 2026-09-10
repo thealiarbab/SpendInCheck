@@ -1,0 +1,29 @@
+/* The rename form sits under the table rather than in the row, so the row
+   does not reflow and the field is never squeezed into an actions column. */
+.panel {
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--line-soft);
+}
+
+.uses { white-space: nowrap; }
+
+.count { color: var(--content-secondary); text-decoration: none; }
+.count:hover { color: var(--accent-default); text-decoration: underline; }
+
+/* A tag nothing carries is the one most likely to want deleting, so it is
+   marked rather than shown as a bare zero. */
+.unused {
+  font-size: 0.75rem;
+  color: var(--content-muted);
+  font-style: italic;
+}
+
+.explain {
+  margin: 0;
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--line-soft);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--content-muted);
+  max-width: 68ch;
+}

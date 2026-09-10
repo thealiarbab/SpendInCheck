@@ -42,3 +42,27 @@
   letter-spacing: 0.06em;
   color: var(--content-muted);
 }
+
+/* Tags sit under the description rather than in a column: a row carries
+   none or six, and a column sized for six is mostly empty. */
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+/* Clickable, because the thing you want after seeing a tag is every other
+   row carrying it. */
+.tagChip {
+  padding: 1px 7px;
+  border: 1px solid var(--line-default);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--content-muted);
+  font: inherit;
+  font-size: 0.6875rem;
+  cursor: pointer;
+}
+
+.tagChip:hover { border-color: var(--accent-default); color: var(--content-primary); }

@@ -164,12 +164,29 @@ export interface TransactionRow {
   account: string | null;
   /** Shared by the two legs of one transfer, and null on everything else. */
   transfer_group: string | null;
+  tags: TagOnRow[];
 }
 
 export interface Category {
   id: number;
   name: string;
   type: "Income" | "Expense";
+}
+
+/** A label a transaction can carry any number of. */
+export interface Tag {
+  id: number;
+  name: string;
+  /** How many transactions carry it, so the list can lead with what matters
+   *  and an unused tag is visibly unused. */
+  uses: number;
+}
+
+/** A tag as it arrives attached to a transaction: no count, since the count
+ *  is a fact about the tag and not about this row. */
+export interface TagOnRow {
+  id: number;
+  name: string;
 }
 
 export type AccountKind = "Bank" | "Cash" | "Card" | "Wallet" | "Other";
@@ -275,6 +292,7 @@ export interface TransactionFilters {
   type?: string;
   category_id?: string;
   account_id?: string;
+  tag_id?: string;
   min?: string;
   max?: string;
   sort?: string;
@@ -292,6 +310,9 @@ export interface TransactionSubmission {
   /** Optional: the server files the row on the default account when the
    *  form does not say. */
   account_id?: number;
+  /** The whole set of tags for this row. Absent leaves them untouched; an
+   *  empty list takes them all off. */
+  tag_ids?: number[];
 }
 
 const query = (params: Record<string, string>) =>
@@ -328,6 +349,19 @@ export const api = {
       (reassignTo === undefined ? "" : query({ reassign_to: String(reassignTo) })),
       { method: "DELETE" }),
 
+  tags: () => request<{ items: Tag[] }>("/tags"),
+  addTag: (name: string) => request<{ id: number }>("/tags", {
+    method: "POST", body: { name },
+  }),
+  renameTag: (id: number, name: string) =>
+    request<void>("/tags/" + id, { method: "PATCH", body: { name } }),
+  deleteTag: (id: number) => request<void>("/tags/" + id, { method: "DELETE" }),
+  /** The whole set, not one tag: an empty list means "no tags", which has
+   *  to be expressible. */
+  setTransactionTags: (transactionId: number, tag_ids: number[]) =>
+    request<void>("/transactions/" + transactionId + "/tags",
+      { method: "PUT", body: { tag_ids } }),
+
   accounts: (includeArchived = false) =>
     request<{ items: AccountRow[] }>(
       "/accounts" + (includeArchived ? "?archived=1" : "")),
@@ -355,10 +389,11 @@ export const api = {
   /** Where the browser should be pointed to download the current view. */
   exportUrl: (filters: TransactionFilters = {}) =>
     BASE + "/transactions/export.csv" + queryOf(filters),
-  transaction: (id: number) => request<TransactionSubmission & { id: number }>(
-    "/transactions/" + id),
+  transaction: (id: number) =>
+    request<TransactionSubmission & { id: number; tags: TagOnRow[] }>(
+      "/transactions/" + id),
   addTransaction: (body: TransactionSubmission) =>
-    request<void>("/transactions", { method: "POST", body }),
+    request<{ id: number }>("/transactions", { method: "POST", body }),
   editTransaction: (id: number, body: TransactionSubmission) =>
     request<void>("/transactions/" + id, { method: "PATCH", body }),
   deleteTransaction: (id: number) =>

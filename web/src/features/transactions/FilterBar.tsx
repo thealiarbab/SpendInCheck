@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { AccountRow, Category, TransactionFilters } from "../../lib/api";
+import type { AccountRow, Category, Tag, TransactionFilters } from "../../lib/api";
 import { Button } from "../../ui";
 import styles from "./FilterBar.module.css";
 
@@ -13,10 +13,11 @@ import styles from "./FilterBar.module.css";
  * the back button useless.
  */
 export function FilterBar(
-  { filters, categories, accounts, total, onChange, onClear, exportHref }: {
+  { filters, categories, accounts, tags, total, onChange, onClear, exportHref }: {
     filters: TransactionFilters;
     categories: Category[];
     accounts: AccountRow[];
+    tags: Tag[];
     total: number;
     onChange: (next: Partial<TransactionFilters>) => void;
     onClear: () => void;
@@ -39,7 +40,7 @@ export function FilterBar(
   // Which controls are actually narrowing anything, so "Clear" can say so
   // and can be hidden when there is nothing to clear.
   const active = (["q", "from", "to", "type", "category_id", "account_id",
-                   "min", "max"] as const)
+                   "tag_id", "min", "max"] as const)
     .filter((name) => filters[name]);
 
   return (
@@ -90,6 +91,22 @@ export function FilterBar(
             <option value="">Any account</option>
             {accounts.map((one) => (
               <option key={one.id} value={one.id}>{one.name}</option>
+            ))}
+          </select>
+        )}
+
+        {/* Hidden until there is a tag to filter by, so an account that
+            does not use tags never sees a control for them. */}
+        {tags.length > 0 && (
+          <select
+            className={styles.control}
+            value={filters.tag_id ?? ""}
+            aria-label="Tag"
+            onChange={(event) => onChange({ tag_id: event.target.value })}
+          >
+            <option value="">Any tag</option>
+            {tags.map((one) => (
+              <option key={one.id} value={one.id}>{one.name} ({one.uses})</option>
             ))}
           </select>
         )}

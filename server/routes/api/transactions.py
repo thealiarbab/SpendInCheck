@@ -40,6 +40,21 @@ def _read_submission(payload):
         "account_id": fields.integer("account_id", required=False, minimum=1),
     }
     fields.raise_if_invalid()
+
+    # Tags ride along with the row rather than needing a second request.
+    # They are read outside the Validator because a list of ids is not one
+    # of the shapes it describes, and because an absent key has to mean
+    # "leave them alone" while an empty list means "take them all off".
+    raw = payload.get("tag_ids")
+    if raw is None:
+        values["tag_ids"] = None
+    elif isinstance(raw, list):
+        try:
+            values["tag_ids"] = [int(one) for one in raw]
+        except (TypeError, ValueError):
+            raise ValidationError({"tag_ids": "Tag ids must be whole numbers."})
+    else:
+        raise ValidationError({"tag_ids": "Send a list of tag ids."})
     return values
 
 
@@ -77,6 +92,7 @@ def _read_filters():
         "txn_type": kind if kind in TYPES else None,
         "category_id": whole("category_id"),
         "account_id": whole("account_id"),
+        "tag_id": whole("tag_id"),
         "min_amount": decimal("min"),
         "max_amount": decimal("max"),
         # Both are looked up in a whitelist inside the operation; an unknown
@@ -104,8 +120,16 @@ def list_transactions():
 
     rows, total = operations.search_transactions(user_id, filters, page, per_page)
 
+    items = money.rows(LIST_FIELDS, rows, money_places())
+    # One query for the whole page rather than one per row: twenty-five
+    # extra round trips to a hosted database costs more than the page does.
+    carried = operations.tags_for_transactions(
+        user_id, [item["id"] for item in items])
+    for item in items:
+        item["tags"] = carried.get(item["id"], [])
+
     return jsonify({
-        "items": money.rows(LIST_FIELDS, rows, money_places()),
+        "items": items,
         "page": {
             "number": page,
             "per_page": per_page,
@@ -124,7 +148,10 @@ def read_transaction(transaction_id):
     record = operations.get_transaction_by_id(user_id, transaction_id)
     if record is None:
         raise NotFound()
-    return jsonify(money.row(RECORD_FIELDS, record, money_places()))
+    body = money.row(RECORD_FIELDS, record, money_places())
+    body["tags"] = operations.tags_for_transactions(
+        user_id, [transaction_id]).get(transaction_id, [])
+    return jsonify(body)
 
 
 @api.post("/transactions")
@@ -132,14 +159,18 @@ def create_transaction():
     """Record a transaction."""
     user_id = require_user()
     values = _read_submission(request.get_json(silent=True) or {})
-    if not operations.add_transaction(user_id, values["txn_date"], values["category_id"],
-                                      values["amount"], values["txn_type"],
-                                      values["description"], values["account_id"]):
+    transaction_id = operations.add_transaction(
+        user_id, values["txn_date"], values["category_id"], values["amount"],
+        values["txn_type"], values["description"], values["account_id"])
+    if transaction_id is None:
         # add_transaction only writes when both the category and the account
-        # belong to this user, so a false return means one of the ids was
+        # belong to this user, so a None return means one of the ids was
         # not theirs to use.
         raise ValidationError({"category_id": "No such category."})
-    return jsonify({"ok": True}), 201
+
+    if values["tag_ids"]:
+        operations.set_transaction_tags(user_id, transaction_id, values["tag_ids"])
+    return jsonify({"ok": True, "id": transaction_id}), 201
 
 
 @api.patch("/transactions/<int:transaction_id>")
@@ -154,6 +185,12 @@ def edit_transaction(transaction_id):
         # Either the transaction is not theirs or the category is not; both
         # answer the same way, so neither confirms another account's ids.
         raise NotFound()
+
+    # None means the caller said nothing about tags, so they are left alone.
+    # An empty list is a caller saying "no tags", which must be able to
+    # clear them.
+    if values["tag_ids"] is not None:
+        operations.set_transaction_tags(user_id, transaction_id, values["tag_ids"])
     return jsonify({"ok": True})
 
 
