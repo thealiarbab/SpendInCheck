@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en" data-theme="brass">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="SpendInCheck - track spending, hold budgets, watch what you own." />
+    <title>SpendInCheck</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      // Resolve the theme before first paint, otherwise the page flashes the
+      // wrong ground colour while React boots. Order: explicit choice, then
+      // the OS preference, then the brass default.
+      (function () {
+        try {
+          var saved = localStorage.getItem("sic.theme");
+          if (saved === "brass" || saved === "paper") {
+            document.documentElement.dataset.theme = saved;
+            return;
+          }
+        } catch (e) {
+          // Private mode can throw on localStorage access; the default stands.
+        }
+        var light = window.matchMedia("(prefers-color-scheme: light)").matches;
+        document.documentElement.dataset.theme = light ? "paper" : "brass";
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
