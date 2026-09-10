@@ -112,8 +112,14 @@ def portfolio_pnl(user_id):
 
     For each row, (current_price - buy_price) * quantity gives the gain or
     loss on that holding. Returns a list of
-    (asset_name, asset_type, buy_price, current_price, quantity, pnl, current_value)
-    tuples ordered by pnl descending (best performers first).
+    (investment_id, asset_name, asset_type, buy_date, buy_price, current_price,
+    quantity, pnl, current_value) tuples ordered by pnl descending.
+
+    The id and the buy date are carried so this answers everything the
+    holdings screen shows. Without them the screen had to fetch the
+    editable rows separately and pair the two lists up by asset name --
+    a second round trip, and wrong the moment an account holds two things
+    with the same name.
     """
     connection = None
     try:
@@ -121,8 +127,10 @@ def portfolio_pnl(user_id):
         cursor = connection.cursor()
         query = """
             SELECT
+                investment_id,
                 asset_name,
                 asset_type,
+                buy_date,
                 buy_price,
                 current_price,
                 quantity,

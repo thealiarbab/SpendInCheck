@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, api } from "../../lib/api";
-import type { InvestmentRow } from "../../lib/api";
+import type { Holding } from "../../lib/api";
 import { formatQuantity, formatMoney, toMinor } from "../../lib/money";
 import { discoverHref, externalLinkProps, stockHref } from "../../lib/links";
 import {
@@ -39,8 +39,11 @@ export function Holdings() {
   const [repricing, setRepricing] = useState<number | null>(null);
   const [price, setPrice] = useState("");
 
-  const holdings = useQuery({ queryKey: ["investments"], queryFn: api.investments });
+  // One request. The portfolio report carries the editable fields as well
+  // as the worked-out profit and loss, so asking /investments separately
+  // was a second trip to Mumbai for columns already on the way back.
   const portfolio = useQuery({ queryKey: ["portfolio"], queryFn: api.portfolio });
+  const holdings = portfolio;
 
   const refresh = () => {
     client.invalidateQueries({ queryKey: ["investments"] });
@@ -77,16 +80,11 @@ export function Holdings() {
   const failure = add.error instanceof ApiError ? add.error : null;
   const fields = failure?.isValidation ? failure.fields : {};
 
-  const rows = holdings.data?.items ?? [];
+  const rows = portfolio.data?.items ?? [];
   const totals = portfolio.data?.totals;
   const pnl = totals ? toMinor(totals.pnl) : 0;
 
-  // Profit and loss comes from the report, keyed by name so the editable
-  // row and its worked-out figures line up without a second id in the API.
-  const worked = new Map(
-    (portfolio.data?.items ?? []).map((item) => [item.asset_name, item]));
-
-  function startReprice(holding: InvestmentRow) {
+  function startReprice(holding: Holding) {
     setRepricing(holding.id);
     setPrice(holding.current_price);
     setConfirming(null);
@@ -184,7 +182,7 @@ export function Holdings() {
             }
           >
             {rows.map((holding) => {
-              const figures = worked.get(holding.asset_name);
+              const figures = holding;
               return (
                 <tr key={holding.id}>
                   <td className={cell.primary}>

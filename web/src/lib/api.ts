@@ -130,8 +130,10 @@ export async function signOut(): Promise<void> {
 }
 
 export interface Holding {
+  id: number;
   asset_name: string;
   asset_type: string;
+  buy_date: string;
   buy_price: string;
   current_price: string;
   quantity: string;

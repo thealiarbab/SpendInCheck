@@ -14,7 +14,14 @@ const queryClient = new QueryClient({
       // Financial figures should not silently re-fetch under the user while
       // they read them; an explicit action refreshes instead.
       refetchOnWindowFocus: false,
-      staleTime: 30_000,
+      // Five minutes rather than thirty seconds. Every write already
+      // invalidates the keys it touches by hand, so this only decides how
+      // long an untouched list is trusted -- and at thirty seconds, simply
+      // walking between screens re-fetched the categories on each one, at
+      // roughly two hundred milliseconds a time, to be told the same eight
+      // rows. Nothing here goes stale on its own: a ledger only changes
+      // when somebody in this tab changes it.
+      staleTime: 300_000,
       retry: 1,
     },
   },

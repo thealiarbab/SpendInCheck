@@ -15,8 +15,8 @@ from server.validators import Validator
 
 SPEND_FIELDS = ["category", "total"]
 BUDGET_FIELDS = ["category", "limit", "actual", "difference"]
-PNL_FIELDS = ["asset_name", "asset_type", "buy_price", "current_price", "quantity",
-              "pnl", "current_value"]
+PNL_FIELDS = ["id", "asset_name", "asset_type", "buy_date", "buy_price",
+              "current_price", "quantity", "pnl", "current_value"]
 
 
 
@@ -68,8 +68,13 @@ def portfolio():
     places = money_places()
     items = money.rows(PNL_FIELDS, rows, places)
 
-    total_value = sum((row[6] for row in rows), start=0)
-    total_pnl = sum((row[5] for row in rows), start=0)
+    # By name, not by position: these indices shifted silently when the
+    # query gained two columns, which is the exact failure money.row()
+    # exists to avoid.
+    value_at = PNL_FIELDS.index("current_value")
+    pnl_at = PNL_FIELDS.index("pnl")
+    total_value = sum((row[value_at] for row in rows), start=0)
+    total_pnl = sum((row[pnl_at] for row in rows), start=0)
     return jsonify({
         "items": items,
         "totals": {

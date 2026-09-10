@@ -10,9 +10,12 @@ import cycle between the two modules that use it.
 
 from server import money, operations
 
-PNL_FIELDS = ["asset_name", "asset_type", "buy_price", "current_price", "quantity",
-              "pnl", "current_value"]
+PNL_FIELDS = ["id", "asset_name", "asset_type", "buy_date", "buy_price",
+              "current_price", "quantity", "pnl", "current_value"]
 TRANSACTION_FIELDS = ["id", "date", "category", "amount", "type", "description"]
+
+VALUE_AT = PNL_FIELDS.index("current_value")
+PNL_AT = PNL_FIELDS.index("pnl")
 
 # How many recent rows the dashboard shows. More than fits on the screen is
 # only weight on the wire.
@@ -37,8 +40,11 @@ def dashboard_payload(user_id, places=2):
         "portfolio": {
             "items": money.rows(PNL_FIELDS, holdings, places),
             "totals": {
-                "value": money.serialise(sum((row[6] for row in holdings), start=0), places),
-                "pnl": money.serialise(sum((row[5] for row in holdings), start=0), places),
+                # By name, not by position -- see the same note in reports.py.
+                "value": money.serialise(
+                    sum((row[VALUE_AT] for row in holdings), start=0), places),
+                "pnl": money.serialise(
+                    sum((row[PNL_AT] for row in holdings), start=0), places),
                 "holdings": len(holdings),
             },
         },
