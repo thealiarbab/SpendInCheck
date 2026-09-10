@@ -32,8 +32,7 @@ createRoot(document.getElementById("root")!).render(
     <ErrorBoundary>
       <ThemeProvider>
         <QueryClientProvider client={queryClient}>
-          {/* basename matches vite's base. Phase 8 flips both to "/". */}
-          <BrowserRouter basename="/app">
+          <BrowserRouter>
             <SessionProvider>
               <App />
             </SessionProvider>
