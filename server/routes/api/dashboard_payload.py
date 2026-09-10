@@ -25,20 +25,19 @@ RECENT_LIMIT = 8
 def dashboard_payload(user_id, places=2):
     """Holdings, portfolio totals and the latest transactions.
 
-    Both queries run against the request's own connection, so asking for all
-    of it at once costs one trip to the database rather than two. Adds no SQL
-    -- these are the same operations the separate endpoints call, and the
-    ledger one is asked for exactly the rows the screen shows.
+    One round trip for the whole payload. The two lists are fetched by a
+    single statement composed from the same pieces the separate endpoints
+    use, and it asks for exactly the eight rows the screen shows rather than
+    two hundred to be sliced.
 
     `places` is the account currency's scale, passed in rather than read
     here so this stays a plain function of a user id and can be called
     outside a request.
     """
-    holdings = operations.portfolio_pnl(user_id)
-    # Asked for eight, not asked for two hundred and sliced to eight. The
-    # ledger query carries a tag lookup per row, so the slice was paying for
-    # 192 rows of work and wire that nothing ever read.
-    recent, _ = operations.search_transactions(user_id, per_page=RECENT_LIMIT)
+    # One statement for both lists. They are independent, which is exactly
+    # why they can share a round trip -- and a round trip to Mumbai costs
+    # more than either query does.
+    recent, holdings = operations.recent_and_holdings(user_id, RECENT_LIMIT)
 
     return {
         "portfolio": {

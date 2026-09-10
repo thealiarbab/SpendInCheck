@@ -5,6 +5,8 @@ function bodies are unchanged. Import these through the package, which
 re-exports every name.
 """
 
+from decimal import Decimal
+
 from psycopg2 import Error
 from .. import db
 from .accounts import default_account_id
@@ -82,6 +84,10 @@ TAGS = ("COALESCE((SELECT json_agg(json_build_object('id', g.tag_id, "
         "            JOIN tags g ON g.tag_id = tt.tag_id "
         "           WHERE tt.transaction_id = page.transaction_id), '[]'::json)"
         " AS tags")
+
+# The tag subquery without its alias: inside json_build_array an "AS name"
+# is a syntax error, and the value is all that is wanted there.
+_TAGS_VALUE = TAGS[:TAGS.rindex(" AS tags")]
 
 COLUMNS = ("t.transaction_id, t.txn_date, c.category_name AS category_name, "
            "t.amount, t.txn_type, t.description, "
@@ -250,6 +256,68 @@ def search_transactions(user_id, filters=None, page=1, per_page=DEFAULT_PER_PAGE
         return [], 0
     finally:
         db.close_connection(connection)
+
+
+def recent_and_holdings(user_id, limit):
+    """The two lists the opening screen shows, in one statement.
+
+    They are independent, which is exactly why they can share a statement:
+    two SELECTs in one round trip rather than two round trips for queries
+    that take single figures to run.
+
+    Composed from the same COLUMNS, FROM_JOIN and TAGS this module already
+    defines, so the ledger half stays one definition rather than a second
+    copy that can drift.
+
+    Returns (recent_rows, holding_rows) in the shapes search_transactions
+    and portfolio_pnl return, so callers cannot tell the difference.
+    """
+    connection = None
+    try:
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        cursor.execute(
+            "WITH page AS ("
+            f"   SELECT {COLUMNS} {FROM_JOIN} "
+            "     WHERE t.user_id = %s "
+            f"    ORDER BY t.txn_date DESC, t.{TIEBREAK} "
+            "     LIMIT %s), "
+            "held AS ("
+            "   SELECT investment_id, asset_name, asset_type, buy_date::text, "
+            "          buy_price::text, current_price::text, quantity::text, "
+            "          ((current_price - buy_price) * quantity)::text AS pnl, "
+            "          (current_price * quantity)::text AS current_value "
+            "     FROM investments WHERE user_id = %s "
+            "    ORDER BY (current_price - buy_price) * quantity DESC) "
+            "SELECT "
+            f"  (SELECT json_agg(json_build_array(transaction_id, txn_date::text, "
+            "        category_name, amount::text, txn_type, description, "
+            f"       account_name, transfer_group, {_TAGS_VALUE})) FROM page), "
+            "  (SELECT json_agg(json_build_array(investment_id, asset_name, "
+            "        asset_type, buy_date, buy_price, current_price, quantity, "
+            "        pnl, current_value)) FROM held)",
+            (user_id, limit, user_id))
+        recent, held = cursor.fetchone()
+        return (_revive(recent, {3}), _revive(held, {4, 5, 6, 7, 8}))
+    except Error as e:
+        print(f"Error fetching the opening screen: {e}")
+        return [], []
+    finally:
+        db.close_connection(connection)
+
+
+def _revive(carried, money_columns):
+    """Turn a JSON array-of-arrays back into the tuples callers expect.
+
+    Money travels as text -- a JSON number is a float, and 1200.50 is not
+    one -- so the columns holding it become Decimals again here.
+    """
+    if not carried:
+        return []
+    return [tuple(Decimal(value) if index in money_columns and value is not None
+                  else value
+                  for index, value in enumerate(row))
+            for row in carried]
 
 
 def get_all_transactions(user_id):
