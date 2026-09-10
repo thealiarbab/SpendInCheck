@@ -159,12 +159,45 @@ export interface TransactionRow {
   amount: string;
   type: "Income" | "Expense";
   description: string | null;
+  /** Which account the row is on. Null only for rows written before
+   *  accounts existed and never edited since. */
+  account: string | null;
+  /** Shared by the two legs of one transfer, and null on everything else. */
+  transfer_group: string | null;
 }
 
 export interface Category {
   id: number;
   name: string;
   type: "Income" | "Expense";
+}
+
+export type AccountKind = "Bank" | "Cash" | "Card" | "Wallet" | "Other";
+
+/** An account and its balance. The balance is derived by the server on
+ *  every read, never stored, so it cannot disagree with the rows. */
+export interface AccountRow {
+  id: number;
+  name: string;
+  kind: AccountKind;
+  opening_balance: string;
+  balance: string;
+  transactions: number;
+  archived: boolean;
+}
+
+/** What sits on an account, so a delete can say what it will move. */
+export interface AccountUsage {
+  transactions: number;
+  transfers: number;
+}
+
+export interface TransferSubmission {
+  from_account_id: number;
+  to_account_id: number;
+  amount: string;
+  date: string;
+  description?: string;
 }
 
 export interface BudgetRow {
@@ -241,6 +274,7 @@ export interface TransactionFilters {
   to?: string;
   type?: string;
   category_id?: string;
+  account_id?: string;
   min?: string;
   max?: string;
   sort?: string;
@@ -255,6 +289,9 @@ export interface TransactionSubmission {
   amount: string;
   type: string;
   description?: string;
+  /** Optional: the server files the row on the default account when the
+   *  form does not say. */
+  account_id?: number;
 }
 
 const query = (params: Record<string, string>) =>
@@ -290,6 +327,27 @@ export const api = {
     request<void>("/categories/" + id +
       (reassignTo === undefined ? "" : query({ reassign_to: String(reassignTo) })),
       { method: "DELETE" }),
+
+  accounts: (includeArchived = false) =>
+    request<{ items: AccountRow[] }>(
+      "/accounts" + (includeArchived ? "?archived=1" : "")),
+  addAccount: (body: Record<string, string>) =>
+    request<{ id: number }>("/accounts", { method: "POST", body }),
+  editAccount: (id: number, body: Record<string, string>) =>
+    request<void>("/accounts/" + id, { method: "PATCH", body }),
+  archiveAccount: (id: number, archived: boolean) =>
+    request<void>("/accounts/" + id + "/archive",
+      { method: "POST", body: { archived: archived ? "1" : "0" } }),
+  accountUsage: (id: number) => request<AccountUsage>("/accounts/" + id + "/usage"),
+  deleteAccount: (id: number, reassignTo?: number) =>
+    request<void>("/accounts/" + id +
+      (reassignTo === undefined ? "" : query({ reassign_to: String(reassignTo) })),
+      { method: "DELETE" }),
+  transfer: (body: TransferSubmission) =>
+    request<{ transfer_group: string }>("/accounts/transfer",
+      { method: "POST", body: body as unknown as Record<string, string> }),
+  deleteTransfer: (group: string) =>
+    request<void>("/transfers/" + group, { method: "DELETE" }),
 
   transactions: (filters: TransactionFilters = {}) =>
     request<{ items: TransactionRow[]; page: PageInfo }>(

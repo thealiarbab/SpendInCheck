@@ -35,11 +35,18 @@ DEMO_ACCOUNTS = [
 # moves -- spelling it out twenty times would make the seed data harder to
 # read for no more realism. Anything unlisted comes from the current account.
 DEMO_ACCOUNT_FOR = {"Groceries": "Cash", "Dining Out": "Cash",
-                    "Transport": "Cash"}
+                    "Transport": "Cash", "Entertainment": "Credit Card"}
 
-# (date, amount, description) for the one demonstration transfer: a cash
-# withdrawal, which is the transfer everybody actually makes.
-DEMO_TRANSFER = ("2026-08-03", 6000.00, "Cash withdrawal")
+# (date, amount, description). Monthly cash withdrawals, which is both the
+# transfer everybody actually makes and the only way the cash account can
+# fund three months of groceries: 3,000 of opening float against 16,000.50
+# of cash spending would otherwise leave the demo showing a wallet 7,000
+# in the red, which reads as a bug rather than as a feature.
+DEMO_TRANSFERS = [
+    ("2026-06-03", 6000.00, "Cash withdrawal"),
+    ("2026-07-03", 6000.00, "Cash withdrawal"),
+    ("2026-08-03", 6000.00, "Cash withdrawal"),
+]
 
 # (date, category name, amount, type, description)
 DEMO_TRANSACTIONS = [
@@ -135,17 +142,20 @@ def _seed(cursor, user_id):
         (user_id, "Transfer"))
     transfer_category = cursor.fetchone()[0]
 
-    transfer_date, transfer_amount, transfer_note = DEMO_TRANSFER
-    cursor.execute(
-        "WITH pair AS (SELECT gen_random_uuid() AS group_id) "
-        "INSERT INTO transactions (user_id, txn_date, category_id, amount, "
-        "                          txn_type, description, account_id, "
-        "                          transfer_group_id) "
-        "SELECT %s, %s, %s, %s, leg.txn_type, %s, leg.account_id, pair.group_id "
-        "  FROM pair, (VALUES ('Expense', %s::int), ('Income', %s::int)) "
-        "         AS leg(txn_type, account_id)",
-        (user_id, transfer_date, transfer_category, transfer_amount, transfer_note,
-         account_ids["Current"], account_ids["Cash"]))
+    # One statement per transfer rather than one for all three: each needs
+    # its own group id, and gen_random_uuid() called once per statement is
+    # what guarantees the two legs of a pair share one and no two pairs do.
+    for transfer_date, transfer_amount, transfer_note in DEMO_TRANSFERS:
+        cursor.execute(
+            "WITH pair AS (SELECT gen_random_uuid() AS group_id) "
+            "INSERT INTO transactions (user_id, txn_date, category_id, amount, "
+            "                          txn_type, description, account_id, "
+            "                          transfer_group_id) "
+            "SELECT %s, %s, %s, %s, leg.txn_type, %s, leg.account_id, pair.group_id "
+            "  FROM pair, (VALUES ('Expense', %s::int), ('Income', %s::int)) "
+            "         AS leg(txn_type, account_id)",
+            (user_id, transfer_date, transfer_category, transfer_amount,
+             transfer_note, account_ids["Current"], account_ids["Cash"]))
 
     execute_values(
         cursor,

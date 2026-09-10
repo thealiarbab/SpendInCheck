@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Category, TransactionFilters } from "../../lib/api";
+import type { AccountRow, Category, TransactionFilters } from "../../lib/api";
 import { Button } from "../../ui";
 import styles from "./FilterBar.module.css";
 
@@ -13,9 +13,10 @@ import styles from "./FilterBar.module.css";
  * the back button useless.
  */
 export function FilterBar(
-  { filters, categories, total, onChange, onClear, exportHref }: {
+  { filters, categories, accounts, total, onChange, onClear, exportHref }: {
     filters: TransactionFilters;
     categories: Category[];
+    accounts: AccountRow[];
     total: number;
     onChange: (next: Partial<TransactionFilters>) => void;
     onClear: () => void;
@@ -37,7 +38,8 @@ export function FilterBar(
 
   // Which controls are actually narrowing anything, so "Clear" can say so
   // and can be hidden when there is nothing to clear.
-  const active = (["q", "from", "to", "type", "category_id", "min", "max"] as const)
+  const active = (["q", "from", "to", "type", "category_id", "account_id",
+                   "min", "max"] as const)
     .filter((name) => filters[name]);
 
   return (
@@ -74,6 +76,23 @@ export function FilterBar(
             <option key={one.id} value={one.id}>{one.name}</option>
           ))}
         </select>
+
+        {/* Only shown once there is a choice to make. With a single account
+            every row is on it, so the control would narrow nothing and only
+            add something to read past. */}
+        {accounts.length > 1 && (
+          <select
+            className={styles.control}
+            value={filters.account_id ?? ""}
+            aria-label="Account"
+            onChange={(event) => onChange({ account_id: event.target.value })}
+          >
+            <option value="">Any account</option>
+            {accounts.map((one) => (
+              <option key={one.id} value={one.id}>{one.name}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       <div className={styles.line}>

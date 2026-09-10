@@ -24,3 +24,21 @@
 /* While a new page or search is loading the old rows stay put, dimmed, so
    the table does not empty and jump on every keystroke. */
 .stale { opacity: 0.55; transition: opacity 120ms ease; }
+
+/* Which account a row is on. Secondary to the category beside it: the
+   category is what the row is, the account is only where it happened. */
+.account { color: var(--content-secondary); font-size: 0.8125rem; }
+
+/* Marks a row as one half of a transfer, so a pair of matching amounts on
+   one date reads as one movement rather than two coincidences. */
+.transfer {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: 1px 6px;
+  border: 1px solid var(--line-default);
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--content-muted);
+}

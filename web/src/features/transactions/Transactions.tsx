@@ -26,17 +26,19 @@ interface Draft {
   id: number | null;
   date: string;
   category_id: string;
+  account_id: string;
   amount: string;
   description: string;
 }
 
 const blank = (): Draft => ({
-  id: null, date: today(), category_id: "", amount: "", description: "",
+  id: null, date: today(), category_id: "", account_id: "", amount: "",
+  description: "",
 });
 
 /** The filter names that live in the URL, in the order they read best. */
 const FILTER_NAMES = [
-  "q", "type", "category_id", "from", "to", "min", "max",
+  "q", "type", "category_id", "account_id", "from", "to", "min", "max",
   "sort", "direction", "page", "per_page",
 ] as const;
 
@@ -87,6 +89,13 @@ export function Transactions() {
   const clear = useCallback(() => setParams(new URLSearchParams()), [setParams]);
 
   const categories = useQuery({ queryKey: ["categories"], queryFn: api.categories });
+  // Live accounts only: an archived one is exactly what should not be
+  // offered for a new row, and the filter follows the form rather than
+  // showing a choice the form below it will not.
+  const accounts = useQuery({
+    queryKey: ["accounts", false],
+    queryFn: () => api.accounts(false),
+  });
   // Keyed by the filters, so going back to a view already seen is instant
   // and each distinct search is cached in its own right.
   const transactions = useQuery({
@@ -99,6 +108,19 @@ export function Transactions() {
 
   const chosen: Category | undefined = categories.data?.items
     .find((one) => String(one.id) === draft.category_id);
+
+  const accountItems = accounts.data?.items ?? [];
+  // Where an unset picker will actually put the row, named rather than left
+  // as "Choose…" -- saying which account beats making somebody find out by
+  // saving.
+  //
+  // The lowest id, not the first in the list: the list is ordered by name
+  // and the server's default is the oldest live account, so on the demo
+  // this would otherwise promise "Cash" and deliver "Current".
+  const defaultAccount = accountItems.reduce<typeof accountItems[number] | null>(
+    (oldest, one) => (oldest === null || one.id < oldest.id ? one : oldest), null);
+  const defaultAccountName = defaultAccount
+    ? `${defaultAccount.name} (default)` : "Default account";
 
   // Everything a write changes: the list, the reports that count it, and
   // the opening screen, which shows the most recent rows.
@@ -139,6 +161,7 @@ export function Transactions() {
       id: record.id,
       date: record.date,
       category_id: String(record.category_id),
+      account_id: record.account_id === null ? "" : String(record.account_id),
       amount: record.amount,
       description: record.description ?? "",
     });
@@ -157,6 +180,10 @@ export function Transactions() {
       // old form let you file an Income under Groceries.
       type: chosen.type,
       description: draft.description,
+      // Left out when unset rather than sent as a zero: the server files the
+      // row on the default account, which is what somebody with one account
+      // means and what every row written before accounts existed did.
+      account_id: draft.account_id ? Number(draft.account_id) : undefined,
     });
   }
 
@@ -198,6 +225,22 @@ export function Transactions() {
             ))}
           </Picker>
           <Derived>{chosen ? <Tag kind={chosen.type} /> : null}</Derived>
+          {/* Only once there is a choice. With one account every row goes
+              there anyway, and a picker with a single option is a question
+              that has already been answered. */}
+          {accountItems.length > 1 && (
+            <Picker
+              label="Account" name="account_id" value={draft.account_id}
+              error={fields.account_id}
+              onChange={(event) =>
+                setDraft({ ...draft, account_id: event.target.value })}
+            >
+              <option value="">{defaultAccountName}</option>
+              {accountItems.map((one) => (
+                <option key={one.id} value={one.id}>{one.name}</option>
+              ))}
+            </Picker>
+          )}
           <Field
             label="Amount" name="amount" type="number" step="0.01" min="0.01" numeric
             value={draft.amount} error={fields.amount} placeholder="0.00"
@@ -230,6 +273,7 @@ export function Transactions() {
         <FilterBar
           filters={filters}
           categories={categories.data?.items ?? []}
+          accounts={accounts.data?.items ?? []}
           total={page?.total ?? rows.length}
           onChange={update}
           onClear={clear}
@@ -260,6 +304,13 @@ export function Transactions() {
                   </button>
                 </th>
                 <th>
+                  <button className={styles.sortable + (filters.sort === "account"
+                          ? " " + styles.sortedOn : "")}
+                          onClick={sortBy("account")}>
+                    Account{sortMark("account")}
+                  </button>
+                </th>
+                <th>
                   <button className={styles.sortable + (filters.sort === "type"
                           ? " " + styles.sortedOn : "")}
                           onClick={sortBy("type")}>
@@ -282,6 +333,17 @@ export function Transactions() {
               <tr key={row.id} className={row.id === draft.id ? rowStyle.editing : undefined}>
                 <td className={cell.numeric} style={{ textAlign: "left" }}>{row.date}</td>
                 <td className={cell.primary}>{row.category}</td>
+                <td className={styles.account}>
+                  {row.account ?? "—"}
+                  {/* Which rows are two halves of one movement rather than
+                      two separate ones. Without the mark a transfer reads as
+                      unexplained money leaving and arriving on the same day. */}
+                  {row.transfer_group && (
+                    <span className={styles.transfer} title="One half of a transfer">
+                      transfer
+                    </span>
+                  )}
+                </td>
                 <td><Tag kind={row.type} /></td>
                 <td className={cell.numeric + (row.type === "Income" ? " " + cell.credit : "")}>
                   {formatMoney(toMinor(row.amount))}

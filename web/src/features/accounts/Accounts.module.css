@@ -1,0 +1,50 @@
+/* Prose inside a card: the transfer and delete panels both have to explain
+   themselves before they offer a control, so they carry more text than a
+   form usually does. */
+.explain {
+  margin: 0 0 var(--space-4);
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--content-secondary);
+  max-width: 68ch;
+}
+
+.explain:last-child {
+  margin: var(--space-4) 0 0;
+  color: var(--content-muted);
+}
+
+.gap { height: var(--space-5); }
+
+/* The kind and the opening balance are context, not the figure being read.
+   Set quieter so the balance column is what the eye lands on. */
+.kind { color: var(--content-secondary); font-size: 0.8125rem; }
+.quiet { color: var(--content-muted); }
+
+/* Closed accounts stay in the list when asked for, so they need a mark that
+   survives without colour -- a word, not a tint. */
+.closed {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: 1px 6px;
+  border: 1px solid var(--line-default);
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--content-muted);
+  vertical-align: middle;
+}
+
+/* Sits in the page head beside the title, like the month picker on Reports. */
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.8125rem;
+  color: var(--content-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.toggle input { accent-color: var(--accent-default); cursor: pointer; }
