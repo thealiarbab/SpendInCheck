@@ -18,7 +18,9 @@ export function Nav({ username }: { username?: string }) {
   return (
     <header className={styles.bar}>
       <div className={styles.left}>
-        <span className={styles.brand}>SpendInCheck</span>
+        <span className={styles.brand}>
+          Spend<span className={styles.brandMark}>InCheck</span>
+        </span>
         <nav className={styles.links} aria-label="Main">
           {PAGES.map((page) => (
             <NavLink

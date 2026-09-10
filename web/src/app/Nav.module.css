@@ -25,9 +25,19 @@
 
 .brand {
   font-family: var(--font-serif);
-  font-size: var(--text-md);
+  /* 25px, matching the mark the old site used. --text-md is for card titles
+     and made the wordmark read as just another heading. */
+  font-size: 1.5625rem;
+  letter-spacing: 0.2px;
   color: var(--content-primary);
   white-space: nowrap;
+}
+
+/* The second half is brass and italic. Two tones and two styles are what
+   make it a wordmark rather than the product's name set in a serif. */
+.brandMark {
+  color: var(--accent-default);
+  font-style: italic;
 }
 
 .links {
