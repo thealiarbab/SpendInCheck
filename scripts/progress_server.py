@@ -61,7 +61,16 @@ COMMIT_PHASE = {
     # 6501316 and c4c1838 closed phase 6 and are counted there, even though
     # they landed after the marker had moved -- the same rule as 1d97254 in
     # phase 3.
-    7: ["24f8a64", "146ea3d", "5a4534c", "53b3104"],
+    # The last six are not phase 7 features -- they are the latency work and
+    # the security fix, which cut across everything and were done between 7
+    # and 8. They are counted here because every key in this map has to be a
+    # phase number: anything else is grouped under a heading nothing renders,
+    # and the commits disappear from the page. Left unlisted they would fall
+    # into CURRENT_PHASE and claim phase 8 had started, when no Jinja has
+    # been killed at all.
+    7: ["24f8a64", "146ea3d", "5a4534c", "53b3104", "51a8db6", "79eea4b",
+        "96d4087", "754576a", "a543936", "8a477cd", "72ca61f", "145318d",
+        "afd4d04"],
 }
 
 PHASES = [

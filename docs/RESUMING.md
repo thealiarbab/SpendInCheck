@@ -119,27 +119,33 @@ found this.
 
 ## 9. Where Phase 8 starts
 
-Phase 7 is closed. Accounts, tags, goals, recurring, rollover and CSV
-import, on migrations 003-007 -- one number later than the plan's table,
-because 002 went on widening the money columns.
+Phase 7 is closed, and so is the round of latency work that followed it.
+Nothing is in progress; the tree is clean and the marker is on 8.
 
-The four decisions worth knowing before touching any of it:
+Phase 8 is **kill Jinja**. From the plan:
 
-- **Balances and goal totals are summed on read, never stored.** A stored
-  total is a second copy of a fact that already exists, and the two
-  disagree the first time something is edited.
-- **`budgets.rollover_in` is the one exception**, because deriving it means
-  walking back through every month a category was ever budgeted for. Every
-  write path recomputes it, and one test rebuilds it from scratch and
-  compares.
-- **A transfer is two ordinary rows sharing a `transfer_group_id`.** Every
-  report carries `transfer_group_id IS NULL`; without it, moving money
-  between your own accounts reads as income and expenditure.
-- **The recurring sweep is idempotent by construction**, via a unique index
-  on `(rule_id, txn_date)`. Vercel cron is at-least-once, so a repeat run
-  has to be a no-op rather than a duplicate rent.
+> Flip the rewrite; delete `templates/`, `static/style.css`, every
+> `render_template` / `flash` / `url_for`. One revertable commit.
+> **Verify:** every old URL works or 404s cleanly; no server route shadows
+> a React route.
 
-Phase 8 is killing Jinja: flip the rewrite so React owns `/*`, in one
-revertable commit. Three Jinja templates have already broken this phase by
-unpacking a tuple that grew a column -- `tests/test_pages_render.py` now
-guards the row shapes, and all of that goes away with the templates.
+What that touches, none of it started:
+
+- `server/routes/web.py` -- 364 lines, thirteen routes, all of them Jinja.
+- `templates/` and `static/`, both still listed in `vercel.json`'s
+  `includeFiles`.
+- `vercel.json` routes everything to `app.py`; React has to be built and
+  served, and `/api/v1/*` must keep working.
+- `scripts/mirror.py` exists only because Flask and Vite are separate
+  origins. After this it has no job.
+
+Two things to be careful of. The old URLs are `/transactions`,
+`/categories` and so on, and the React routes are the same paths under
+`/app` today -- so the flip is also a decision about whether `/app/*`
+keeps working or redirects. And **this is the first phase a visitor
+sees**: pushing to `main` deploys spendincheck.com, so it needs asking
+first.
+
+Everything else in this file still applies: one round trip per screen, the
+REST API deliberately closed, and the tests running against the real
+database.
