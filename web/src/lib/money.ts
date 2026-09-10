@@ -34,8 +34,11 @@ const LOCALE = "en-IN";
 function build(code: string): Active {
   let digits = 2;
   try {
+    // ?? 2 because the type is optional: every currency Intl knows resolves
+    // to a real number here, and the fallback is only there so an engine
+    // that omitted it cannot turn every amount into NaN.
     digits = new Intl.NumberFormat(LOCALE, { style: "currency", currency: code })
-      .resolvedOptions().maximumFractionDigits;
+      .resolvedOptions().maximumFractionDigits ?? 2;
   } catch {
     // An unknown code would otherwise throw on every render. Fall back to
     // the default rather than take the screen down over a label.

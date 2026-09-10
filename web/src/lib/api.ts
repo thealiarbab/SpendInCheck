@@ -399,7 +399,7 @@ const query = (params: Record<string, string>) =>
  * at the URL, and "?q=&type=" in a shared link says a filter is set when
  * none is.
  */
-function queryOf(filters: Record<string, string | undefined>): string {
+function queryOf(filters: TransactionFilters): string {
   const params = new URLSearchParams();
   for (const [name, value] of Object.entries(filters)) {
     if (value !== undefined && value !== "") params.set(name, value);
