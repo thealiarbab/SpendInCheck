@@ -5,8 +5,6 @@ it a freshly opened page cannot tell "signed out" from "still checking", and
 would flash the sign-in screen at someone who is already signed in.
 """
 
-import secrets
-
 from flask import jsonify, request, session
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -15,6 +13,7 @@ from server.auth import (csrf_token, current_user_id, is_demo, require_user,
                          sign_in, sign_out)
 from server.errors import ApiError, ValidationError
 from server.routes.api import api
+from server.routes.api.dashboard_payload import dashboard_payload
 from server.validators import Validator
 
 # Any name starting with this is reserved for demonstration accounts, which
@@ -115,14 +114,21 @@ def start_demo():
     The password is set to an unguessable value nobody is told, since the
     only way into these accounts is through this endpoint.
     """
-    user_id, username = operations.create_demo_user(
-        generate_password_hash(secrets.token_urlsafe(32)))
+    user_id, username = operations.create_demo_user()
     if user_id is None:
         raise ApiError("The demo is unavailable right now.",
                        code="demo_unavailable", status=503)
 
     token = sign_in(user_id, username, demo=True)
-    return jsonify({"user": _account_body(), "csrf_token": token}), 201
+    # The dashboard rides along. This request already holds an open
+    # connection, so reading the seeded rows costs a few milliseconds here
+    # against a further two hundred for a separate round trip -- and the
+    # visitor is staring at a button the whole time.
+    return jsonify({
+        "user": _account_body(),
+        "csrf_token": token,
+        "dashboard": dashboard_payload(user_id),
+    }), 201
 
 
 @api.post("/auth/sign-out")

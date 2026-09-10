@@ -11,7 +11,6 @@ known expiry date.
 Contains no SQL. Every route calls a function from server.operations.
 """
 
-import secrets
 from datetime import datetime
 
 from flask import (flash, redirect, render_template, request, session, url_for)
@@ -163,8 +162,7 @@ def register(app):
         POST because it writes. As a GET, any crawler or link prefetcher that
         touched this URL would create an account.
         """
-        user_id, username = operations.create_demo_user(
-            generate_password_hash(secrets.token_urlsafe(32)))
+        user_id, username = operations.create_demo_user()
         if user_id is None:
             flash("The demo is unavailable right now.", "error")
             return redirect(url_for("landing"))

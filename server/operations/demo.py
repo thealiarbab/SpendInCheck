@@ -138,7 +138,14 @@ def reset_demo_data(user_id):
         db.close_connection(connection)
 
 
-def create_demo_user(password_hash):
+# A stored value no password can ever hash to, so check_password_hash always
+# returns False. Demo accounts are only ever reached through the endpoint that
+# creates them, so deriving a real hash costs about 220ms of scrypt to protect
+# a password nobody is ever told.
+UNUSABLE_PASSWORD = "!"
+
+
+def create_demo_user(password_hash=UNUSABLE_PASSWORD):
     """Create a private, throwaway demonstration account and seed it.
 
     Every visitor gets their own. A single shared demo row means two people
