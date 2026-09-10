@@ -1,0 +1,21 @@
+.month { margin-bottom: var(--space-5); }
+
+/* The month's total, set apart from the categories it sums. */
+.total td {
+  border-top: 1px solid var(--line-strong);
+  font-weight: 600;
+  color: var(--content-primary);
+}
+
+.total td:first-child {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.7rem;
+  color: var(--content-muted);
+}
+
+.replacing {
+  margin: var(--space-4) 0 0;
+  font-size: 0.875rem;
+  color: var(--content-secondary);
+}

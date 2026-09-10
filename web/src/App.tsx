@@ -5,6 +5,7 @@ import { useSession } from "./app/SessionProvider";
 import { Dashboard } from "./features/dashboard/Dashboard";
 import { Transactions } from "./features/transactions/Transactions";
 import { Categories } from "./features/categories/Categories";
+import { Budgets } from "./features/budgets/Budgets";
 import { Loading } from "./ui";
 import { ThemeLab } from "./features/themelab/ThemeLab";
 
@@ -40,7 +41,7 @@ export default function App() {
         <Route index element={<Private><Dashboard /></Private>} />
         <Route path="transactions" element={<Private><Transactions /></Private>} />
         <Route path="categories" element={<Private><Categories /></Private>} />
-        <Route path="budgets" element={<Placeholder title="Budgets" />} />
+        <Route path="budgets" element={<Private><Budgets /></Private>} />
         <Route path="investments" element={<Placeholder title="Holdings" />} />
         <Route path="reports" element={<Placeholder title="Reports" />} />
         {/* Development-only: the brass/paper comparison. Tree-shaken from
