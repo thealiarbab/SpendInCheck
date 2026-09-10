@@ -64,3 +64,14 @@ def test_a_column_of_amounts_totals_exactly():
     # exactly 20.0 -- but accumulating in a loop, which is what aggregating
     # rows actually looks like, drifts to 20.000000000000014.
     assert drifting != 20
+
+
+def test_a_quantity_keeps_the_four_places_it_is_stored_at():
+    """Units are not money. Rounding them to paise loses a real distinction:
+    12.3456 units of a fund is not the same holding as 12.35."""
+    assert money.row(["quantity"], [Decimal("12.3456")]) == {"quantity": "12.3456"}
+
+
+def test_an_amount_is_still_rounded_to_paise():
+    """The quantity exception must not widen to every Decimal."""
+    assert money.row(["amount"], [Decimal("12.3456")]) == {"amount": "12.35"}

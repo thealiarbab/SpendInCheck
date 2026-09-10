@@ -17,6 +17,14 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 # Two decimal places, matching DECIMAL(10,2) in the schema.
 PAISA = Decimal("0.01")
 
+# Four, matching DECIMAL(10,4) -- the scale investments.quantity is stored at.
+UNIT = Decimal("0.0001")
+
+# Columns that are counts of units rather than sums of money. Quantising one
+# of these to paise loses real precision: a mutual fund holding of 12.3456
+# units would leave the database as "12.35" and never come back.
+QUANTITY_FIELDS = frozenset({"quantity"})
+
 
 def to_decimal(raw_value):
     """Parse submitted input into a Decimal, or return None if unusable.
@@ -64,13 +72,23 @@ def serialise(amount):
     return f"{quantise(Decimal(amount)):.2f}"
 
 
-def jsonify_value(value):
+def serialise_quantity(amount):
+    """Render a Decimal at the four places investments.quantity is stored at."""
+    if amount is None:
+        return None
+    return f"{Decimal(amount).quantize(UNIT, rounding=ROUND_HALF_UP):.4f}"
+
+
+def jsonify_value(value, field_name=None):
     """Convert one value into something json can serialise.
 
     Decimal becomes a string, dates become ISO-8601, and anything else is
-    returned untouched. Applied by row(), below.
+    returned untouched. Applied by row(), below, which passes the column
+    name so a quantity is not rounded to paise like an amount.
     """
     if isinstance(value, Decimal):
+        if field_name in QUANTITY_FIELDS:
+            return serialise_quantity(value)
         return serialise(value)
     if hasattr(value, "isoformat"):
         return value.isoformat()
@@ -85,7 +103,8 @@ def row(field_names, values):
     Naming the fields at the route boundary keeps the SQL layer unchanged
     while the JSON stays stable.
     """
-    return {name: jsonify_value(value) for name, value in zip(field_names, values)}
+    return {name: jsonify_value(value, name)
+            for name, value in zip(field_names, values)}
 
 
 def rows(field_names, values_list):

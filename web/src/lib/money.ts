@@ -105,3 +105,20 @@ export function moneyTone(paise: Paise): "credit" | "debit" | "level" {
   if (paise < 0) return "debit";
   return "level";
 }
+
+/**
+ * A holding's quantity, as many places as it actually has.
+ *
+ * Stored as DECIMAL(10,4) and sent as "500.0000", because units are not
+ * money and rounding them to paise loses real precision -- 12.3456 units of
+ * a fund is a different holding from 12.35. Trailing zeros are dropped here
+ * rather than on the wire, so the exact figure survives the trip and only
+ * the display is tidied.
+ */
+export function formatQuantity(value: string | number | null | undefined): string {
+  if (value === null || value === undefined || value === "") return "—";
+  const text = String(value);
+  if (!text.includes(".")) return text;
+  const trimmed = text.replace(/0+$/, "").replace(/\.$/, "");
+  return trimmed === "" ? "0" : trimmed;
+}

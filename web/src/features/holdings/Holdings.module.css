@@ -1,0 +1,29 @@
+.hint {
+  margin: var(--space-4) 0 0;
+  font-size: 0.8125rem;
+  color: var(--content-muted);
+}
+
+/* StockSaathi's own colour, never --money-credit: a link is far enough from
+   a figure that it should not read as "this is a gain". */
+.symbol {
+  color: var(--accent-invest);
+  text-decoration: none;
+}
+
+.symbol:hover { text-decoration: underline; }
+
+/* Repricing happens in the cell showing the price, so the figure being
+   changed and the box changing it are the same place on screen. */
+.priceInput {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+  color: var(--content-primary);
+  background: var(--surface-inset);
+  border: 1px solid var(--line-focus);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+  width: 8rem;
+  text-align: right;
+}

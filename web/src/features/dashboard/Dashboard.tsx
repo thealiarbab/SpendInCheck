@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../lib/api";
-import { formatRupees, toPaise } from "../../lib/money";
+import { formatQuantity, formatRupees, toPaise } from "../../lib/money";
 import { Card, Empty, Loading, Money, Notice, PageHead, Stat, StatRow, Table, Tag, cell } from "../../ui";
 
 /**
@@ -65,7 +65,7 @@ export function Dashboard() {
                 <td>{holding.asset_type}</td>
                 <td className={cell.numeric}>{formatRupees(toPaise(holding.buy_price))}</td>
                 <td className={cell.numeric}>{formatRupees(toPaise(holding.current_price))}</td>
-                <td className={cell.numeric}>{holding.quantity}</td>
+                <td className={cell.numeric}>{formatQuantity(holding.quantity)}</td>
                 <td className={cell.numeric}><Money value={holding.pnl} signed /></td>
               </tr>
             ))}
