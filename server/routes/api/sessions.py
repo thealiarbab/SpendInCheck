@@ -9,9 +9,9 @@ from flask import jsonify, request, session
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from server import operations
-from server.auth import (csrf_token, current_currency, current_user_id, is_demo,
-                         money_places, remember_currency, require_user,
-                         sign_in, sign_out)
+from server.auth import (csrf_token, current_currency, current_user_id,
+                         demo_account_is_gone, is_demo, money_places,
+                         remember_currency, require_user, sign_in, sign_out)
 from server.errors import ApiError, ValidationError
 from server.routes.api import api
 from server.routes.api.dashboard_payload import dashboard_payload
@@ -34,7 +34,7 @@ def _account_body():
     # for an account that no longer exists -- and without this it is told
     # it is signed in and then shown an empty ledger, which reads as data
     # loss rather than as a demo having expired.
-    if is_demo() and not operations.user_exists(user_id):
+    if demo_account_is_gone():
         sign_out()
         return None
 

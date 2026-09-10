@@ -5,7 +5,7 @@ under test is the whole path: CSRF gate, validation, session, and the shape
 of the body that comes back.
 """
 
-from server import operations
+from server import auth, operations
 
 
 def test_session_reports_a_signed_out_visitor_without_failing(client):
@@ -111,10 +111,16 @@ def test_the_pages_still_redirect_rather_than_returning_json(client):
     assert "/sign-in" in response.headers["Location"]
 
 
-def test_a_session_whose_demo_account_was_swept_reports_signed_out(client):
+def test_a_session_whose_demo_account_was_swept_reports_signed_out(client, monkeypatch):
     """Demonstration accounts are deleted on a schedule, but the cookie in
     somebody's browser knows nothing about that. Reporting them as signed
-    in and then showing an empty ledger reads as data loss."""
+    in and then showing an empty ledger reads as data loss.
+
+    The recheck window is set to zero here so the check runs on the next
+    request rather than an hour later.
+    """
+    monkeypatch.setattr(auth, "DEMO_RECHECK_SECONDS", 0)
+
     token = client.get("/api/v1/auth/session").get_json()["csrf_token"]
     body = client.post("/api/v1/auth/demo",
                        headers={"X-CSRF-Token": token}).get_json()
@@ -123,3 +129,23 @@ def test_a_session_whose_demo_account_was_swept_reports_signed_out(client):
     operations.delete_demo_user(body["user"]["id"])
 
     assert client.get("/api/v1/auth/session").get_json()["user"] is None
+
+
+def test_a_fresh_demo_session_is_not_re_checked(client, monkeypatch):
+    """The check costs a round trip to Supabase, and GET /auth/session runs
+    on every page load. Doing it every time put 260ms on the most frequent
+    request in the app to catch something that happens once a day."""
+    reads = []
+    real = operations.user_exists
+    monkeypatch.setattr(operations, "user_exists",
+                        lambda user_id: (reads.append(user_id), real(user_id))[1])
+
+    token = client.get("/api/v1/auth/session").get_json()["csrf_token"]
+    body = client.post("/api/v1/auth/demo",
+                       headers={"X-CSRF-Token": token}).get_json()
+    try:
+        for _ in range(5):
+            assert client.get("/api/v1/auth/session").get_json()["user"] is not None
+        assert reads == [], "the account was re-checked inside the trusted window"
+    finally:
+        operations.delete_demo_user(body["user"]["id"])

@@ -13,6 +13,7 @@ sign in through either, and the other already knows who you are.
 
 import hmac
 import secrets
+import time
 
 from flask import session
 
@@ -75,6 +76,41 @@ def money_places():
     return currencies.decimals(current_currency())
 
 
+# How long a demonstration session is trusted before its account is checked
+# for again. The sweep runs daily, so an hour is far more often than it can
+# possibly matter -- and it keeps the check off the path of somebody who is
+# simply using the app.
+DEMO_RECHECK_SECONDS = 3600
+
+
+def demo_account_is_gone():
+    """True when this demo session points at an account that no longer exists.
+
+    Confirming an account exists costs a round trip to Supabase, and
+    GET /auth/session is called on every single page load, so doing it every
+    time put 260ms on the most frequent request in the app to catch
+    something that can only happen once a day.
+
+    So a session is trusted for an hour after it was last confirmed. A demo
+    swept overnight is still caught the next morning, which is the case that
+    actually occurs; an account deleted in the last hour shows an empty
+    ledger until the next check, which is what happened before this existed
+    at all.
+    """
+    if not is_demo():
+        return False
+
+    checked = session.get("verified_at")
+    if checked is not None and time.time() - checked < DEMO_RECHECK_SECONDS:
+        return False
+
+    from server import operations
+    if operations.user_exists(current_user_id()):
+        session["verified_at"] = time.time()
+        return False
+    return True
+
+
 def is_demo():
     """True when this session is using a demonstration account."""
     user_id = current_user_id()
@@ -95,6 +131,8 @@ def sign_in(user_id, username, *, demo=False):
     session["username"] = username
     if demo:
         session["demo_id"] = user_id
+        # Just created, so it certainly exists.
+        session["verified_at"] = time.time()
     session.permanent = True
     return rotate_csrf_token()
 

@@ -1,32 +1,32 @@
 {
-  "measured_at": 1789019566,
+  "measured_at": 1789040440,
   "runs": 5,
   "entries": [
     {
       "label": "Open the demo, to a screen with figures",
-      "best": 484,
-      "median": 547,
+      "best": 590,
+      "median": 618,
       "baseline": 3100,
       "note": "Session, account creation, seeding and the dashboard payload."
     },
     {
       "label": "Dashboard, already signed in",
-      "best": 275,
-      "median": 287,
+      "best": 309,
+      "median": 345,
       "baseline": 489,
       "note": "Holdings and recent rows together, sharing one connection."
     },
     {
       "label": "Transactions list",
-      "best": 238,
-      "median": 279,
+      "best": 287,
+      "median": 311,
       "baseline": 234,
       "note": "A single query."
     },
     {
       "label": "Budget vs actual report",
-      "best": 250,
-      "median": 268,
+      "best": 267,
+      "median": 274,
       "baseline": 312,
       "note": "Joins budgets to transactions."
     },
