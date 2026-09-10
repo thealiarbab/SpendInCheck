@@ -97,6 +97,11 @@ def register(app):
         account, because all data is stored per user and there is nothing
         meaningful to show without knowing whose ledger to read.
         """
+        # The API answers for itself, in JSON. Without this the redirect below
+        # would catch /api/* too and hand a fetch() an HTML sign-in page with
+        # a 302, instead of the 401 the client knows how to act on.
+        if request.path.startswith("/api/"):
+            return None
         if current_user_id() or request.endpoint in PUBLIC_ENDPOINTS:
             return None
         return redirect(url_for("sign_in"))

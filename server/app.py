@@ -13,6 +13,7 @@ from flask import Flask
 
 from server import config
 from server.routes import web
+from server.routes.api import api, handle_unknown_path
 
 # Templates and static files stayed at the repo root when this module moved
 # into server/. Flask resolves both relative to the module's own directory,
@@ -46,6 +47,12 @@ def create_app(secret_key=None):
     _check_production_config(app)
 
     web.register(app)
+    app.register_blueprint(api)
+
+    # See handle_unknown_path: a routing miss belongs to no blueprint, so this
+    # has to be registered here to answer unknown /api paths in JSON.
+    app.register_error_handler(404, handle_unknown_path)
+
     return app
 
 
