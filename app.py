@@ -20,7 +20,7 @@ from flask import (Flask, flash, redirect, render_template, request, session,
                    url_for)
 from werkzeug.security import check_password_hash, generate_password_hash
 
-import operations
+from server import operations
 
 app = Flask(__name__)
 # Signs the session cookie. Supplied as an environment variable when hosted.

@@ -19,7 +19,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import db  # noqa: E402
-import operations  # noqa: E402
+from server import operations  # noqa: E402
 
 
 def _delete_user(user_id):

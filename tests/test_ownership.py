@@ -6,7 +6,7 @@ screen" -- it is a lookup that answers about the wrong user and lets a later
 call act on that answer. So these tests ask each ownership check directly.
 """
 
-import operations
+from server import operations
 
 
 def test_investment_exists_rejects_another_users_investment(make_user):
