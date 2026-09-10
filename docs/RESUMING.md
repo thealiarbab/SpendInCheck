@@ -86,7 +86,25 @@ opening the demo is three.
 progress page renders. Run it after touching any request path, and quote
 figures from it rather than reasoning about them.
 
-## 7. Decisions that are not visible in the code
+## 7. The database is closed to everything but this app
+
+Supabase serves every table in the `public` schema over PostgREST, and by
+default grants `anon` and `authenticated` full read and write on all of
+them. The publishable key is not a secret -- it is meant to ship in client
+code -- so until migration 010 the whole database, `users.password_hash`
+included, was readable and deletable by anyone holding it. That was
+verified against the live project, not inferred.
+
+Migration 010 enables RLS on every table with no policies and revokes the
+grants, including default privileges so new tables do not reopen it. The
+app is unaffected because it connects as `postgres`, which has
+`rolbypassrls`.
+
+**Anything that creates a table must not hand privileges back to `anon` or
+`authenticated`.** Run `get_advisors` after schema changes; it is what
+found this.
+
+## 8. Decisions that are not visible in the code
 
 - **Both themes ship, toggleable.** Every UI primitive reads semantic
   tokens, never a literal colour, so a screen is correct in brass and paper
@@ -99,7 +117,7 @@ figures from it rather than reasoning about them.
   changing currency relabels and re-rounds, and the settings screen says so
   before the control.
 
-## 8. Where Phase 8 starts
+## 9. Where Phase 8 starts
 
 Phase 7 is closed. Accounts, tags, goals, recurring, rollover and CSV
 import, on migrations 003-007 -- one number later than the plan's table,
