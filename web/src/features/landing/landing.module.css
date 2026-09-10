@@ -1,0 +1,113 @@
+/* The one screen a stranger sees. Wider measures and larger type than the
+   app behind it, because nothing here is a table of figures -- it is prose,
+   and prose set at the density of a ledger is hard work.
+
+   Every colour, radius and edge is a semantic token, so this page is right
+   in brass and paper without a second rule: brass sets every radius to 0,
+   which is why the pill below is --radius-pill rather than a number. */
+
+.hero {
+  max-width: 46rem;
+  margin: var(--space-10) auto var(--space-16);
+  text-align: center;
+}
+
+.pill {
+  display: inline-block;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--line-default);
+  border-radius: var(--radius-pill);
+  color: var(--content-secondary);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.title {
+  margin: var(--space-5) 0 0;
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: clamp(var(--text-2xl), 7vw, var(--text-3xl));
+  line-height: var(--leading-tight);
+  color: var(--content-primary);
+}
+
+/* The second of the two lines, in the accent, so the accent marks the claim
+   rather than the whole sentence. */
+.claim {
+  color: var(--accent-default);
+}
+
+.tagline {
+  margin: var(--space-5) auto 0;
+  max-width: 40rem;
+  color: var(--content-secondary);
+  line-height: var(--leading-normal);
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: var(--space-8);
+}
+
+.note {
+  margin: var(--space-5) auto 0;
+  max-width: 40rem;
+  color: var(--content-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.note a {
+  color: var(--content-secondary);
+}
+
+.sectionHead {
+  text-align: center;
+  margin: 0 0 var(--space-8);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: var(--text-lg);
+  color: var(--content-primary);
+}
+
+.sectionSub {
+  margin: var(--space-2) 0 0;
+  color: var(--content-secondary);
+  font-size: var(--text-sm);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-16);
+}
+
+.feature {
+  padding: var(--space-6);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+}
+
+.featureTitle {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--content-primary);
+}
+
+.featureBody {
+  margin: 0;
+  color: var(--content-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
