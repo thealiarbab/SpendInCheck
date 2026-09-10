@@ -70,13 +70,15 @@ class Validator:
     def text(self, field, *, required=True, max_length=None, label=None):
         """A trimmed, non-empty string."""
         name = label or field.replace("_", " ")
-        # "Enter an email" rather than "Enter a email". This is a first-letter
-        # test, not a pronunciation one: "u" is left out of the vowel list
-        # because every u-word used as a label here ("username") is said "yoo"
-        # and takes "a". It would get "an hour" wrong. That is fine only while
-        # the set of field labels stays small and known -- a label whose first
-        # letter disagrees with its first sound needs its own message instead.
-        article = "an" if name[:1].lower() in "aeio" else "a"
+        # "Enter an email" rather than "Enter a email". These are not the
+        # vowels (which are a, e, i, o, u) -- they are the letters that take
+        # "an" here. "u" is absent because every u-word used as a label
+        # ("username") is said "yoo" and takes "a". It would still get "an
+        # hour" wrong, so this holds only while the set of labels stays small
+        # and known; a label whose first letter disagrees with its first sound
+        # needs its own message instead.
+        takes_an = "aeio"
+        article = "an" if name[:1].lower() in takes_an else "a"
         raw = self.payload.get(field)
 
         if raw is None or str(raw).strip() == "":
