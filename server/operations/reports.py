@@ -6,7 +6,7 @@ re-exports every name.
 """
 
 from psycopg2 import Error
-import db
+from .. import db
 
 def category_wise_spend(user_id, month_year):
     """Report: total Expense amount per category for the given 'YYYY-MM' month.

@@ -6,7 +6,7 @@ re-exports every name.
 """
 
 from psycopg2 import Error
-import db
+from .. import db
 
 def set_budget(user_id, category_id, month_year, budget_limit):
     """Create or update the budget limit for a category in a given month.

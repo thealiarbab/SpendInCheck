@@ -9,7 +9,7 @@ one place that knows how to reach the database.
 import psycopg2
 from psycopg2 import Error
 
-import config
+from . import config
 
 
 def get_connection():

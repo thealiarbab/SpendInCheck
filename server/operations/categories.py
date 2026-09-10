@@ -6,7 +6,7 @@ re-exports every name.
 """
 
 from psycopg2 import Error
-import db
+from .. import db
 
 def add_category(user_id, category_name, category_type):
     """Insert a new category. category_type must be 'Income' or 'Expense'.

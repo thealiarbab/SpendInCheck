@@ -6,7 +6,7 @@ re-exports every name.
 """
 
 from psycopg2 import Error
-import db
+from .. import db
 
 def add_investment(user_id, asset_name, asset_type, buy_date, buy_price,
                    quantity, current_price):

@@ -6,7 +6,7 @@ re-exports every name.
 """
 
 from psycopg2 import Error
-import db
+from .. import db
 
 from .users import get_user_by_login
 

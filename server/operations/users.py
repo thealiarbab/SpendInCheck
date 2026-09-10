@@ -6,7 +6,7 @@ re-exports every name.
 """
 
 from psycopg2 import Error
-import db
+from .. import db
 
 # Categories every new account starts with, so the app is usable immediately
 # instead of presenting empty dropdowns on the first visit.
