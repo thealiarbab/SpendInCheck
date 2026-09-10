@@ -22,16 +22,17 @@ for the project to gain a dependency.
 
 import http.client
 import shutil
+import socket
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 
 PORT = 8000
-# Named rather than pinned to 127.0.0.1: Vite listens on ::1 only, so a
-# literal IPv4 address silently misses it and the mirror quietly serves a
-# stale web/dist instead. "localhost" resolves to both, and Python tries
-# each address in turn.
+# Named rather than pinned to an address, because the two servers do not
+# agree on a family: Flask listens on 127.0.0.1 and Vite on ::1, so either
+# literal misses one of them. What the name must not do is cost anything --
+# see address_for() below.
 FLASK = ("localhost", 5000)
 VITE = ("localhost", 5173)
 
@@ -53,15 +54,62 @@ CONTENT_TYPES = {
 }
 
 
-def reachable(target):
-    """True when something is listening, so the fallback can be chosen."""
+# Which concrete address each named target actually answers on, remembered
+# after the first successful connection.
+_resolved = {}
+
+# How long to wait when trying a candidate address. Refusal is not instant on
+# Windows -- a closed port takes about 2.3 seconds to say so -- and without a
+# short bound here the wrong family is paid for at full price.
+PROBE_TIMEOUT = 0.4
+
+
+def _answers(address):
+    """True when something accepts a connection at this exact address."""
     try:
-        connection = http.client.HTTPConnection(*target, timeout=0.4)
-        connection.connect()
-        connection.close()
+        socket.create_connection(address, timeout=PROBE_TIMEOUT).close()
         return True
     except OSError:
         return False
+
+
+def address_for(target, refresh=False):
+    """The address a named target actually answers on, or None.
+
+    getaddrinfo("localhost") returns the IPv6 form first on this machine, and
+    a refused connection takes about 2.3 seconds to fail. Flask listens only
+    on 127.0.0.1, so simply handing the name to http.client paid that 2.3
+    seconds on every single request through the mirror -- which is what made
+    opening the demo take nine seconds rather than the six hundred
+    milliseconds the API actually spends.
+
+    So the families are tried once, with a short timeout, and the one that
+    answers is remembered. A server restarting on the other family is handled
+    by refresh=True, which the proxy passes after a failed attempt.
+    """
+    if not refresh and target in _resolved:
+        return _resolved[target]
+
+    _resolved.pop(target, None)
+    host, port = target
+    try:
+        candidates = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    except socket.gaierror:
+        return None
+
+    for _, _, _, _, address in candidates:
+        # getaddrinfo hands back four-tuples for IPv6; create_connection and
+        # http.client both want just the host and the port.
+        address = (address[0], address[1])
+        if _answers(address):
+            _resolved[target] = address
+            return address
+    return None
+
+
+def reachable(target):
+    """True when something is listening, so the fallback can be chosen."""
+    return address_for(target) is not None
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -106,6 +154,20 @@ class Handler(BaseHTTPRequestHandler):
 
     # --- proxying -----------------------------------------------------------
 
+    def forward(self, target, path, body, headers, refresh=False):
+        """Send one request upstream and read the whole reply back."""
+        address = address_for(target, refresh=refresh)
+        if address is None:
+            raise OSError(f"nothing listening for {target[0]}:{target[1]}")
+
+        connection = http.client.HTTPConnection(*address, timeout=90)
+        try:
+            connection.request(self.command, path, body=body, headers=headers)
+            upstream = connection.getresponse()
+            return upstream.read(), upstream
+        finally:
+            connection.close()
+
     def proxy(self, target, path):
         length = int(self.headers.get("Content-Length") or 0)
         body = self.rfile.read(length) if length else None
@@ -122,13 +184,18 @@ class Handler(BaseHTTPRequestHandler):
         headers["Host"] = f"{target[0]}:{target[1]}"
         headers["Accept-Encoding"] = "identity"
 
+        # Connect to the address this target is known to answer on, rather
+        # than to its name: the name costs a refused IPv6 attempt first.
         try:
-            connection = http.client.HTTPConnection(*target, timeout=90)
-            connection.request(self.command, path, body=body, headers=headers)
-            upstream = connection.getresponse()
-            payload = upstream.read()
-        except OSError as error:
-            return self.explain_unreachable(target, error)
+            payload, upstream = self.forward(target, path, body, headers)
+        except OSError:
+            # The server may have restarted on the other family. Resolve
+            # again and give it one more chance before reporting it down.
+            try:
+                payload, upstream = self.forward(target, path, body, headers,
+                                                 refresh=True)
+            except OSError as error:
+                return self.explain_unreachable(target, error)
 
         self.send_response(upstream.status)
         for name, value in upstream.getheaders():
@@ -138,7 +205,6 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
         self.wfile.write(payload)
-        connection.close()
 
     # --- fallback when Vite is not running ----------------------------------
 
