@@ -9,12 +9,14 @@ from flask import jsonify, request
 from server import money, operations
 from server.auth import require_user
 from server.routes.api import api
+from server.routes.api.dashboard_payload import dashboard_payload
 from server.validators import Validator
 
 SPEND_FIELDS = ["category", "total"]
 BUDGET_FIELDS = ["category", "limit", "actual", "difference"]
 PNL_FIELDS = ["asset_name", "asset_type", "buy_price", "current_price", "quantity",
               "pnl", "current_value"]
+
 
 
 def _requested_month():
@@ -39,6 +41,17 @@ def budget_vs_actual():
     user_id = require_user()
     rows = operations.budget_vs_actual(user_id, _requested_month())
     return jsonify({"items": money.rows(BUDGET_FIELDS, rows)})
+
+
+@api.get("/reports/dashboard")
+def dashboard():
+    """Everything the opening screen shows, in one request.
+
+    The client used to ask for the portfolio and the transactions separately.
+    Both queries are quick; what is not quick is reaching the database, at
+    roughly 200ms of handshake per request.
+    """
+    return jsonify(dashboard_payload(require_user()))
 
 
 @api.get("/reports/portfolio")
