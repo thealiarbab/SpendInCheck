@@ -91,8 +91,13 @@ class Validator:
             return self.fail(field, f"Keep this to {max_length} characters or fewer.")
         return value
 
-    def amount(self, field="amount", *, required=True, allow_zero=False):
-        """A positive money value, as a Decimal rounded to two places."""
+    def amount(self, field="amount", *, required=True, allow_zero=False, places=2):
+        """A positive money value, rounded to the currency's own places.
+
+        `places` defaults to two, which is right for 156 of the 162
+        currencies in use but not for the yen or the dinars, so routes
+        holding the account's currency pass its scale.
+        """
         raw = self.payload.get(field)
         if raw is None or str(raw).strip() == "":
             if required:
@@ -106,7 +111,7 @@ class Validator:
             return self.fail(field, "Must not be negative.")
         if value == 0 and not allow_zero:
             return self.fail(field, "Must be greater than 0.")
-        return quantise(value)
+        return quantise(value, places)
 
     def quantity(self, field="quantity", *, required=True):
         """A positive quantity. Four decimal places, because mutual fund

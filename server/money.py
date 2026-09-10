@@ -14,8 +14,15 @@ see web/src/lib/money.ts, which is the other half of this contract.
 
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
+from . import currency
+
 # Two decimal places, matching DECIMAL(10,2) in the schema.
 PAISA = Decimal("0.01")
+
+# The scale for a currency with `places` decimals: Decimal("0.01") for two,
+# Decimal("1") for a currency with no minor unit, Decimal("0.001") for the
+# dinars. Built once rather than from a string each call.
+_SCALES = {places: Decimal(1).scaleb(-places) for places in (0, 2, 3)}
 
 # Four, matching DECIMAL(10,4) -- the scale investments.quantity is stored at.
 UNIT = Decimal("0.0001")
@@ -49,27 +56,31 @@ def to_decimal(raw_value):
         return None
 
 
-def quantise(amount):
-    """Round a Decimal to two places, half away from zero.
+def quantise(amount, places=2):
+    """Round a Decimal to a currency's own number of places, half away from zero.
 
     ROUND_HALF_UP rather than Decimal's ROUND_HALF_EVEN default: bankers'
     rounding is correct for statistics and surprising in a ledger, where a
     person expects 0.005 to become 0.01 every time.
+
+    `places` defaults to two because most currencies have two, but it is not
+    universal -- the yen has no minor unit and the dinars have three -- so
+    callers holding an account's currency pass its own scale.
     """
     if amount is None:
         return None
-    return amount.quantize(PAISA, rounding=ROUND_HALF_UP)
+    return amount.quantize(_SCALES[places], rounding=ROUND_HALF_UP)
 
 
-def serialise(amount):
-    """Render a Decimal as the fixed two-place string the API sends.
+def serialise(amount, places=2):
+    """Render a Decimal as the fixed-place string the API sends.
 
     None becomes None so a genuinely absent amount stays absent rather than
     arriving as "0.00" and being read as a real zero.
     """
     if amount is None:
         return None
-    return f"{quantise(Decimal(amount)):.2f}"
+    return f"{quantise(Decimal(amount), places):.{places}f}"
 
 
 def serialise_quantity(amount):
@@ -79,7 +90,7 @@ def serialise_quantity(amount):
     return f"{Decimal(amount).quantize(UNIT, rounding=ROUND_HALF_UP):.4f}"
 
 
-def jsonify_value(value, field_name=None):
+def jsonify_value(value, field_name=None, places=2):
     """Convert one value into something json can serialise.
 
     Decimal becomes a string, dates become ISO-8601, and anything else is
@@ -89,13 +100,13 @@ def jsonify_value(value, field_name=None):
     if isinstance(value, Decimal):
         if field_name in QUANTITY_FIELDS:
             return serialise_quantity(value)
-        return serialise(value)
+        return serialise(value, places)
     if hasattr(value, "isoformat"):
         return value.isoformat()
     return value
 
 
-def row(field_names, values):
+def row(field_names, values, places=2):
     """Zip a database row into a dict, converting each value for JSON.
 
     The operations layer returns tuples, which is fine for SQL and wrong for
@@ -103,10 +114,15 @@ def row(field_names, values):
     Naming the fields at the route boundary keeps the SQL layer unchanged
     while the JSON stays stable.
     """
-    return {name: jsonify_value(value, name)
+    return {name: jsonify_value(value, name, places)
             for name, value in zip(field_names, values)}
 
 
-def rows(field_names, values_list):
+def rows(field_names, values_list, places=2):
     """Apply row() to a list of database rows."""
-    return [row(field_names, values) for values in values_list]
+    return [row(field_names, values, places) for values in values_list]
+
+
+def places_for(code):
+    """How many decimal places money in this currency is written to."""
+    return currency.decimals(code or currency.DEFAULT)

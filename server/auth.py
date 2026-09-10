@@ -16,6 +16,7 @@ import secrets
 
 from flask import session
 
+from server import currency as currencies
 from server.errors import NotSignedIn
 
 CSRF_SESSION_KEY = "csrf_token"
@@ -37,6 +38,41 @@ def require_user():
     if user_id is None:
         raise NotSignedIn()
     return user_id
+
+
+def current_currency():
+    """The currency this account keeps its ledger in.
+
+    Cached on the session after the first read. It is wanted on nearly every
+    response -- money is serialised to its scale -- and re-reading it would
+    add a round trip to Supabase to each one, for a value that changes on a
+    settings screen almost nobody visits twice.
+    """
+    held = session.get("currency")
+    if held:
+        return held
+
+    user_id = current_user_id()
+    if user_id is None:
+        return currencies.DEFAULT
+
+    # Imported here rather than at module level: operations imports the
+    # database layer, and auth is imported by parts of the app that must
+    # stay usable without one.
+    from server import operations
+    code = operations.get_currency(user_id) or currencies.DEFAULT
+    session["currency"] = code
+    return code
+
+
+def remember_currency(code):
+    """Update the cached currency after it has been changed."""
+    session["currency"] = code
+
+
+def money_places():
+    """How many decimal places this account's money is written to."""
+    return currencies.decimals(current_currency())
 
 
 def is_demo():

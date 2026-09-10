@@ -9,7 +9,7 @@ needs to preselect a dropdown.
 from flask import jsonify, request
 
 from server import money, operations
-from server.auth import require_user
+from server.auth import money_places, require_user
 from server.errors import NotFound, ValidationError
 from server.routes.api import api
 from server.validators import Validator
@@ -22,10 +22,11 @@ TYPES = ["Income", "Expense"]
 def _read_submission(payload):
     """Validate a transaction body and return its cleaned fields."""
     fields = Validator(payload)
+    places = money_places()
     values = {
         "txn_date": fields.past_date("date"),
         "category_id": fields.integer("category_id", minimum=1),
-        "amount": fields.amount(),
+        "amount": fields.amount(places=places),
         "txn_type": fields.choice("type", TYPES),
         "description": fields.text("description", required=False, max_length=255),
     }
@@ -38,7 +39,7 @@ def list_transactions():
     """Every transaction, newest first."""
     user_id = require_user()
     rows = operations.get_all_transactions(user_id)
-    return jsonify({"items": money.rows(LIST_FIELDS, rows)})
+    return jsonify({"items": money.rows(LIST_FIELDS, rows, money_places())})
 
 
 @api.get("/transactions/<int:transaction_id>")
@@ -48,7 +49,7 @@ def read_transaction(transaction_id):
     record = operations.get_transaction_by_id(user_id, transaction_id)
     if record is None:
         raise NotFound()
-    return jsonify(money.row(RECORD_FIELDS, record))
+    return jsonify(money.row(RECORD_FIELDS, record, money_places()))
 
 
 @api.post("/transactions")

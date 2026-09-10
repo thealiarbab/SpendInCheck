@@ -11,7 +11,8 @@ domain now, but this package re-exports every public name, so callers still
 write `operations.add_transaction(...)` and never import the submodules.
 """
 
-from .users import STARTER_CATEGORIES, create_user, get_user_by_login, username_taken
+from .users import (STARTER_CATEGORIES, create_user, get_currency,
+                    get_user_by_login, set_currency, username_taken)
 from .demo import (DEMO_BUDGETS, DEMO_CATEGORIES, DEMO_INVESTMENTS,
                    DEMO_TRANSACTIONS, create_demo_user, delete_demo_user,
                    delete_stale_demo_users, reset_demo_data)
@@ -30,7 +31,8 @@ from .investments import (add_investment, delete_investment, get_all_investments
 # anywhere below breaks this import loudly instead of silently shrinking
 # the public surface.
 __all__ = [
-    "STARTER_CATEGORIES", "create_user", "get_user_by_login", "username_taken",
+    "STARTER_CATEGORIES", "create_user", "get_currency", "get_user_by_login",
+    "set_currency", "username_taken",
     "DEMO_BUDGETS", "DEMO_CATEGORIES", "DEMO_INVESTMENTS", "DEMO_TRANSACTIONS",
     "create_demo_user", "delete_demo_user", "delete_stale_demo_users",
     "reset_demo_data",

@@ -3,7 +3,7 @@
 from flask import jsonify, request
 
 from server import money, operations
-from server.auth import require_user
+from server.auth import money_places, require_user
 from server.errors import ValidationError
 from server.routes.api import api
 from server.validators import Validator
@@ -15,7 +15,8 @@ FIELDS = ["id", "category", "month", "limit"]
 def list_budgets():
     """Every budget the account has set, across all months."""
     user_id = require_user()
-    return jsonify({"items": money.rows(FIELDS, operations.get_all_budgets(user_id))})
+    return jsonify({"items": money.rows(FIELDS, operations.get_all_budgets(user_id),
+                                    money_places())})
 
 
 @api.put("/budgets")
@@ -30,7 +31,7 @@ def set_budget():
     fields = Validator(request.get_json(silent=True) or {})
     category_id = fields.integer("category_id", minimum=1)
     month = fields.month()
-    limit = fields.amount("limit")
+    limit = fields.amount("limit", places=money_places())
     fields.raise_if_invalid()
 
     if not operations.set_budget(user_id, category_id, month, limit):

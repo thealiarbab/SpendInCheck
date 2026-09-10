@@ -98,3 +98,45 @@ def username_taken(username, email):
         return "Could not check that account right now."
     finally:
         db.close_connection(connection)
+
+
+def get_currency(user_id):
+    """The currency this account keeps its ledger in, or None if unknown."""
+    connection = None
+    try:
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        cursor.execute("SELECT currency FROM users WHERE user_id = %s", (user_id,))
+        found = cursor.fetchone()
+        return found[0] if found else None
+    except Error as e:
+        print(f"Error reading currency: {e}")
+        return None
+    finally:
+        db.close_connection(connection)
+
+
+def set_currency(user_id, code):
+    """Change the currency this account keeps its ledger in.
+
+    Only the label changes. No amount is converted, because the ledger holds
+    no exchange rates and inventing one would silently rewrite every figure
+    the account has ever recorded.
+
+    Returns True if the account exists and was saved.
+    """
+    connection = None
+    try:
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        cursor.execute("UPDATE users SET currency = %s WHERE user_id = %s",
+                       (code, user_id))
+        connection.commit()
+        return cursor.rowcount > 0
+    except Error as e:
+        if connection:
+            connection.rollback()
+        print(f"Error setting currency: {e}")
+        return False
+    finally:
+        db.close_connection(connection)

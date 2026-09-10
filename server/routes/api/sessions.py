@@ -9,7 +9,8 @@ from flask import jsonify, request, session
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from server import operations
-from server.auth import (csrf_token, current_user_id, is_demo, require_user,
+from server.auth import (csrf_token, current_currency, current_user_id, is_demo,
+                         money_places, remember_currency, require_user,
                          sign_in, sign_out)
 from server.errors import ApiError, ValidationError
 from server.routes.api import api
@@ -27,7 +28,8 @@ def _account_body():
     user_id = current_user_id()
     if user_id is None:
         return None
-    return {"id": user_id, "username": session.get("username"), "is_demo": is_demo()}
+    return {"id": user_id, "username": session.get("username"),
+            "is_demo": is_demo(), "currency": current_currency()}
 
 
 @api.get("/auth/session")
@@ -127,7 +129,7 @@ def start_demo():
     return jsonify({
         "user": _account_body(),
         "csrf_token": token,
-        "dashboard": dashboard_payload(user_id),
+        "dashboard": dashboard_payload(user_id, money_places()),
     }), 201
 
 

@@ -7,7 +7,7 @@ the month is a filter on a report rather than an identifier for one.
 from flask import jsonify, request
 
 from server import money, operations
-from server.auth import require_user
+from server.auth import money_places, require_user
 from server.routes.api import api
 from server.routes.api.dashboard_payload import dashboard_payload
 from server.validators import Validator
@@ -32,7 +32,7 @@ def category_spend():
     """Total expense per category for one month, biggest first."""
     user_id = require_user()
     rows = operations.category_wise_spend(user_id, _requested_month())
-    return jsonify({"items": money.rows(SPEND_FIELDS, rows)})
+    return jsonify({"items": money.rows(SPEND_FIELDS, rows, money_places())})
 
 
 @api.get("/reports/budget-vs-actual")
@@ -40,7 +40,7 @@ def budget_vs_actual():
     """Every budgeted category for one month, with the over/under difference."""
     user_id = require_user()
     rows = operations.budget_vs_actual(user_id, _requested_month())
-    return jsonify({"items": money.rows(BUDGET_FIELDS, rows)})
+    return jsonify({"items": money.rows(BUDGET_FIELDS, rows, money_places())})
 
 
 @api.get("/reports/dashboard")
@@ -51,7 +51,7 @@ def dashboard():
     Both queries are quick; what is not quick is reaching the database, at
     roughly 200ms of handshake per request.
     """
-    return jsonify(dashboard_payload(require_user()))
+    return jsonify(dashboard_payload(require_user(), money_places()))
 
 
 @api.get("/reports/portfolio")
@@ -64,15 +64,16 @@ def portfolio():
     """
     user_id = require_user()
     rows = operations.portfolio_pnl(user_id)
-    items = money.rows(PNL_FIELDS, rows)
+    places = money_places()
+    items = money.rows(PNL_FIELDS, rows, places)
 
     total_value = sum((row[6] for row in rows), start=0)
     total_pnl = sum((row[5] for row in rows), start=0)
     return jsonify({
         "items": items,
         "totals": {
-            "value": money.serialise(total_value),
-            "pnl": money.serialise(total_pnl),
+            "value": money.serialise(total_value, places),
+            "pnl": money.serialise(total_pnl, places),
             "holdings": len(items),
         },
     })

@@ -10,6 +10,8 @@ between the SQL and the schema. A mock cursor accepts any conflict target
 and would have reported success throughout.
 """
 
+from decimal import Decimal
+
 from server import db, operations
 
 
@@ -48,7 +50,10 @@ def test_setting_the_same_month_twice_overwrites(make_user):
 
     stored = operations.get_all_budgets(user_id)
     assert len(stored) == 1
-    assert str(stored[0][3]) == "6000.00"
+    # Compared as a number, not as a string: the column's scale is the
+    # currency work's business, and a test about overwriting a limit should
+    # not fail because money can now hold a third decimal place.
+    assert stored[0][3] == Decimal("6000")
 
 
 def test_two_accounts_can_budget_the_same_month(make_user):
