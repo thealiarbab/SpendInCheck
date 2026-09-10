@@ -1,0 +1,121 @@
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  height: var(--topbar-height);
+  padding: 0 var(--page-gutter);
+  background: var(--surface-page);
+  border-bottom: 1px solid var(--line-default);
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  /* Takes the slack, so Invest and the right cluster sit hard against the
+     end of the bar while the link row absorbs the remaining width. */
+  flex: 1 1 auto;
+  /* min-width:0 lets this flex child shrink below its content width, which is
+     what allows .links to scroll rather than shove the right cluster off. */
+  min-width: 0;
+}
+
+.brand {
+  font-family: var(--font-serif);
+  font-size: var(--text-md);
+  color: var(--content-primary);
+  white-space: nowrap;
+}
+
+.links {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.links::-webkit-scrollbar {
+  display: none;
+}
+
+.link {
+  font-size: var(--text-sm);
+  color: var(--content-muted);
+  white-space: nowrap;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.link:hover,
+.link[aria-current="page"] {
+  color: var(--content-primary);
+}
+
+.divider {
+  width: 1px;
+  height: 16px;
+  background: var(--line-default);
+  flex: none;
+}
+
+/*
+ * The Invest link leaves the app for StockSaathi. Three things make that
+ * honest rather than a bait-and-switch: the divider separating it from the
+ * internal pages, the arrow glyph, and target=_blank.
+ *
+ * It uses --accent-invest, never --money-credit. Both are green, but one means
+ * "StockSaathi" and the other means "a gain", and they must never merge.
+ */
+.invest {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--accent-invest);
+  white-space: nowrap;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.invest:hover {
+  color: var(--accent-invest-hover);
+}
+
+.arrow {
+  font-size: 0.9em;
+  line-height: 1;
+}
+
+.investWrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  flex: none;
+  padding-left: var(--space-3);
+  background: var(--surface-page);
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  /* Never shrink or get scrolled under by the link row. */
+  flex: none;
+}
+
+.who {
+  font-size: var(--text-sm);
+  color: var(--content-muted);
+}
+
+@media (max-width: 720px) {
+  .links {
+    gap: var(--space-4);
+  }
+  .brand {
+    display: none;
+  }
+}
