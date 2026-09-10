@@ -32,7 +32,7 @@ BASELINE = "b2c9a7c"
 # mapping rather than a range. Any commit not listed is treated as part of
 # CURRENT_PHASE, which is what keeps this accurate as new work lands without
 # anyone editing the file.
-CURRENT_PHASE = 2
+CURRENT_PHASE = 3
 
 COMMIT_PHASE = {
     0: ["5e3ab5e", "6308244", "931dabe", "490f434", "c030a97", "e166bb4", "efb70ab"],
@@ -41,7 +41,8 @@ COMMIT_PHASE = {
     2: ["ddaf76c", "ac9de82", "e001a5c", "944c83d", "93c81f1", "fc9dd98",
         "8b7896b", "aaca719", "89c58b0", "9324f7e", "2a00990", "ad743d9",
         "2fddf8d", "44e2272", "f2b37c8", "269ea6a", "a56f0fd", "f7c0cf4",
-        "5f13215"],
+        "5f13215", "29ca7b1", "2ff172d", "c0b8098", "f3e57b2", "e40f64e",
+        "cd7f9d8"],
     3: ["e3edb16", "5167880", "0078b12", "d5faeb9", "d722367", "58fbd03",
         "8f2bae6", "514eb37", "8e97c8f", "c32e02b", "357a022", "d027ab7",
         "4685dcd", "21a21de"],
@@ -56,12 +57,11 @@ PHASES = [
      "blurb": "create_app() factory, operations split into seven domain modules, "
               "money/validators/errors, migration 001. Zero behaviour change by design.",
      "open": []},
-    {"n": 2, "name": "JSON API alongside Jinja", "state": "now",
+    {"n": 2, "name": "JSON API alongside Jinja", "state": "done",
      "blurb": "A /api/v1 blueprint reusing the existing operations, mounted beside the "
               "pages so both read the same session and screens can move one at a time.",
-     "open": ["Endpoint tests for the five resource groups",
-              "Scheduled cleanup for abandoned demo accounts"]},
-    {"n": 3, "name": "Design system and shell", "state": "started",
+     "open": []},
+    {"n": 3, "name": "Design system and shell", "state": "now",
      "blurb": "Tokens, both themes, the UI primitives and the side-by-side ThemeLab. "
               "Built early, so the code exists and the decision does not.",
      "open": ["YOUR CALL: brass, paper, or ship both — before Phase 4 builds on it"]},
