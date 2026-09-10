@@ -1,0 +1,109 @@
+/* Every colour here is a --chart-* token, so both themes are correct at
+   once and no chart has to know which one it is in. */
+
+.figure { margin: 0; }
+
+.caption {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--content-muted);
+}
+
+.note { font-size: 0.75rem; color: var(--content-muted); }
+
+.svg { width: 100%; height: auto; display: block; }
+
+.grid { stroke: var(--chart-grid); stroke-width: 1; }
+.zero { stroke: var(--content-muted); stroke-width: 1; stroke-dasharray: 3 3; }
+
+.axis {
+  fill: var(--content-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.income { fill: var(--chart-2); }
+.expense { fill: var(--chart-3); }
+
+.line { fill: none; stroke: var(--chart-1); stroke-width: 2; }
+.area { fill: var(--chart-1); opacity: 0.12; }
+.point { fill: var(--chart-1); }
+
+.empty {
+  margin: 0;
+  padding: var(--space-5) 0;
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--content-muted);
+}
+
+/* --- ranked bars ---------------------------------------------------------- */
+
+.ranked { list-style: none; margin: 0; padding: 0; }
+
+.rank {
+  display: grid;
+  grid-template-columns: minmax(6rem, 10rem) 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+}
+
+.rankLabel {
+  font-size: 0.8125rem;
+  color: var(--content-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-transform: capitalize;
+}
+
+.track {
+  height: 8px;
+  background: var(--surface-inset);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.bar { display: block; height: 100%; background: var(--chart-1); }
+
+.rankValue {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8125rem;
+  color: var(--content-secondary);
+  white-space: nowrap;
+}
+
+.rankCaption {
+  font-style: normal;
+  font-size: 0.7rem;
+  color: var(--content-muted);
+  margin-left: var(--space-2);
+}
+
+/* --- legend --------------------------------------------------------------- */
+
+.legend {
+  list-style: none;
+  display: flex;
+  gap: var(--space-4);
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  font-size: 0.75rem;
+  color: var(--content-muted);
+}
+
+.legend li { display: flex; align-items: center; gap: var(--space-2); }
+
+.swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
