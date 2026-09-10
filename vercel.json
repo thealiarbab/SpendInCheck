@@ -5,9 +5,24 @@
       "src": "app.py",
       "use": "@vercel/python",
       "config": {
-        "includeFiles": ["server/**", "templates/**", "static/**"]
+        "includeFiles": [
+          "server/**",
+          "templates/**",
+          "static/**"
+        ]
       }
     }
   ],
-  "routes": [{ "src": "/(.*)", "dest": "app.py" }]
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "app.py"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/v1/cron/clear-demos",
+      "schedule": "0 3 * * *"
+    }
+  ]
 }

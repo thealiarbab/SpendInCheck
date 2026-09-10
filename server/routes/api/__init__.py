@@ -37,6 +37,10 @@ def require_csrf_token():
     """
     if request.method not in UNSAFE_METHODS:
         return None
+    # Scheduled jobs are called by the platform, not a browser: there is no
+    # session to hold a token, and they authenticate with a secret instead.
+    if request.path.startswith("/api/v1/cron/"):
+        return None
     if auth.csrf_is_valid(request.headers.get(auth.CSRF_HEADER)):
         return None
     return jsonify({"error": {
@@ -86,6 +90,7 @@ def handle_unknown_path(error):
 # `auth`, because `from ... import auth` inside this package resolves to
 # server.auth and the routes then attach to nothing.
 from server.routes.api import budgets  # noqa: E402,F401
+from server.routes.api import cron  # noqa: E402,F401
 from server.routes.api import categories  # noqa: E402,F401
 from server.routes.api import investments  # noqa: E402,F401
 from server.routes.api import reports  # noqa: E402,F401
