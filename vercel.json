@@ -24,5 +24,8 @@
       "path": "/api/v1/cron/clear-demos",
       "schedule": "0 3 * * *"
     }
+  ],
+  "regions": [
+    "bom1"
   ]
 }
