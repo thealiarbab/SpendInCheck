@@ -4,7 +4,7 @@ from flask import jsonify, request
 
 from server import money, operations
 from server.auth import require_user
-from server.errors import ApiError, ValidationError
+from server.errors import ValidationError
 from server.routes.api import api
 from server.validators import Validator
 
