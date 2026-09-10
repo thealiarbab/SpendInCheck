@@ -67,13 +67,26 @@ the SQL. Two consequences:
 
 Client tests: `cd web && node --test --experimental-strip-types src/lib/money.test.ts`
 
-## 5. Measure, do not assert
+## 5. What decides latency here
+
+Two numbers, both measured against the Mumbai pooler: **182ms** to open a
+connection, **28ms** for a round trip whatever it carries. Queries are
+single figures. So an endpoint costs its statement count times 28ms, and
+optimising means counting statements, not tuning SQL.
+
+`server/db.py` pools connections and keeps them in autocommit, because a
+plain SELECT otherwise leaves a transaction open that costs a full round
+trip to roll back. Anything needing several statements to succeed or fail
+together uses `db.transaction()`. Every read endpoint is one round trip;
+opening the demo is three.
+
+## 6. Measure, do not assert
 
 `python scripts/benchmark.py` writes `docs/benchmarks.json`, which the
 progress page renders. Run it after touching any request path, and quote
 figures from it rather than reasoning about them.
 
-## 6. Decisions that are not visible in the code
+## 7. Decisions that are not visible in the code
 
 - **Both themes ship, toggleable.** Every UI primitive reads semantic
   tokens, never a literal colour, so a screen is correct in brass and paper
@@ -86,7 +99,7 @@ figures from it rather than reasoning about them.
   changing currency relabels and re-rounds, and the settings screen says so
   before the control.
 
-## 7. Where Phase 8 starts
+## 8. Where Phase 8 starts
 
 Phase 7 is closed. Accounts, tags, goals, recurring, rollover and CSV
 import, on migrations 003-007 -- one number later than the plan's table,
