@@ -139,3 +139,30 @@ def portfolio_pnl(user_id):
         return []
     finally:
         db.close_connection(connection)
+
+
+def delete_investment(user_id, investment_id):
+    """Delete a holding.
+
+    Nothing references investments, so unlike a category this is a plain
+    delete. The user_id in the WHERE clause is what stops one account
+    deleting another's row by guessing an id.
+
+    Returns True if a row was deleted, False if none matched.
+    """
+    connection = None
+    try:
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        cursor.execute("DELETE FROM investments "
+                       "WHERE investment_id = %s AND user_id = %s",
+                       (investment_id, user_id))
+        connection.commit()
+        return cursor.rowcount > 0
+    except Error as e:
+        if connection:
+            connection.rollback()
+        print(f"Error deleting investment: {e}")
+        return False
+    finally:
+        db.close_connection(connection)

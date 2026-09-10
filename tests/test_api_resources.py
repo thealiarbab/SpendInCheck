@@ -247,6 +247,33 @@ def test_repricing_a_holding(make_api_account):
     assert client.get("/api/v1/investments").get_json()["items"][0]["current_price"] == "200.00"
 
 
+def test_deleting_a_holding(make_api_account):
+    client = make_api_account()
+    client.post("/api/v1/investments", headers=client.headers,
+                json={"asset_name": "Probe", "asset_type": "Stock",
+                      "buy_date": "2026-01-01", "buy_price": "100",
+                      "quantity": "10", "current_price": "150"})
+    holding = client.get("/api/v1/investments").get_json()["items"][0]["id"]
+
+    assert client.delete("/api/v1/investments/" + str(holding),
+                         headers=client.headers).status_code == 200
+    assert client.get("/api/v1/investments").get_json()["items"] == []
+
+
+def test_deleting_someone_elses_holding(make_api_account):
+    """A guessed id must not be a way to empty another account's portfolio."""
+    owner, stranger = make_api_account(), make_api_account()
+    owner.post("/api/v1/investments", headers=owner.headers,
+               json={"asset_name": "Probe", "asset_type": "Stock",
+                     "buy_date": "2026-01-01", "buy_price": "100",
+                     "quantity": "10", "current_price": "150"})
+    holding = owner.get("/api/v1/investments").get_json()["items"][0]["id"]
+
+    assert stranger.delete("/api/v1/investments/" + str(holding),
+                           headers=stranger.headers).status_code == 404
+    assert len(owner.get("/api/v1/investments").get_json()["items"]) == 1
+
+
 # --- reports ----------------------------------------------------------------
 
 def test_the_portfolio_totals_match_the_rows(make_api_account):

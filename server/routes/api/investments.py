@@ -51,3 +51,12 @@ def reprice_investment(investment_id):
     if not operations.update_investment_price(user_id, investment_id, price):
         raise NotFound()
     return jsonify({"ok": True})
+
+
+@api.delete("/investments/<int:investment_id>")
+def remove_investment(investment_id):
+    """Delete a holding."""
+    user_id = require_user()
+    if not operations.delete_investment(user_id, investment_id):
+        raise NotFound()
+    return jsonify({"ok": True})

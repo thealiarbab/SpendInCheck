@@ -15,14 +15,16 @@ from .users import STARTER_CATEGORIES, create_user, get_user_by_login, username_
 from .demo import (DEMO_BUDGETS, DEMO_CATEGORIES, DEMO_INVESTMENTS,
                    DEMO_TRANSACTIONS, create_demo_user, delete_demo_user,
                    delete_stale_demo_users, reset_demo_data)
-from .categories import add_category, category_exists, get_all_categories
+from .categories import (add_category, category_exists, count_category_use,
+                         delete_category, get_all_categories, rename_category)
 from .transactions import (add_transaction, delete_transaction,
                            get_all_transactions, get_transaction_by_id,
                            update_transaction)
 from .budgets import get_all_budgets, set_budget
 from .reports import budget_vs_actual, category_wise_spend
-from .investments import (add_investment, get_all_investments, investment_exists,
-                          portfolio_pnl, update_investment_price)
+from .investments import (add_investment, delete_investment, get_all_investments,
+                          investment_exists, portfolio_pnl,
+                          update_investment_price)
 
 # Named explicitly rather than star-imported so that deleting a function
 # anywhere below breaks this import loudly instead of silently shrinking
@@ -32,11 +34,12 @@ __all__ = [
     "DEMO_BUDGETS", "DEMO_CATEGORIES", "DEMO_INVESTMENTS", "DEMO_TRANSACTIONS",
     "create_demo_user", "delete_demo_user", "delete_stale_demo_users",
     "reset_demo_data",
-    "add_category", "category_exists", "get_all_categories",
+    "add_category", "category_exists", "count_category_use", "delete_category",
+    "get_all_categories", "rename_category",
     "add_transaction", "delete_transaction", "get_all_transactions",
     "get_transaction_by_id", "update_transaction",
     "get_all_budgets", "set_budget",
     "budget_vs_actual", "category_wise_spend",
-    "add_investment", "get_all_investments", "investment_exists",
-    "portfolio_pnl", "update_investment_price",
+    "add_investment", "delete_investment", "get_all_investments",
+    "investment_exists", "portfolio_pnl", "update_investment_price",
 ]
