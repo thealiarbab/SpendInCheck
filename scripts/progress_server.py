@@ -105,7 +105,7 @@ def collect():
     """Build the whole progress payload from the repository as it stands now."""
     phase_of = {sha: n for n, shas in COMMIT_PHASE.items() for sha in shas}
 
-    log = git("log", "--format=%h\x1f%s\x1f%ar\x1f%b\x1e", "--reverse",
+    log = git("log", "--format=%h\x1f%s\x1f%ct\x1f%b\x1e", "--reverse",
               f"{BASELINE}..HEAD")
     commits = []
     for entry in log.split("\x1e"):
@@ -115,12 +115,12 @@ def collect():
         parts = entry.split("\x1f")
         if len(parts) < 3:
             continue
-        sha, subject, when = parts[0], parts[1], parts[2]
+        sha, subject, at = parts[0], parts[1], parts[2]
         body = parts[3].strip() if len(parts) > 3 else ""
         commits.append({
             "sha": sha,
             "subject": subject,
-            "when": when,
+            "at": int(at) if at.isdigit() else 0,
             # The first paragraph of the body is the reason for the change,
             # which is the part worth reading at a glance.
             "why": body.split("\n\n")[0].replace("\n", " ") if body else "",
@@ -270,6 +270,26 @@ footer{margin-top:60px;padding-top:20px;border-top:1px solid var(--rule);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c =>
   ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
+// Rendered from an absolute timestamp every second, so the label counts up
+// smoothly instead of jumping whenever the data happens to be refetched.
+function ago(seconds) {
+  const d = Math.max(0, Math.floor(Date.now() / 1000) - seconds);
+  if (d < 10) return "just now";
+  if (d < 60) return d + "s ago";
+  if (d < 3600) {
+    const m = Math.floor(d / 60);
+    return m + "m " + (d % 60) + "s ago";
+  }
+  if (d < 86400) return Math.floor(d / 3600) + "h " + Math.floor((d % 3600) / 60) + "m ago";
+  return Math.floor(d / 86400) + "d ago";
+}
+
+function retime() {
+  document.querySelectorAll("[data-at]").forEach(el => {
+    el.textContent = ago(Number(el.dataset.at));
+  });
+}
+
 function render(d) {
   document.getElementById("stats").innerHTML = [
     [d.done + " / 11", "phases complete"],
@@ -280,7 +300,7 @@ function render(d) {
 
   const latest = d.latest;
   document.getElementById("now").innerHTML = latest ? `
-    <span class="k">Most recent commit &mdash; ${esc(latest.when)}</span>
+    <span class="k">Most recent commit &mdash; <span data-at="${latest.at}"></span></span>
     <div class="v"><span class="c-sha">${esc(latest.sha)}</span>${esc(latest.subject)}</div>
     ${latest.why ? `<div class="why">${esc(latest.why)}</div>` : ""}
     ${d.dirty.length ? `<div class="dirty">${d.dirty.length} file${d.dirty.length > 1 ? "s" : ""} changed but not committed &mdash; ${d.dirty.slice(0, 4).map(esc).join(", ")}${d.dirty.length > 4 ? " …" : ""}</div>` : ""}
@@ -302,7 +322,7 @@ function render(d) {
         ${p.open.length ? `<ul class="open">${p.open.map(o => `<li>${esc(o)}</li>`).join("")}</ul>` : ""}
         ${p.commits.length ? `<ul class="commits">${p.commits.slice().reverse().map((c, i) => `
           <li class="${i === 0 && p.state === "now" ? "fresh" : ""}">
-            <span class="kind ${esc(c.kind)}">${esc(c.kind)}</span><span class="c-sha">${esc(c.sha)}</span><span class="c-sub">${esc(c.subject.replace(/^[a-z]+(\([^)]*\))?:\s*/, ""))}</span><span class="c-when">${esc(c.when)}</span>
+            <span class="kind ${esc(c.kind)}">${esc(c.kind)}</span><span class="c-sha">${esc(c.sha)}</span><span class="c-sub">${esc(c.subject.replace(/^[a-z]+(\([^)]*\))?:\s*/, ""))}</span><span class="c-when" data-at="${c.at}"></span>
             ${c.why ? `<span class="c-why">${esc(c.why)}</span>` : ""}
           </li>`).join("")}</ul>` : `<p class="empty">Not started.</p>`}
       </div>
@@ -317,6 +337,7 @@ async function tick() {
   try {
     const r = await fetch("/progress.json", { cache: "no-store" });
     render(await r.json());
+    retime();
     beat.textContent = "live";
   } catch (e) {
     beat.textContent = "server stopped";
@@ -324,6 +345,8 @@ async function tick() {
 }
 tick();
 setInterval(tick, 4000);
+// The clock runs independently of the data, so times stay honest between polls.
+setInterval(retime, 1000);
 </script>
 </body></html>
 """
