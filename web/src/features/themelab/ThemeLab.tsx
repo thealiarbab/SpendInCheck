@@ -30,7 +30,7 @@ const CONTRAST_PAIRS: Array<{
   { fg: "--content-secondary", bg: "--surface-raised", label: "Secondary on card" },
   { fg: "--content-muted", bg: "--surface-raised", label: "Muted on card" },
   { fg: "--accent-default", bg: "--surface-page", label: "Accent on page" },
-  { fg: "--content-on-accent", bg: "--accent-default", label: "Text on accent fill" },
+  { fg: "--content-on-accent", bg: "--accent-fill", label: "Text on accent fill" },
   { fg: "--money-credit", bg: "--surface-raised", label: "Credit figure" },
   { fg: "--money-debit", bg: "--surface-raised", label: "Debit figure" },
   { fg: "--state-error", bg: "--surface-raised", label: "Error text" },
