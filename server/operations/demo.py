@@ -5,10 +5,12 @@ function bodies are unchanged. Import these through the package, which
 re-exports every name.
 """
 
+import secrets
+
 from psycopg2 import Error
 from .. import db
 
-from .users import get_user_by_login
+from .users import create_user
 
 # A shared, public account. Anything a visitor does to it is wiped and rebuilt
 # the next time somebody signs in or out of it, so it can never be left in a
@@ -116,45 +118,99 @@ def reset_demo_data(user_id):
         db.close_connection(connection)
 
 
-def ensure_demo_user(username, email, password_hash):
-    """Return the demo account's user_id, creating the row if it is missing.
+def create_demo_user(password_hash):
+    """Create a private, throwaway demonstration account and seed it.
 
-    The stored password is rewritten to the supplied hash every time, so the
-    credentials are whatever the application declares them to be. That is what
-    makes them unresettable: nothing that happens to the row can leave the
-    published demo password not working.
+    Every visitor gets their own. A single shared demo row means two people
+    trying the app at the same time edit the same ledger and reset each
+    other's data mid-session, which is the one thing a demonstration must
+    not do.
+
+    The account is marked is_demo so the cleanup job can find it later, and
+    the name carries a random suffix rather than a counter so it cannot be
+    guessed or enumerated.
+
+    Returns (user_id, username), or (None, None) if the account could not
+    be created.
     """
-    existing = get_user_by_login(username)
-    if existing:
-        connection = None
-        try:
-            connection = db.get_connection()
-            cursor = connection.cursor()
-            cursor.execute("UPDATE users SET password_hash = %s WHERE user_id = %s",
-                           (password_hash, existing[0]))
-            connection.commit()
-        except Error as e:
-            if connection:
-                connection.rollback()
-            print(f"Error refreshing demo password: {e}")
-        finally:
-            db.close_connection(connection)
-        return existing[0]
+    connection = None
+    try:
+        # Six bytes is enough that a collision needs billions of demos, and
+        # the UNIQUE constraint would reject one anyway.
+        username = "demo_" + secrets.token_hex(6)
+        email = f"{username}@demo.invalid"
+
+        user_id = create_user(username, email, password_hash)
+        if user_id is None:
+            return None, None
+
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        cursor.execute("UPDATE users SET is_demo = TRUE WHERE user_id = %s", (user_id,))
+        connection.commit()
+
+        # Seeded separately so the demonstration data and the starter
+        # categories every account gets stay one definition each.
+        reset_demo_data(user_id)
+        return user_id, username
+    except Error as e:
+        if connection:
+            connection.rollback()
+        print(f"Error creating demo account: {e}")
+        return None, None
+    finally:
+        db.close_connection(connection)
+
+
+def delete_stale_demo_users(older_than_hours=24):
+    """Remove demonstration accounts older than the given age.
+
+    Every data table cascades from users, so one DELETE clears the whole
+    account. Run on a schedule: per-visitor demos would otherwise accumulate
+    one row per person who ever clicked the link.
+
+    Returns the number of accounts removed.
+    """
     connection = None
     try:
         connection = db.get_connection()
         cursor = connection.cursor()
         cursor.execute(
-            "INSERT INTO users (username, email, password_hash) VALUES (%s, %s, %s) "
-            "RETURNING user_id",
-            (username, email, password_hash))
-        user_id = cursor.fetchone()[0]
+            "DELETE FROM users WHERE is_demo = TRUE "
+            "AND created_at < NOW() - make_interval(hours => %s)",
+            (older_than_hours,))
         connection.commit()
-        return user_id
+        return cursor.rowcount
     except Error as e:
         if connection:
             connection.rollback()
-        print(f"Error creating demo user: {e}")
-        return None
+        print(f"Error clearing old demo accounts: {e}")
+        return 0
+    finally:
+        db.close_connection(connection)
+
+
+def delete_demo_user(user_id):
+    """Delete one demonstration account and everything it owns.
+
+    Guarded on is_demo so that a session holding a stale demo_id can never
+    cause a real account to be deleted. Every data table cascades from the
+    user row, so one statement clears the lot.
+
+    Returns True when an account was removed.
+    """
+    connection = None
+    try:
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        cursor.execute(
+            "DELETE FROM users WHERE user_id = %s AND is_demo = TRUE", (user_id,))
+        connection.commit()
+        return cursor.rowcount > 0
+    except Error as e:
+        if connection:
+            connection.rollback()
+        print(f"Error removing demo account: {e}")
+        return False
     finally:
         db.close_connection(connection)

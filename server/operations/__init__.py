@@ -13,7 +13,8 @@ write `operations.add_transaction(...)` and never import the submodules.
 
 from .users import STARTER_CATEGORIES, create_user, get_user_by_login, username_taken
 from .demo import (DEMO_BUDGETS, DEMO_CATEGORIES, DEMO_INVESTMENTS,
-                   DEMO_TRANSACTIONS, ensure_demo_user, reset_demo_data)
+                   DEMO_TRANSACTIONS, create_demo_user, delete_demo_user,
+                   delete_stale_demo_users, reset_demo_data)
 from .categories import add_category, category_exists, get_all_categories
 from .transactions import (add_transaction, delete_transaction,
                            get_all_transactions, get_transaction_by_id,
@@ -29,7 +30,8 @@ from .investments import (add_investment, get_all_investments, investment_exists
 __all__ = [
     "STARTER_CATEGORIES", "create_user", "get_user_by_login", "username_taken",
     "DEMO_BUDGETS", "DEMO_CATEGORIES", "DEMO_INVESTMENTS", "DEMO_TRANSACTIONS",
-    "ensure_demo_user", "reset_demo_data",
+    "create_demo_user", "delete_demo_user", "delete_stale_demo_users",
+    "reset_demo_data",
     "add_category", "category_exists", "get_all_categories",
     "add_transaction", "delete_transaction", "get_all_transactions",
     "get_transaction_by_id", "update_transaction",

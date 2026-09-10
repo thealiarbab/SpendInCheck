@@ -19,10 +19,10 @@
       <a href="{{ url_for('register') }}" class="btn-lg ghost">Create your own account</a>
     {% elif signed_in %}
       <a href="{{ url_for('dashboard') }}" class="btn-lg">Open your ledger &rarr;</a>
-      <a href="{{ url_for('demo_login') }}" class="btn-lg ghost">Try the demo</a>
+      <form class="inline" method="post" action="{{ url_for('demo_login') }}"><button type="submit" class="btn-lg ghost">Try the demo</button></form>
     {% else %}
       <a href="{{ url_for('register') }}" class="btn-lg">Create account &rarr;</a>
-      <a href="{{ url_for('demo_login') }}" class="btn-lg ghost">Try the demo &mdash; no signup</a>
+      <form class="inline" method="post" action="{{ url_for('demo_login') }}"><button type="submit" class="btn-lg ghost">Try the demo &mdash; no signup</button></form>
     {% endif %}
   </div>
 
@@ -37,7 +37,7 @@
     {% else %}
       Already have an account? <a href="{{ url_for('sign_in') }}">Sign in</a>.
       The demo is loaded with three months of real figures &mdash; edit and delete
-      anything, it resets when you leave.
+      anything &mdash; it is your own copy, and it is discarded when you leave.
     {% endif %}
   </p>
 

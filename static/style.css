@@ -66,7 +66,9 @@ body {
 .brand span { color: var(--brass); font-style: italic; }
 
 .topbar nav { display: flex; gap: 2px; flex-wrap: wrap; }
-.topbar nav a {
+.topbar nav a,
+.topbar nav button {
+  font-family: inherit; cursor: pointer; background: none;
   color: var(--paper-mute);
   text-decoration: none;
   padding: 7px 12px;
@@ -74,17 +76,21 @@ body {
   font-weight: 500;
   border-bottom: 2px solid transparent;
 }
-.topbar nav a:hover { color: var(--paper); border-bottom-color: var(--brass-dim); }
+.topbar nav a:hover,
+.topbar nav button:hover { color: var(--paper); border-bottom-color: var(--brass-dim); }
 
 .topbar .who,
 .topbar nav.nav-right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
 .topbar .who { color: var(--paper-mute); font-size: 13px; }
 .topbar .who b { color: var(--paper); font-weight: 600; }
-.topbar .who a, .topbar nav.nav-right a {
+.topbar .who a, .topbar nav.nav-right a,
+.topbar .who button, .topbar nav.nav-right button {
+  font-family: inherit; cursor: pointer; background: none;
   color: var(--paper-dim); text-decoration: none; font-size: 13px;
   padding: 7px 14px; border: 1px solid var(--rule);
 }
-.topbar .who a:hover, .topbar nav.nav-right a:hover {
+.topbar .who a:hover, .topbar nav.nav-right a:hover,
+.topbar .who button:hover, .topbar nav.nav-right button:hover {
   color: var(--ink); background: var(--brass); border-color: var(--brass);
 }
 
@@ -211,14 +217,15 @@ button.subtle:hover { background: var(--panel-2); color: var(--paper); }
 .hero-tagline strong { color: var(--paper); font-weight: 600; }
 
 .cta-row { display: flex; gap: 12px; flex-wrap: wrap; margin: 34px 0 0; }
-a.btn-lg {
-  display: inline-block; padding: 13px 26px; font-size: 14px; font-weight: 700;
+.btn-lg {
+  display: inline-block;
+  font-family: inherit; cursor: pointer; padding: 13px 26px; font-size: 14px; font-weight: 700;
   letter-spacing: .3px; text-decoration: none; background: var(--brass);
   color: var(--ink); border: 1px solid var(--brass); border-radius: 0;
 }
-a.btn-lg:hover { background: #f0bb4c; border-color: #f0bb4c; }
-a.btn-lg.ghost { background: none; color: var(--paper); border-color: var(--rule); }
-a.btn-lg.ghost:hover { background: var(--panel); border-color: var(--paper-mute); }
+.btn-lg:hover { background: #f0bb4c; border-color: #f0bb4c; }
+.btn-lg.ghost { background: none; color: var(--paper); border-color: var(--rule); }
+.btn-lg.ghost:hover { background: var(--panel); border-color: var(--paper-mute); }
 
 .hero .stat-row { margin-top: 56px; background: none; border: none;
                   border-top: 1px solid var(--rule); }
@@ -289,3 +296,16 @@ a.btn-lg.ghost:hover { background: var(--panel); border-color: var(--paper-mute)
              line-height: 1.6; }
 .demo-note a { color: var(--brass); text-decoration: none;
                border-bottom: 1px solid var(--brass-dim); }
+
+/* Actions that change data are forms, not links: a link is fetched by
+   prefetchers and crawlers, and /demo now creates an account. display:contents
+   keeps the form out of the layout so the button sits exactly where the
+   anchor did. */
+form.inline { display: contents; }
+
+button.linkish {
+  font-family: inherit; font-size: inherit; cursor: pointer;
+  background: none; border: 0; padding: 0;
+  color: var(--brass); text-decoration: underline;
+}
+button.linkish:hover { color: #f0bb4c; }

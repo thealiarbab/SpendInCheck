@@ -5,6 +5,8 @@ it a freshly opened page cannot tell "signed out" from "still checking", and
 would flash the sign-in screen at someone who is already signed in.
 """
 
+import secrets
+
 from flask import jsonify, request, session
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -100,6 +102,27 @@ def sign_in_route():
 
     token = sign_in(account[0], account[1])
     return jsonify({"user": _account_body(), "csrf_token": token})
+
+
+@api.post("/auth/demo")
+def start_demo():
+    """Create a private demonstration account and sign into it.
+
+    A POST because it creates a row. Each visitor gets their own ledger, so
+    two people trying the app at once cannot edit or reset each other's
+    data -- and nobody needs to register to look around.
+
+    The password is set to an unguessable value nobody is told, since the
+    only way into these accounts is through this endpoint.
+    """
+    user_id, username = operations.create_demo_user(
+        generate_password_hash(secrets.token_urlsafe(32)))
+    if user_id is None:
+        raise ApiError("The demo is unavailable right now.",
+                       code="demo_unavailable", status=503)
+
+    token = sign_in(user_id, username, demo=True)
+    return jsonify({"user": _account_body(), "csrf_token": token}), 201
 
 
 @api.post("/auth/sign-out")

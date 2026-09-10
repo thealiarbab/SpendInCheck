@@ -19,8 +19,12 @@
     <button type="submit" class="signin-btn">Sign in &rarr;</button>
   </form>
 
-  <p class="signin-alt">No account yet? <a href="{{ url_for('register') }}">Create one</a>
-    &nbsp;&middot;&nbsp; <a href="{{ url_for('demo_login') }}">Try the demo</a></p>
+  <div class="signin-alt">No account yet? <a href="{{ url_for('register') }}">Create one</a>
+    &nbsp;&middot;&nbsp;
+    <form class="inline" method="post" action="{{ url_for('demo_login') }}">
+      <button type="submit" class="linkish">Try the demo</button>
+    </form>
+  </div>
   <a class="signin-back" href="{{ url_for('landing') }}">&larr; Back to the front page</a>
 </div>
 {% endblock %}

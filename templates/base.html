@@ -15,10 +15,10 @@
     {% if request.endpoint in ('landing', 'sign_in', 'register') %}
     <div class="who">
       {% if session.get('user_id') %}
-        {% if not in_demo %}<a href="{{ url_for('demo_login') }}">Try the demo</a>{% endif %}
+        {% if not in_demo %}<form class="inline" method="post" action="{{ url_for('demo_login') }}"><button type="submit">Try the demo</button></form>{% endif %}
         <a href="{{ url_for('dashboard') }}">Open the ledger</a>
       {% else %}
-        <a href="{{ url_for('demo_login') }}">Try the demo</a>
+        <form class="inline" method="post" action="{{ url_for('demo_login') }}"><button type="submit">Try the demo</button></form>
         <a href="{{ url_for('sign_in') }}">Sign in</a>
         <a href="{{ url_for('register') }}">Create account</a>
       {% endif %}
@@ -34,7 +34,7 @@
     </nav>
     <div class="who">
       <span>signed in as <b>{{ session.get('username') }}</b></span>
-      <a href="{{ url_for('sign_out') }}">Sign out</a>
+      <form class="inline" method="post" action="{{ url_for('sign_out') }}"><button type="submit">Sign out</button></form>
     </div>
     {% endif %}
   </header>

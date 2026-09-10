@@ -11,6 +11,7 @@ known expiry date.
 Contains no SQL. Every route calls a function from server.operations.
 """
 
+import secrets
 from datetime import datetime
 
 from flask import (flash, redirect, render_template, request, session, url_for)
@@ -21,22 +22,14 @@ from server import operations
 
 PUBLIC_ENDPOINTS = ("landing", "sign_in", "register", "demo_login", "static")
 
-# A public account anyone can try. The credentials are fixed here rather than
-# stored as changeable settings, and its data is rebuilt on every sign-in and
-# sign-out, so visitors can edit and delete freely without spoiling it.
-DEMO_USERNAME = "demo"
-DEMO_EMAIL = "demo@spendincheck.com"
-DEMO_PASSWORD = "demo1234"
-
-
-def demo_user_id():
-    """The demo account's id, creating the account on first use."""
-    return operations.ensure_demo_user(
-        DEMO_USERNAME, DEMO_EMAIL, generate_password_hash(DEMO_PASSWORD))
+# Demonstration accounts are created per visitor and named with this prefix,
+# which is therefore reserved: a registered "demo_..." account would occupy a
+# name this flow expects to own.
+DEMO_NAME_PREFIX = "demo"
 
 
 def is_demo(user_id):
-    """True when this session is using the shared demo account."""
+    """True when this session is using a demonstration account."""
     return user_id is not None and user_id == session.get("demo_id")
 
 
@@ -122,7 +115,7 @@ def register(app):
             elif len(password) < 8:
                 flash("Password must be at least 8 characters.", "error")
             else:
-                if username.lower() == DEMO_USERNAME or email.lower() == DEMO_EMAIL:
+                if username.lower().startswith(DEMO_NAME_PREFIX):
                     flash("That name is reserved for the public demo.", "error")
                     return redirect(url_for("register"))
                 taken = operations.username_taken(username, email)
@@ -151,10 +144,6 @@ def register(app):
             # One message for both cases, so this cannot be used to discover
             # which usernames exist.
             if account and check_password_hash(account[3], password):
-                # Reaching the demo through the ordinary form must behave the same
-                # as the /demo link, or its data would drift.
-                if account[1] == DEMO_USERNAME:
-                    return redirect(url_for("demo_login"))
                 session["user_id"] = account[0]
                 session["username"] = account[1]
                 return redirect(url_for("dashboard"))
@@ -163,32 +152,45 @@ def register(app):
         return render_template("sign_in.html")
 
 
-    @app.route("/demo")
+    @app.route("/demo", methods=["POST"])
     def demo_login():
-        """Sign in to the shared demo account, rebuilding its data first."""
-        user_id = demo_user_id()
+        """Create a private demonstration account and sign into it.
+
+        Every visitor gets their own ledger. A single shared account means two
+        people trying the app at the same time edit the same rows and reset
+        each other's data mid-session.
+
+        POST because it writes. As a GET, any crawler or link prefetcher that
+        touched this URL would create an account.
+        """
+        user_id, username = operations.create_demo_user(
+            generate_password_hash(secrets.token_urlsafe(32)))
         if user_id is None:
             flash("The demo is unavailable right now.", "error")
             return redirect(url_for("landing"))
-        operations.reset_demo_data(user_id)
+
         session.clear()
         session["user_id"] = user_id
-        session["username"] = DEMO_USERNAME
+        session["username"] = username
         session["demo_id"] = user_id
-        flash("You are exploring the demo account. Anything you change here is "
-              "reset when you sign out.", "success")
+        flash("This is your own copy of the demo. Change anything you like -- "
+              "it is discarded when you sign out.", "success")
         return redirect(url_for("dashboard"))
 
 
-    @app.route("/sign-out")
+    @app.route("/sign-out", methods=["POST"])
     def sign_out():
         """Clear the session and return to the front page.
 
-        If this was the demo account, its data is rebuilt on the way out so the
-        next visitor starts from the same place.
+        A demonstration account belongs to one visitor and one visit, so it is
+        deleted on the way out rather than reset; everything it owns cascades
+        from the user row. Abandoned ones are cleared on a schedule instead.
+
+        POST because it destroys a session, and previously any prefetcher or
+        <img> pointed at this URL could sign somebody out.
         """
         if is_demo(current_user_id()):
-            operations.reset_demo_data(current_user_id())
+            operations.delete_demo_user(current_user_id())
         session.clear()
         return redirect(url_for("landing"))
 
