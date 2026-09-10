@@ -1,0 +1,20 @@
+.main {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: var(--space-10) var(--page-gutter) var(--space-20);
+}
+
+.footer {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: var(--space-6) var(--page-gutter) var(--space-10);
+  border-top: 1px solid var(--line-soft);
+  font-size: var(--text-sm);
+  color: var(--content-muted);
+}
+
+@media (max-width: 720px) {
+  .main {
+    padding-top: var(--space-6);
+  }
+}
