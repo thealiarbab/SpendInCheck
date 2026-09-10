@@ -55,8 +55,10 @@ DB_USE_SSL = _env("DB_USE_SSL").lower() in ("1", "true", "yes")
 # --- Application ------------------------------------------------------------
 
 # Signs the session cookie. A random value on each boot would log everyone out
-# on every deploy, so this must be set in production.
-SECRET_KEY = _env("SECRET_KEY", "dev-only-not-for-production")
+# on every deploy, so this must be set in production. Named as a constant so
+# the startup check can recognise it without repeating the literal.
+DEV_SECRET_KEY = "dev-only-not-for-production"
+SECRET_KEY = _env("SECRET_KEY", DEV_SECRET_KEY)
 
 # Guards the scheduled endpoints. Vercel cron requests are unauthenticated by
 # default, so /api/v1/cron/* refuses to run without this matching.
