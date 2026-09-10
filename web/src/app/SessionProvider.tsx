@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState } from "rea
 import type { ReactNode } from "react";
 import type { Account } from "../lib/api";
 import { readSession, signOut as endSession, startDemo } from "../lib/api";
+import { setCurrency } from "../lib/money";
 
 /**
  * Who is signed in, for the whole app.
@@ -32,6 +33,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     try {
       const user = await readSession();
+      // Before anything renders a figure: the currency decides how every
+      // amount is parsed as well as shown, so a screen must never draw one
+      // in the wrong scale first and correct itself after.
+      if (user?.currency) setCurrency(user.currency);
       setAccount(user);
       setStatus(user ? "signed-in" : "signed-out");
       setUnreachable(false);
@@ -49,7 +54,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [refresh]);
 
   const beginDemo = useCallback(async () => {
-    setAccount(await startDemo());
+    const user = await startDemo();
+    if (user.currency) setCurrency(user.currency);
+    setAccount(user);
     setStatus("signed-in");
     setUnreachable(false);
   }, []);

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, api } from "../../lib/api";
 import type { BudgetRow } from "../../lib/api";
-import { formatRupees, toPaise } from "../../lib/money";
+import { formatMoney, toMinor } from "../../lib/money";
 import {
   Button, Card, Empty, Field, Form, FormActions, Loading, Notice, PageHead, Picker,
   RowActions, Table, cell, row as rowStyle,
@@ -118,7 +118,7 @@ export function Budgets() {
         {existing && (
           <p className={styles.replacing}>
             {existing.category} already has a limit of{" "}
-            {formatRupees(toPaise(existing.limit))} for {monthName(month)}. Saving
+            {formatMoney(toMinor(existing.limit))} for {monthName(month)}. Saving
             replaces it.
           </p>
         )}
@@ -135,7 +135,7 @@ export function Budgets() {
       ) : months.length ? (
         months.map((each) => {
           const forMonth = rows.filter((row) => row.month === each);
-          const total = forMonth.reduce((sum, row) => sum + toPaise(row.limit), 0);
+          const total = forMonth.reduce((sum, row) => sum + toMinor(row.limit), 0);
           return (
             <div key={each} className={styles.month}>
               <Card title={monthName(each)} flush>
@@ -154,7 +154,7 @@ export function Budgets() {
                       className={row.id === existing?.id ? rowStyle.editing : undefined}
                     >
                       <td className={cell.primary}>{row.category}</td>
-                      <td className={cell.numeric}>{formatRupees(toPaise(row.limit))}</td>
+                      <td className={cell.numeric}>{formatMoney(toMinor(row.limit))}</td>
                       <td>
                         <RowActions>
                           <Button kind="quiet" small onClick={() => edit(row)}>Change</Button>
@@ -166,7 +166,7 @@ export function Budgets() {
                       which no screen showed before. */}
                   <tr className={styles.total}>
                     <td className={cell.primary}>Budgeted</td>
-                    <td className={cell.numeric}>{formatRupees(total)}</td>
+                    <td className={cell.numeric}>{formatMoney(total)}</td>
                     <td />
                   </tr>
                 </Table>

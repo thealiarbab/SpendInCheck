@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, api } from "../../lib/api";
 import type { InvestmentRow } from "../../lib/api";
-import { formatQuantity, formatRupees, toPaise } from "../../lib/money";
+import { formatQuantity, formatMoney, toMinor } from "../../lib/money";
 import { discoverHref, externalLinkProps, stockHref } from "../../lib/links";
 import {
   Button, Card, Confirm, Empty, Field, Form, FormActions, Loading, Money, Notice,
@@ -77,7 +77,7 @@ export function Holdings() {
 
   const rows = holdings.data?.items ?? [];
   const totals = portfolio.data?.totals;
-  const pnl = totals ? toPaise(totals.pnl) : 0;
+  const pnl = totals ? toMinor(totals.pnl) : 0;
 
   // Profit and loss comes from the report, keyed by name so the editable
   // row and its worked-out figures line up without a second id in the API.
@@ -99,9 +99,9 @@ export function Holdings() {
       ) : (
         <StatRow>
           <Stat label="Portfolio value"
-                value={totals ? formatRupees(toPaise(totals.value)) : "—"} />
+                value={totals ? formatMoney(toMinor(totals.value)) : "—"} />
           <Stat label="Total profit / loss"
-                value={totals ? (pnl >= 0 ? "+" : "") + formatRupees(pnl) : "—"}
+                value={totals ? (pnl >= 0 ? "+" : "") + formatMoney(pnl) : "—"}
                 tone={pnl > 0 ? "credit" : pnl < 0 ? "debit" : undefined} />
           <Stat label="Holdings" value={String(totals?.holdings ?? 0)} />
         </StatRow>
@@ -200,7 +200,7 @@ export function Holdings() {
                     {holding.buy_date}
                   </td>
                   <td className={cell.numeric}>
-                    {formatRupees(toPaise(holding.buy_price))}
+                    {formatMoney(toMinor(holding.buy_price))}
                   </td>
                   <td className={cell.numeric}>{formatQuantity(holding.quantity)}</td>
                   <td className={cell.numeric}>
@@ -211,7 +211,7 @@ export function Holdings() {
                         aria-label={`New price for ${holding.asset_name}`}
                         onChange={(e) => setPrice(e.target.value)}
                       />
-                    ) : formatRupees(toPaise(holding.current_price))}
+                    ) : formatMoney(toMinor(holding.current_price))}
                   </td>
                   <td className={cell.numeric}>
                     {figures ? <Money value={figures.pnl} signed /> : "—"}

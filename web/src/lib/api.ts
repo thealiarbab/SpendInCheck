@@ -32,6 +32,8 @@ export interface Account {
   id: number;
   username: string;
   is_demo: boolean;
+  /** ISO 4217 code the ledger is kept in. Decides scale, not just symbol. */
+  currency: string;
 }
 
 const BASE = "/api/v1";
@@ -227,6 +229,12 @@ export const api = {
   reprice: (id: number, current_price: string) =>
     request<void>("/investments/" + id + "/price",
       { method: "PATCH", body: { current_price } }),
+
+  currencies: () => request<{ items: string[]; current: string }>(
+    "/settings/currencies"),
+  setCurrency: (currency: string) =>
+    request<{ currency: string; decimals: number }>(
+      "/settings/currency", { method: "PUT", body: { currency } }),
 
   portfolio: () => request<PortfolioReport>("/reports/portfolio"),
   categorySpend: (month: string) =>

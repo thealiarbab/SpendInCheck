@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, api } from "../../lib/api";
 import type { Category, TransactionSubmission } from "../../lib/api";
-import { formatRupees, toPaise } from "../../lib/money";
+import { formatMoney, toMinor } from "../../lib/money";
 import {
   Button, Card, Confirm, Derived, Empty, Field, Form, FormActions, Loading, Notice,
   PageHead, Picker, RowActions, Table, Tag, cell, row as rowStyle,
@@ -112,7 +112,9 @@ export function Transactions() {
 
   return (
     <>
-      <PageHead title="Transactions" subtitle="Every rupee in and out, tied to a category." />
+      {/* Not "every rupee": the ledger can be kept in any of 162
+          currencies, and naming one of them here would be wrong for most. */}
+      <PageHead title="Transactions" subtitle="Everything in and out, tied to a category." />
 
       <Card title={draft.id === null ? "Add a transaction" : `Editing #${draft.id}`}>
         <Form>
@@ -184,7 +186,7 @@ export function Transactions() {
                 <td className={cell.primary}>{row.category}</td>
                 <td><Tag kind={row.type} /></td>
                 <td className={cell.numeric + (row.type === "Income" ? " " + cell.credit : "")}>
-                  {formatRupees(toPaise(row.amount))}
+                  {formatMoney(toMinor(row.amount))}
                 </td>
                 <td>{row.description || "—"}</td>
                 <td>

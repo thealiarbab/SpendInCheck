@@ -1,5 +1,5 @@
 import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
-import { formatRupees, formatSigned, toPaise } from "../lib/money";
+import { formatMoney, formatSigned, toMinor } from "../lib/money";
 import styles from "./ui.module.css";
 
 /* Shared primitives. Everything here reads its colours from semantic tokens,
@@ -55,11 +55,11 @@ export function Stat(
 
 /** A money figure, coloured by whether it helps or hurts. */
 export function Money({ value, signed }: { value: string; signed?: boolean }) {
-  const paise = toPaise(value);
+  const paise = toMinor(value);
   const tone = paise > 0 ? styles.credit : paise < 0 ? styles.debit : "";
   return (
     <span className={signed ? tone : ""}>
-      {signed ? formatSigned(paise) : formatRupees(paise)}
+      {signed ? formatSigned(paise) : formatMoney(paise)}
     </span>
   );
 }

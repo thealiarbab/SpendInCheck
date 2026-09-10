@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { formatRupees, formatSigned, toPaise } from "../../lib/money";
+import { formatMoney, formatSigned, toMinor } from "../../lib/money";
 import { contrastRatio, gradeContrast, resolveToken } from "./contrast";
 import type { Theme } from "../../app/ThemeProvider";
 import styles from "./ThemeLab.module.css";
@@ -43,14 +43,14 @@ const CONTRAST_PAIRS: Array<{
 /** One themed pane: a live miniature of the app under a single theme. */
 function Pane({ theme }: { theme: Theme }) {
   const [amount, setAmount] = useState("1250.00");
-  const showError = toPaise(amount) <= 0;
+  const showError = toMinor(amount) <= 0;
 
   const totalPnl = HOLDINGS.reduce(
-    (sum, holding) => sum + (toPaise(holding.now) - toPaise(holding.buy)) * holding.qty,
+    (sum, holding) => sum + (toMinor(holding.now) - toMinor(holding.buy)) * holding.qty,
     0,
   );
   const totalValue = HOLDINGS.reduce(
-    (sum, holding) => sum + toPaise(holding.now) * holding.qty,
+    (sum, holding) => sum + toMinor(holding.now) * holding.qty,
     0,
   );
 
@@ -61,7 +61,7 @@ function Pane({ theme }: { theme: Theme }) {
       <div className={styles.statRow}>
         <div className={styles.stat}>
           <p className={styles.statLabel}>Portfolio</p>
-          <p className={styles.statValue}>{formatRupees(totalValue, { whole: true })}</p>
+          <p className={styles.statValue}>{formatMoney(totalValue, { whole: true })}</p>
         </div>
         <div className={styles.stat}>
           <p className={styles.statLabel}>Total P&amp;L</p>
@@ -88,7 +88,7 @@ function Pane({ theme }: { theme: Theme }) {
             </thead>
             <tbody>
               {HOLDINGS.map((holding) => {
-                const pnl = (toPaise(holding.now) - toPaise(holding.buy)) * holding.qty;
+                const pnl = (toMinor(holding.now) - toMinor(holding.buy)) * holding.qty;
                 return (
                   <tr key={holding.ticker}>
                     <td>
@@ -96,7 +96,7 @@ function Pane({ theme }: { theme: Theme }) {
                       <br />
                       <span className={styles.invest}>{holding.ticker} &#8599;</span>
                     </td>
-                    <td className={styles.right}>{formatRupees(toPaise(holding.now))}</td>
+                    <td className={styles.right}>{formatMoney(toMinor(holding.now))}</td>
                     <td className={pnl >= 0 ? styles.rightCredit : styles.rightDebit}>
                       {formatSigned(pnl, { whole: true })}
                     </td>
@@ -111,8 +111,8 @@ function Pane({ theme }: { theme: Theme }) {
       <div className={styles.card}>
         <h3>Budgets</h3>
         {BUDGETS.map((budget) => {
-          const limit = toPaise(budget.limit);
-          const spent = toPaise(budget.spent);
+          const limit = toMinor(budget.limit);
+          const spent = toMinor(budget.spent);
           const over = spent > limit;
           const level = spent === limit;
           const status = over ? "Over" : level ? "Level" : "Under";
@@ -121,7 +121,7 @@ function Pane({ theme }: { theme: Theme }) {
               <div className={styles.budgetHead}>
                 <span className={styles.budgetName}>{budget.category}</span>
                 <span className={styles.budgetFigures}>
-                  {formatRupees(spent, { whole: true })} / {formatRupees(limit, { whole: true })}
+                  {formatMoney(spent, { whole: true })} / {formatMoney(limit, { whole: true })}
                   <span className={over ? styles.pillOver : styles.pillUnder}>{status}</span>
                 </span>
               </div>

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../lib/api";
-import { formatQuantity, formatRupees, toPaise } from "../../lib/money";
+import { formatQuantity, formatMoney, toMinor } from "../../lib/money";
 import { Card, Empty, Loading, Money, Notice, PageHead, Stat, StatRow, Table, Tag, cell } from "../../ui";
 
 /**
@@ -14,7 +14,7 @@ export function Dashboard() {
   const transactions = useQuery({ queryKey: ["transactions"], queryFn: api.transactions });
 
   const totals = portfolio.data?.totals;
-  const pnl = totals ? toPaise(totals.pnl) : 0;
+  const pnl = totals ? toMinor(totals.pnl) : 0;
   const recent = transactions.data?.items.slice(0, 8) ?? [];
 
   return (
@@ -32,11 +32,11 @@ export function Dashboard() {
         <StatRow>
           <Stat
             label="Portfolio value"
-            value={totals ? formatRupees(toPaise(totals.value)) : "—"}
+            value={totals ? formatMoney(toMinor(totals.value)) : "—"}
           />
           <Stat
             label="Total profit / loss"
-            value={totals ? (pnl >= 0 ? "+" : "") + formatRupees(pnl) : "—"}
+            value={totals ? (pnl >= 0 ? "+" : "") + formatMoney(pnl) : "—"}
             tone={pnl > 0 ? "credit" : pnl < 0 ? "debit" : undefined}
           />
           <Stat label="Holdings" value={String(totals?.holdings ?? 0)} />
@@ -63,8 +63,8 @@ export function Dashboard() {
               <tr key={holding.asset_name}>
                 <td className={cell.primary}>{holding.asset_name}</td>
                 <td>{holding.asset_type}</td>
-                <td className={cell.numeric}>{formatRupees(toPaise(holding.buy_price))}</td>
-                <td className={cell.numeric}>{formatRupees(toPaise(holding.current_price))}</td>
+                <td className={cell.numeric}>{formatMoney(toMinor(holding.buy_price))}</td>
+                <td className={cell.numeric}>{formatMoney(toMinor(holding.current_price))}</td>
                 <td className={cell.numeric}>{formatQuantity(holding.quantity)}</td>
                 <td className={cell.numeric}><Money value={holding.pnl} signed /></td>
               </tr>
@@ -98,7 +98,7 @@ export function Dashboard() {
                 <td className={cell.primary}>{row.category}</td>
                 <td><Tag kind={row.type} /></td>
                 <td className={cell.numeric + " " + (row.type === "Income" ? cell.credit : "")}>
-                  {formatRupees(toPaise(row.amount))}
+                  {formatMoney(toMinor(row.amount))}
                 </td>
                 <td>{row.description || "—"}</td>
               </tr>

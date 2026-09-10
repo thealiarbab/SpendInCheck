@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../lib/api";
-import { formatPercent, formatRupees, formatSigned, toPaise } from "../../lib/money";
+import { formatPercent, formatMoney, formatSigned, toMinor } from "../../lib/money";
 import { externalLinkProps, surplusHref } from "../../lib/links";
 import {
   Card, Empty, Field, Loading, Notice, PageHead, Stat, StatRow, Table, cell,
@@ -45,11 +45,11 @@ export function Reports() {
   const spendRows = spend.data?.items ?? [];
   const budgetRows = budget.data?.items ?? [];
 
-  const spent = spendRows.reduce((sum, row) => sum + toPaise(row.total), 0);
-  const budgeted = budgetRows.reduce((sum, row) => sum + toPaise(row.limit), 0);
+  const spent = spendRows.reduce((sum, row) => sum + toMinor(row.total), 0);
+  const budgeted = budgetRows.reduce((sum, row) => sum + toMinor(row.limit), 0);
   // Against budgeted categories only, so it agrees with the table below it
   // rather than counting spending the month never had a limit for.
-  const measured = budgetRows.reduce((sum, row) => sum + toPaise(row.actual), 0);
+  const measured = budgetRows.reduce((sum, row) => sum + toMinor(row.actual), 0);
   const difference = budgeted - measured;
 
   return (
@@ -64,9 +64,9 @@ export function Reports() {
       </PageHead>
 
       <StatRow>
-        <Stat label="Spent this month" value={formatRupees(spent)}
+        <Stat label="Spent this month" value={formatMoney(spent)}
               note={spendRows.length ? `across ${spendRows.length} categories` : undefined} />
-        <Stat label="Budgeted" value={budgeted ? formatRupees(budgeted) : "—"}
+        <Stat label="Budgeted" value={budgeted ? formatMoney(budgeted) : "—"}
               note={budgetRows.length ? `${budgetRows.length} categories with a limit`
                                       : "no limits set"} />
         <Stat
@@ -95,12 +95,12 @@ export function Reports() {
             {spendRows.map((row) => (
               <tr key={row.category}>
                 <td className={cell.primary}>{row.category}</td>
-                <td className={cell.numeric}>{formatRupees(toPaise(row.total))}</td>
+                <td className={cell.numeric}>{formatMoney(toMinor(row.total))}</td>
                 {/* Share of the month, which is the question the ordering
                     is really answering and the old table left you to work
                     out from the figures. */}
                 <td className={cell.numeric + " " + styles.share}>
-                  {formatPercent(toPaise(row.total), spent)}
+                  {formatPercent(toMinor(row.total), spent)}
                 </td>
               </tr>
             ))}
@@ -130,14 +130,14 @@ export function Reports() {
             }
           >
             {budgetRows.map((row) => {
-              const gap = toPaise(row.difference);
-              const limit = toPaise(row.limit);
-              const used = limit === 0 ? 0 : Math.min(toPaise(row.actual) / limit, 1);
+              const gap = toMinor(row.difference);
+              const limit = toMinor(row.limit);
+              const used = limit === 0 ? 0 : Math.min(toMinor(row.actual) / limit, 1);
               return (
                 <tr key={row.category}>
                   <td className={cell.primary}>{row.category}</td>
-                  <td className={cell.numeric}>{formatRupees(limit)}</td>
-                  <td className={cell.numeric}>{formatRupees(toPaise(row.actual))}</td>
+                  <td className={cell.numeric}>{formatMoney(limit)}</td>
+                  <td className={cell.numeric}>{formatMoney(toMinor(row.actual))}</td>
                   <td className={
                     cell.numeric + " " + (gap < 0 ? cell.debit : gap > 0 ? cell.credit : "")
                   }>
@@ -148,7 +148,7 @@ export function Reports() {
                         matter of degree, and "under budget" reads the same
                         at 99% spent as at 5%. */}
                     <div className={styles.gauge} role="img"
-                         aria-label={`${formatPercent(toPaise(row.actual), limit)} of the limit spent`}>
+                         aria-label={`${formatPercent(toMinor(row.actual), limit)} of the limit spent`}>
                       <div
                         className={gap < 0 ? styles.barOver : styles.bar}
                         style={{ width: `${Math.round(used * 100)}%` }}
@@ -169,7 +169,7 @@ export function Reports() {
 
       {budgeted > 0 && difference > 0 && (
         <p className={styles.surplus}>
-          {formatRupees(difference)} of {monthName(month)}'s budget is unspent.{" "}
+          {formatMoney(difference)} of {monthName(month)}'s budget is unspent.{" "}
           <a href={surplusHref} {...externalLinkProps}>See what it could be earning ↗</a>
         </p>
       )}

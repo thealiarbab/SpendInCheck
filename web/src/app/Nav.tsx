@@ -10,6 +10,7 @@ const PAGES = [
   { to: "/budgets", label: "Budgets" },
   { to: "/investments", label: "Holdings" },
   { to: "/reports", label: "Reports" },
+  { to: "/settings", label: "Settings" },
 ];
 
 export function Nav({ username }: { username?: string }) {
