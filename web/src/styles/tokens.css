@@ -31,8 +31,10 @@
   --w-500: #877a6a;
   --w-400: #b3a695;
   --w-300: #d5c9b6;
+  --w-250: #d8cbb4;
   --w-200: #e4dbcb;
   --w-150: #ede6dc;
+  --w-120: #f0e9dc;
   --w-100: #f4efe6;
   --w-50:  #faf7f1;
   --w-0:   #fffdf9;
@@ -48,6 +50,7 @@
 
   /* accounting green - a gain, under budget */
   --green-700: #2f5325;
+  --green-650: #2f7a3a;
   --green-600: #3f6b32;
   --green-500: #5c8f4a;
   --green-400: #7da96a;
@@ -56,6 +59,7 @@
 
   /* accounting red - a loss, over budget */
   --red-700: #7c2a19;
+  --red-650: #bd3f26;
   --red-600: #a33a24;
   --red-500: #c4553d;
   --red-400: #d97a63;
@@ -139,6 +143,8 @@
   --accent-hover: var(--brass-200);
   --accent-muted: var(--brass-500);
   --accent-wash: rgba(224, 168, 54, 0.1);
+  --accent-fill: var(--brass-300);
+  --accent-fill-hover: var(--brass-200);
   /* Deliberately its own token, never --money-credit: the Invest link is
      StockSaathi's brand green and must never drift into "a gain is green". */
   --accent-invest: var(--ss-500);
@@ -181,9 +187,12 @@
 
 /* Paper: ink on aged stock. The light twin. */
 [data-theme="paper"] {
-  --surface-page: var(--w-50);
+  /* The page is a deeper, warmer stock than the cards laid on it. An earlier
+     pass had both at near-white, which read as one flat sheet with hairlines
+     drawn on it rather than as paper with things resting on it. */
+  --surface-page: var(--w-120);
   --surface-raised: var(--w-0);
-  --surface-sunken: var(--w-100);
+  --surface-sunken: var(--w-150);
   --surface-inset: var(--w-0);
   --surface-overlay: var(--w-0);
   --surface-hover: var(--w-100);
@@ -192,32 +201,41 @@
   --content-secondary: #5c5145;
   /* #877a6a measured 4.12:1 on a raised card, under the 4.5:1 AA floor. */
   --content-muted: #6f6353;
-  --content-on-accent: var(--w-0);
+  /* Dark ink on a bright brass fill, exactly as in the dark theme. */
+  --content-on-accent: var(--w-950);
 
-  --line-default: var(--w-200);
-  --line-soft: var(--w-100);
+  --line-default: var(--w-250);
+  --line-soft: var(--w-150);
   --line-strong: var(--w-300);
   --line-focus: var(--brass-600);
 
-  --accent-default: var(--brass-600);
-  --accent-hover: var(--brass-700);
+  /* Text colour: must clear 4.5:1 against paper, so it is a deep brass.
+     brass-600 measured 4.44:1 once the page ground was deepened. */
+  --accent-default: var(--brass-700);
+  --accent-hover: #563d0b;
   --accent-muted: var(--brass-500);
-  --accent-wash: rgba(138, 100, 20, 0.08);
-  --accent-invest: var(--ss-600);
-  --accent-invest-hover: #005c46;
+  --accent-wash: rgba(224, 168, 54, 0.18);
+  /* Fill colour: the same bright brass the dark theme uses. Contrast is
+     carried by the dark text on top, so the gold stays gold. */
+  --accent-fill: var(--brass-300);
+  --accent-fill-hover: var(--brass-400);
+  /* ss-600 measured 4.47:1 on the deepened ground. */
+  --accent-invest: #006b51;
+  --accent-invest-hover: #00543f;
 
-  --money-credit: var(--green-600);
-  --money-debit: var(--red-600);
-  --money-level: var(--brass-600);
-  --money-credit-wash: var(--green-100);
-  --money-debit-wash: var(--red-100);
+  /* The 650 stops keep their hue on white where the 600s went muddy. */
+  --money-credit: var(--green-650);
+  --money-debit: var(--red-650);
+  --money-level: var(--brass-500);
+  --money-credit-wash: #d8ecd0;
+  --money-debit-wash: #fadbd2;
 
-  --state-error: var(--red-600);
-  --state-error-wash: var(--red-100);
-  --state-success: var(--green-600);
-  --state-success-wash: var(--green-100);
+  --state-error: var(--red-650);
+  --state-error-wash: #fadbd2;
+  --state-success: var(--green-650);
+  --state-success-wash: #d8ecd0;
   --state-warning: var(--brass-600);
-  --state-warning-wash: #f8edd4;
+  --state-warning-wash: #f6e3b8;
 
   /* Paper allows a little softness, and light needs real elevation. */
   --radius-sm: 2px;

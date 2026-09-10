@@ -176,13 +176,13 @@
 
 .btn {
   padding: var(--space-2) var(--space-4);
-  background: var(--accent-default);
+  background: var(--accent-fill);
   color: var(--content-on-accent);
-  border: 1px solid var(--accent-default);
+  border: 1px solid var(--accent-fill);
   border-radius: var(--radius-sm);
   cursor: pointer;
 }
-.btn:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn:hover { background: var(--accent-fill-hover); border-color: var(--accent-fill-hover); }
 
 .btnGhost {
   composes: btn;
