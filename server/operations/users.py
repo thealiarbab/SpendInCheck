@@ -6,6 +6,7 @@ re-exports every name.
 """
 
 from psycopg2 import Error
+from psycopg2.extras import execute_values
 from .. import db
 
 # Categories every new account starts with, so the app is usable immediately
@@ -51,19 +52,24 @@ def create_user(username, email, password_hash):
 
 
 def _create_user_rows(cursor, username, email, password_hash):
-    """The three inserts a new account needs, on an open cursor."""
+    """The three inserts a new account needs, on an open cursor.
+
+    Three statements, not ten: the categories go in together. This runs on
+    the path somebody waits through to register, and a statement against the
+    database is a round trip to Mumbai, so writing eight starter categories
+    one at a time was most of what that wait actually was.
+    """
     cursor.execute(
-            "INSERT INTO users (username, email, password_hash) "
+        "INSERT INTO users (username, email, password_hash) "
         "VALUES (%s, %s, %s) RETURNING user_id",
         (username, email, password_hash),
     )
     user_id = cursor.fetchone()[0]
-    for name, kind in STARTER_CATEGORIES:
-        cursor.execute(
-            "INSERT INTO categories (user_id, category_name, category_type) "
-            "VALUES (%s, %s, %s)",
-            (user_id, name, kind),
-        )
+    execute_values(
+        cursor,
+        "INSERT INTO categories (user_id, category_name, category_type) VALUES %s",
+        [(user_id, name, kind) for name, kind in STARTER_CATEGORIES],
+    )
     # And somewhere to put the money. Every transaction belongs to an
     # account, so a new user with none would be unable to write their
     # first row -- the one moment a ledger must not fail.

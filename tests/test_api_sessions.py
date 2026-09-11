@@ -22,6 +22,25 @@ def test_session_reports_a_signed_out_visitor_without_failing(client):
     assert body["csrf_token"]
 
 
+def test_registering_seeds_every_starter_category_and_an_account(api_account):
+    """All eight, not merely some.
+
+    The starter categories used to go in one INSERT at a time and now go in
+    together, so the count is what proves the batch did not quietly drop any.
+    A new account also needs somewhere to put money: every transaction
+    belongs to an account, so a user seeded without one could not write their
+    first row -- the one moment a ledger must not fail.
+    """
+    client = api_account["client"]
+
+    seeded = client.get("/api/v1/categories").get_json()["items"]
+    assert len(seeded) == len(operations.STARTER_CATEGORIES)
+    assert {one["name"] for one in seeded} == {
+        name for name, _ in operations.STARTER_CATEGORIES}
+
+    assert len(client.get("/api/v1/accounts").get_json()["items"]) == 1
+
+
 def test_writes_without_a_csrf_token_are_refused(client):
     response = client.post("/api/v1/auth/sign-in",
                            json={"login": "someone", "password": "whatever"})
