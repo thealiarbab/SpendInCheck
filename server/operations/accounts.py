@@ -51,9 +51,6 @@ def list_accounts(user_id, include_archived=False):
             " ORDER BY a.is_archived, a.account_name",
             (user_id, include_archived))
         return cursor.fetchall()
-    except Error as e:
-        print(f"Error fetching accounts: {e}")
-        return []
     finally:
         db.close_connection(connection)
 

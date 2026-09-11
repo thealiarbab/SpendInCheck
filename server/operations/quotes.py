@@ -135,9 +135,6 @@ def recent_closes(tickers, days=30):
         for ticker, on_date, close in cursor.fetchall():
             series.setdefault(ticker, []).append((on_date, close))
         return series
-    except Error as e:
-        print(f"Error reading recent closes: {e}")
-        return {}
     finally:
         db.close_connection(connection)
 
@@ -205,9 +202,6 @@ def instruments_for(tickers):
         return {row[0]: {"name": row[1], "sector": row[2], "exchange": row[3],
                          "low_52w": row[4], "high_52w": row[5]}
                 for row in cursor.fetchall()}
-    except Error as e:
-        print(f"Error reading instruments: {e}")
-        return {}
     finally:
         db.close_connection(connection)
 
@@ -293,8 +287,5 @@ def basket_against_benchmark(user_id, months=12, benchmark=None):
              ORDER BY basket.month_start
         """, (months - 1, user_id, benchmark))
         return cursor.fetchall()
-    except Error as e:
-        print(f"Error comparing against the benchmark: {e}")
-        return []
     finally:
         db.close_connection(connection)

@@ -64,9 +64,6 @@ def get_all_investments(user_id):
         """
         cursor.execute(query, (user_id,))
         return cursor.fetchall()
-    except Error as e:
-        print(f"Error fetching investments: {e}")
-        return []
     finally:
         db.close_connection(connection)
 
@@ -161,9 +158,6 @@ def portfolio_pnl(user_id):
         """
         cursor.execute(query, (user_id,))
         return cursor.fetchall()
-    except Error as e:
-        print(f"Error generating portfolio P&L report: {e}")
-        return []
     finally:
         db.close_connection(connection)
 
@@ -263,9 +257,6 @@ def symbols_to_price(user_id=None):
              ORDER BY ticker
         """, (user_id, user_id))
         return [row[0] for row in cursor.fetchall()]
-    except Error as e:
-        print(f"Error listing symbols to price: {e}")
-        return []
     finally:
         db.close_connection(connection)
 
@@ -288,9 +279,6 @@ def symbols_held(user_id):
              ORDER BY ticker
         """, (user_id,))
         return [row[0] for row in cursor.fetchall()]
-    except Error as e:
-        print(f"Error listing symbols held: {e}")
-        return []
     finally:
         db.close_connection(connection)
 

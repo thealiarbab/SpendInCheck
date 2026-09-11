@@ -251,9 +251,6 @@ def search_transactions(user_id, filters=None, page=1, per_page=DEFAULT_PER_PAGE
         # rides on every row; no rows means nothing matched.
         total = rows[0][-2] if rows else 0
         return [row[:-2] + (row[-1],) for row in rows], total
-    except Error as e:
-        print(f"Error searching transactions: {e}")
-        return [], 0
     finally:
         db.close_connection(connection)
 
@@ -310,9 +307,6 @@ def recent_and_holdings(user_id, limit):
             (user_id, limit, user_id))
         recent, held = cursor.fetchone()
         return (_revive(recent, {3}), _revive(held, {4, 5, 6, 7, 8}))
-    except Error as e:
-        print(f"Error fetching the opening screen: {e}")
-        return [], []
     finally:
         db.close_connection(connection)
 

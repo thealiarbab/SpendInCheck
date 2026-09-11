@@ -44,9 +44,6 @@ def list_goals(user_id, include_archived=False):
             "          g.target_date NULLS LAST, lower(g.goal_name)",
             (user_id, include_archived))
         return cursor.fetchall()
-    except Error as e:
-        print(f"Error fetching goals: {e}")
-        return []
     finally:
         db.close_connection(connection)
 
@@ -203,9 +200,6 @@ def list_contributions(user_id, goal_id):
             " ORDER BY c.contributed_on DESC, c.contribution_id DESC",
             (user_id, goal_id))
         return cursor.fetchall()
-    except Error as e:
-        print(f"Error fetching contributions: {e}")
-        return []
     finally:
         db.close_connection(connection)
 

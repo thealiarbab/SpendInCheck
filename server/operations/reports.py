@@ -16,8 +16,15 @@ account among the places your money goes.
 
 from decimal import Decimal
 
-from psycopg2 import Error
 from .. import db
+
+
+# Nothing here catches psycopg2.Error. A report that cannot run has no
+# answer, and an empty list is not "no answer" -- it is the specific claim
+# that the account spent nothing, which is a lie the reader has no way to
+# see through. The blueprint turns a database error into 503, so letting it
+# out is what produces an honest one.
+
 
 def category_wise_spend(user_id, month_year):
     """Report: total Expense amount per category for the given 'YYYY-MM' month.
@@ -47,9 +54,6 @@ def category_wise_spend(user_id, month_year):
         """
         cursor.execute(query, (user_id, year_part, month_part))
         return cursor.fetchall()
-    except Error as e:
-        print(f"Error generating category-wise spend report: {e}")
-        return []
     finally:
         db.close_connection(connection)
 
@@ -96,9 +100,6 @@ def budget_vs_actual(user_id, month_year):
         """
         cursor.execute(query, (year_part, month_part, user_id, month_year))
         return cursor.fetchall()
-    except Error as e:
-        print(f"Error generating budget-vs-actual report: {e}")
-        return []
     finally:
         db.close_connection(connection)
 
@@ -138,9 +139,6 @@ def monthly_trend(user_id, months=SERIES_MONTHS):
             ORDER BY date_trunc('month', txn_date)
         """, (user_id, months - 1))
         return cursor.fetchall()
-    except Error as e:
-        print(f"Error generating the monthly trend: {e}")
-        return []
     finally:
         db.close_connection(connection)
 
@@ -179,9 +177,6 @@ def cashflow_series(user_id, months=SERIES_MONTHS):
             ORDER BY month_start
         """, (user_id, months - 1))
         return cursor.fetchall()
-    except Error as e:
-        print(f"Error generating the cashflow series: {e}")
-        return []
     finally:
         db.close_connection(connection)
 
@@ -223,9 +218,6 @@ def top_merchants(user_id, months=MERCHANT_MONTHS, limit=MERCHANT_LIMIT):
             LIMIT %s
         """, (user_id, months - 1, limit))
         return cursor.fetchall()
-    except Error as e:
-        print(f"Error generating the top merchants report: {e}")
-        return []
     finally:
         db.close_connection(connection)
 
@@ -326,9 +318,6 @@ def net_worth_series(user_id, months=SERIES_MONTHS):
             ORDER BY cash.month_start
         """, (months - 1, user_id, user_id, user_id))
         return cursor.fetchall()
-    except Error as e:
-        print(f"Error generating the net worth series: {e}")
-        return []
     finally:
         db.close_connection(connection)
 
@@ -487,9 +476,6 @@ def dashboard_summary(user_id, months=SERIES_MONTHS):
             "merchants": _rows(merchants, {2}),
             "spend_by_category": _rows(spend, {1}),
         }
-    except Error as e:
-        print(f"Error generating the dashboard summary: {e}")
-        return {}
     finally:
         db.close_connection(connection)
 

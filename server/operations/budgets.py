@@ -75,9 +75,6 @@ def get_all_budgets(user_id):
         """
         cursor.execute(query, (user_id,))
         return cursor.fetchall()
-    except Error as e:
-        print(f"Error fetching budgets: {e}")
-        return []
     finally:
         db.close_connection(connection)
 

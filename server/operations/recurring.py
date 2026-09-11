@@ -72,9 +72,6 @@ def list_rules(user_id):
             " ORDER BY r.is_paused, r.next_run_on, lower(r.description)",
             (user_id,))
         return cursor.fetchall()
-    except Error as e:
-        print(f"Error fetching recurring rules: {e}")
-        return []
     finally:
         db.close_connection(connection)
 

@@ -49,9 +49,6 @@ def get_all_categories(user_id):
                        "WHERE user_id = %s AND NOT is_system "
                        "ORDER BY category_name", (user_id,))
         return cursor.fetchall()
-    except Error as e:
-        print(f"Error fetching categories: {e}")
-        return []
     finally:
         db.close_connection(connection)
 

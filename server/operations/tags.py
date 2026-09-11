@@ -35,9 +35,6 @@ def list_tags(user_id):
             " ORDER BY uses DESC, lower(t.tag_name)",
             (user_id,))
         return cursor.fetchall()
-    except Error as e:
-        print(f"Error fetching tags: {e}")
-        return []
     finally:
         db.close_connection(connection)
 
@@ -166,9 +163,6 @@ def tags_for_transactions(user_id, transaction_ids):
             found.setdefault(transaction_id, []).append(
                 {"id": tag_id, "name": tag_name})
         return found
-    except Error as e:
-        print(f"Error fetching tags for transactions: {e}")
-        return {}
     finally:
         db.close_connection(connection)
 
