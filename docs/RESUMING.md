@@ -123,49 +123,91 @@ found this.
   changing currency relabels and re-rounds, and the settings screen says so
   before the control.
 
-## 9. What Phase 8 left, and where Phase 9 starts
+## 9. Where things stand
 
-Phase 8 is done in the repository and **not in production**. The Jinja app
-is deleted, the client owns every URL, and the tests pass — but nothing was
-pushed, so spendincheck.com is still serving `templates/` from an older
-commit. That is the one open item, and it is not a code decision:
+**Phase 8 is done and not deployed.** The Jinja app is deleted, the client
+owns every URL, the tests pass -- and nothing has been pushed, so
+spendincheck.com is still serving `templates/` from an older commit.
 
 > Pushing to `main` deploys. This is the first phase a visitor sees, so it
 > needs asking first.
 
-Two things to know before that push.
+**Phase 9 is most of the way there.** What works, verified against the
+live database and the real API:
 
-**`vercel.json` changed shape and has never run.** It now declares two
-builds instead of one: `@vercel/python` for `app.py` as before, and
-`@vercel/static-build` for the client. Only `/api` reaches Python;
-everything else is served from the edge, with `index.html` as the fallback
-for any path that is not a file.
+- Migration 011 puts `ticker`, `exchange`, `isin`, `auto_price`,
+  `price_source` and `price_updated_at` on `investments`. `auto_price`
+  defaults false, so no existing figure moved.
+- `server/services/stocksaathi.py` is the only place that knows their API.
+- Pointing a holding at a symbol prices it in the same request; a symbol
+  that returns no price is refused with the field named.
+- The holdings screen shows a live price and the day's move beside the
+  stored one, polling only while the market is open.
+- Migration 012 adds `quote_history`, and net worth is valued month by
+  month from real closes with `current_price` as the fallback.
+- The nightly snapshot backfills a year for a symbol it has never seen and
+  tops up five days for one it has.
 
-The static build's entrypoint is the **root** `package.json`, whose only
-job is `npm --prefix web ci && npm --prefix web run build`. That is
-deliberate: a legacy build mounts its output under the directory of its
-entrypoint, so pointing it at `web/package.json` would have addressed
-every file as `/web/...` — a prefix that cannot be checked without
-deploying. From the root there is no prefix to get wrong, and `handle:
-filesystem` then serves whatever the build produced without anything
-having to name it. `npm run build` at the repo root is exactly what
-Vercel runs, and it works.
+### Two things Phase 9 cannot finish from this repository
+
+**Symbol autocomplete is blocked, and the plan wanted it first.** It was
+meant to complete against StockSaathi's instrument master. There is no
+public endpoint for it: their API serves `live-quote`, `quote`, `history`,
+`mf-history`, `screener` and `universe-quotes`, and none of them search.
+The master lives in their Supabase as `dhan_instruments`, and their anon
+key returns `[]` for it -- RLS is on with no policy, which is correct of
+them and closes the door to us.
+
+So it needs **a new endpoint on StockSaathi**, something like
+`GET /api/search?q=reli` returning symbol, name, exchange and ISIN. That
+is a change to the other repository and a deploy of a second production
+site, which is not mine to make. Until then a symbol is typed rather than
+chosen -- and it is still checked: a symbol that does not quote cannot be
+switched on.
+
+**Portfolio vs NIFTY is blocked for the same kind of reason.** The index
+does not quote: `NIFTY` and `^NSEI` both come back null, and `NIFTY50`
+returns about 8,095, which is some other instrument and not the index --
+using it would draw a confident wrong line. `NIFTYBEES`, the ETF that
+tracks the index, does quote and is the honest substitute if labelled as
+one.
+
+### What is left that is not blocked
+
+- Sparklines per holding from `/api/history`, and the 52-week range.
+- The two remaining contextual nudges: the surplus prompt when a month
+  closes under budget, and the savings-goal-reached card. The investments
+  empty state is done. Three placements is the cap -- more reads as
+  advertising.
+- Phase 10, opt-in account linking, which is untouched and is the only
+  feature that can damage a different product's data.
+
+### Deployment notes worth having before the push
+
+`vercel.json` declares two builds: `@vercel/python` for `app.py`, and
+`@vercel/static-build` on the **root** `package.json`, whose only job is
+`npm --prefix web ci && npm --prefix web run build`. The entrypoint is at
+the root deliberately -- a legacy build mounts its output under its
+entrypoint's directory, so pointing it at `web/package.json` would address
+every file as `/web/...`, a prefix that cannot be checked without
+deploying. From the root there is no prefix to get wrong. `npm run build`
+at the repo root is exactly what Vercel runs, and it works.
+
+**This account is on Vercel's Hobby plan, which allows two cron jobs.**
+That is a choice, not a list. The two scheduled are the snapshot (11:30
+UTC, 90 minutes after the NSE close, and the only job whose data cannot be
+recovered later -- a close nobody wrote down is gone) and the demo sweep.
+`/api/v1/cron/recurring` is deliberately **not** scheduled: rules can be
+materialised from the app through `POST /recurring/run`, which is how it
+has always worked, and a third entry would exceed the plan.
 
 **An unknown URL answers 200, not 404.** The catch-all serves
-`index.html`, and React renders "Not found" inside it. That is how a
-single-page app works and the alternative is worse — the edge cannot tell
-`/reports` from `/nonsense` — but it does mean a crawler sees 200 for
-anything. The old URLs are all accounted for: `/dashboard`,
-`/transactions`, `/categories`, `/budgets`, `/investments`, `/reports`
-and `/sign-in` and `/register` are real routes; `/app/*` redirects to the
-same path without the prefix; `/demo` and `/sign-out` were POST-only
+`index.html` and React renders "Not found" inside it -- how any SPA works,
+since the edge cannot tell `/reports` from `/nonsense`. The old URLs are
+all accounted for: `/dashboard`, `/transactions`, `/categories`,
+`/budgets`, `/investments`, `/reports`, `/sign-in` and `/register` are
+real routes; `/app/*` redirects; `/demo` and `/sign-out` were POST-only
 actions and are now `/api/v1/auth/demo` and `/api/v1/auth/sign-out`.
-
-Phase 9 is **StockSaathi prices**. From the plan: symbol autocomplete
-first, because it populates the ticker every later price feature depends
-on. Nothing has been started, and it is the first phase that reaches
-outside this repository — `G:\StockSaathi` is the other working
-directory.
 
 Everything else in this file still applies: one round trip per screen, the
 REST API deliberately closed, and the tests running against the real

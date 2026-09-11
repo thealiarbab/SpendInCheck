@@ -79,7 +79,7 @@ COMMIT_PHASE = {
     # so falls into CURRENT_PHASE -- same as 6501316 in phase 6. Pin it here
     # next time anything is added.
     8: ["cf190d7", "00d171b", "4665ff9", "17c2947", "bebb16c", "a19006a",
-        "8a51adc"],
+        "8a51adc", "c50015b"],
 }
 
 PHASES = [
@@ -146,9 +146,30 @@ PHASES = [
      "open": ["Not deployed. Pushing to main puts this in front of visitors, "
               "and the new vercel.json has never run -- read the build log."]},
     {"n": 9, "name": "StockSaathi prices", "state": "now",
-     "blurb": "Symbol autocomplete first, because it populates the ticker every later "
-              "price feature depends on.",
-     "open": []},
+     "blurb": "Migrations 011-012. A holding can be pointed at an NSE symbol and "
+              "priced from the market; current_price keeps its meaning and is "
+              "simply written by the feed instead of by a person, so no report "
+              "had to change. auto_price is off by default and per holding, so "
+              "the migration could not move a figure anybody was looking at. "
+              "The browser polls their CORS-open API directly -- at the "
+              "upstream's own cache TTL, and not at all while the market is "
+              "shut -- which keeps a ticking screen out of the serverless bill. "
+              "quote_history is the piece that cannot be bought later: net "
+              "worth is now valued month by month at what things actually "
+              "closed at, where before every month was valued at today's price "
+              "and the line described the portfolio changing rather than the "
+              "market.",
+     "open": [
+         "Symbol autocomplete is blocked. It needs a public search endpoint on "
+         "StockSaathi -- the instrument master is in their Supabase and their "
+         "anon key returns [] for it, which is correct of them. Until then a "
+         "symbol is typed rather than chosen, and checked before it is used.",
+         "Portfolio vs NIFTY is blocked: the index does not quote. NIFTY and "
+         "^NSEI come back null and NIFTY50 returns some other instrument "
+         "entirely. NIFTYBEES is the honest substitute if labelled as one.",
+         "Still to do and not blocked: sparklines per holding, the 52-week "
+         "range, and the two remaining nudges (surplus, goal reached).",
+     ]},
     {"n": 10, "name": "Opt-in account linking", "state": "next",
      "blurb": "Last, because it is the only feature that can damage a different "
               "product's data.",
