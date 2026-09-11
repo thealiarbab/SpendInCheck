@@ -119,6 +119,13 @@
 .who {
   font-size: var(--text-sm);
   color: var(--content-muted);
+  /* A demonstration account is called demo_6266d27976b0, which is
+     fourteen characters of nothing anybody reads. Cap it rather than let
+     it set the width of the right-hand cluster. */
+  max-width: 12ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 720px) {
@@ -127,5 +134,21 @@
   }
   .brand {
     display: none;
+  }
+}
+
+/* Below this the right-hand cluster -- theme toggle, who you are, sign out
+   -- could not fit beside the link row, and because it is flex:none it
+   pushed the whole bar wider than the screen instead of shrinking. The
+   page then scrolled sideways, which nothing in this app should ever do.
+   The name is what goes: the toggle and the way out are both actions, and
+   you already know who you are. */
+@media (max-width: 40rem) {
+  .who {
+    display: none;
+  }
+
+  .right {
+    gap: var(--space-3);
   }
 }

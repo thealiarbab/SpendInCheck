@@ -21,6 +21,12 @@ from server import db, operations
 
 TICKER = "TESTCO"
 
+# A stand-in for the benchmark. The real one, NIFTYBEES, is a live symbol
+# whose closes every account's comparison chart reads -- deleting it in
+# teardown wiped that chart for everybody until the next nightly run,
+# which is what these tests did before this constant existed.
+TEST_BENCHMARK = "TESTBM"
+
 
 @pytest.fixture
 def clean_history():
@@ -28,8 +34,9 @@ def clean_history():
 
     quote_history and instruments are both shared -- a price and a company
     name are facts about the market, not about a user -- so they are the
-    two tables a test cannot clean up by deleting its user. TESTCO is not
-    a real NSE symbol, so nothing else can be using it.
+    two tables a test cannot clean up by deleting its user. Every symbol
+    touched here is synthetic for that reason: deleting rows for a symbol
+    somebody's screen actually reads is how a test breaks production.
     """
     def wipe():
         connection = db.get_connection()
@@ -37,11 +44,11 @@ def clean_history():
             cursor = connection.cursor()
             cursor.execute("DELETE FROM quote_history WHERE ticker = %s", (TICKER,))
             cursor.execute("DELETE FROM instruments WHERE ticker = %s", (TICKER,))
-            # The benchmark's own history is seeded by these tests too, and
-            # it is a real symbol the nightly job also writes -- so it is
-            # cleared here rather than left to collide with a fixture.
+            # The stand-in, never the real benchmark. Both are synthetic
+            # symbols no exchange lists, so nothing outside these tests
+            # can be using either.
             cursor.execute("DELETE FROM quote_history WHERE ticker = %s",
-                           (operations.BENCHMARK,))
+                           (TEST_BENCHMARK,))
             connection.commit()
         finally:
             db.close_connection(connection)
@@ -280,12 +287,26 @@ def test_the_history_endpoint_carries_what_each_symbol_is(
 
 # --- against the market -----------------------------------------------------
 
+@pytest.fixture
+def stand_in_benchmark(monkeypatch):
+    """Point the benchmark at a synthetic symbol for the duration.
+
+    Patched in both modules because operations re-exports the name by
+    value, so the package attribute and the one the query reads are two
+    separate bindings.
+    """
+    from server.operations import quotes
+    monkeypatch.setattr(quotes, "BENCHMARK", TEST_BENCHMARK)
+    monkeypatch.setattr(operations, "BENCHMARK", TEST_BENCHMARK)
+    return TEST_BENCHMARK
+
+
 def seed_benchmark(closes):
-    """Give the benchmark a price history for these (date, price) pairs."""
-    operations.record_closes(operations.BENCHMARK, closes)
+    """Give the stand-in benchmark a price history."""
+    operations.record_closes(TEST_BENCHMARK, closes)
 
 
-def test_the_basket_holds_quantities_constant(make_api_account, clean_history):
+def test_the_basket_holds_quantities_constant(make_api_account, clean_history, stand_in_benchmark):
     """The whole reason this is not just the portfolio's value.
 
     Buying more of something raises what the holdings are worth without
@@ -326,7 +347,7 @@ def test_the_basket_holds_quantities_constant(make_api_account, clean_history):
         Decimal("50.000"), Decimal("55.000"), Decimal("60.000")]
 
 
-def test_a_deposit_takes_no_part(make_api_account, clean_history):
+def test_a_deposit_takes_no_part(make_api_account, clean_history, stand_in_benchmark):
     """It has no market return to compare, and including it at a flat
     price would drag the line toward no movement at all."""
     client = make_api_account()
@@ -335,10 +356,10 @@ def test_a_deposit_takes_no_part(make_api_account, clean_history):
 
     body = client.get("/api/v1/reports/benchmark").get_json()
     assert body["items"] == []
-    assert body["benchmark"] == operations.BENCHMARK
+    assert body["benchmark"] == TEST_BENCHMARK
 
 
-def test_both_sides_are_rebased_to_a_hundred(make_api_account, clean_history):
+def test_both_sides_are_rebased_to_a_hundred(make_api_account, clean_history, stand_in_benchmark):
     """A basket worth 180,000 and an ETF unit worth 267 share no axis
     until both are expressed as what a hundred became."""
     client = make_api_account()

@@ -223,7 +223,7 @@ def instruments_for(tickers):
 BENCHMARK = "NIFTYBEES"
 
 
-def basket_against_benchmark(user_id, months=12, benchmark=BENCHMARK):
+def basket_against_benchmark(user_id, months=12, benchmark=None):
     """What this account's holdings did, beside what the market did.
 
     Returns (month, basket_value, benchmark_close) oldest first, with
@@ -240,7 +240,15 @@ def basket_against_benchmark(user_id, months=12, benchmark=BENCHMARK):
     Only holdings with a ticker take part. A deposit has no market return
     to compare, and including it at a flat price would quietly drag the
     line toward zero movement.
+
+    `benchmark` resolves at call time rather than defaulting in the
+    signature, so a test can substitute a synthetic symbol. That is not
+    tidiness: NIFTYBEES is a real symbol whose history every account's
+    chart reads, and a test that cleaned up after itself by deleting it
+    wiped the chart for everybody until the next nightly run. It did
+    exactly that once.
     """
+    benchmark = benchmark or BENCHMARK
     connection = None
     try:
         connection = db.get_connection()
