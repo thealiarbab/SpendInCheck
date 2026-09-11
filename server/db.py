@@ -9,10 +9,12 @@ one place that knows how to reach the database.
 import atexit
 import os
 import threading
+import time
 from contextlib import contextmanager
 
 import psycopg2
 from psycopg2 import Error, pool as psycopg2_pool
+from psycopg2.pool import PoolError
 
 from . import config
 
@@ -41,7 +43,24 @@ _REQUEST_KEY = "_spendincheck_connection"
 #
 # Requests beyond this wait for a connection to come back, which is still
 # far cheaper than the 180ms of handshake they would otherwise each pay.
+# The waiting is done in _checkout below: psycopg2's pool does not wait, it
+# raises "connection pool exhausted" the instant every connection is out.
+# This comment described the intended behaviour and not the actual one for
+# long enough that the reports screen -- five requests fired at once
+# against three connections -- served a 400 to whichever lost the race.
 MAX_CONNECTIONS = max(1, int(os.environ.get("DB_MAX_CONNECTIONS", "3")))
+
+# How long a request will wait for somebody else's connection before giving
+# up. Generous against a query, because the thing being waited for is
+# another request finishing, and those are tens of milliseconds; short
+# against a person, who is watching a screen. A request that waits 40ms and
+# succeeds is invisible; one that fails immediately is a broken page.
+POOL_WAIT_SECONDS = 5.0
+
+# Polled rather than signalled, because psycopg2's pool offers no way to be
+# woken when a connection is returned. 10ms is well under the round trip it
+# is waiting on, so the polling costs nothing measurable.
+POOL_POLL_SECONDS = 0.01
 
 _pool = None
 _pool_lock = threading.Lock()
@@ -108,23 +127,48 @@ def _checkout():
 
     Anything that needs several statements to succeed or fail together says
     so explicitly, with transaction() below.
+
+    Waits when the pool is empty rather than failing. A connection is held
+    for one round trip, so a request that arrives during a burst waits
+    milliseconds; psycopg2's own pool raises instead, which is how five
+    simultaneous requests against three connections produced a 400 on a
+    request that was in no way bad.
     """
     pool = _get_pool()
-    for _ in range(MAX_CONNECTIONS):
-        connection = pool.getconn()
+    deadline = time.monotonic() + POOL_WAIT_SECONDS
+    attempts = 0
+
+    while True:
+        try:
+            connection = pool.getconn()
+        except PoolError:
+            # Every connection is out with another request. Wait for one:
+            # they are held for a single round trip, so the wait is
+            # normally a few milliseconds. Failing here instead is what
+            # turned a busy screen into an error page.
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(POOL_POLL_SECONDS)
+            continue
+
         if connection.closed:
             pool.putconn(connection, close=True)
-            continue
-        try:
-            connection.rollback()
-            connection.autocommit = True
-        except Error:
-            pool.putconn(connection, close=True)
-            continue
-        return connection
-    # Every pooled connection was dead, which means the database is
-    # unreachable rather than the pool being unlucky.
-    return _open()
+        else:
+            try:
+                connection.rollback()
+                connection.autocommit = True
+            except Error:
+                pool.putconn(connection, close=True)
+            else:
+                return connection
+
+        # A dead connection was discarded rather than waited for, so this
+        # is bounded by how many the pool holds rather than by the clock:
+        # if every one of them is dead the database is unreachable, and one
+        # fresh connection will say so faster than retrying the pool.
+        attempts += 1
+        if attempts >= MAX_CONNECTIONS:
+            return _open()
 
 
 def _release(connection):

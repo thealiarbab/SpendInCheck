@@ -113,7 +113,15 @@ def summary():
     places = money_places()
     found = operations.dashboard_summary(user_id, _months())
     if not found:
-        raise ApiError("Could not build the summary.", code="summary_failed")
+        # 503, not the 400 this used to be. Nothing about the request can
+        # cause this -- the months parameter is validated above and every
+        # other input is the session's -- so the only ways here are the
+        # database being unreachable or the connection pool being busy.
+        # Telling a client its request was bad when the server was simply
+        # out of connections sends everybody looking in the wrong place,
+        # and it is not retryable, which this is.
+        raise ApiError("Could not build the summary.", code="summary_failed",
+                       status=503)
 
     return jsonify({
         "this_month": {
