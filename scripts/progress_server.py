@@ -160,7 +160,10 @@ PHASES = [
               "and the line described the portfolio changing rather than the "
               "market. Sparklines read that same table, so six holdings are "
               "one statement against our own database rather than six "
-              "requests to somebody else's.",
+              "requests to somebody else's. Migration 013 keeps what a "
+              "symbol is -- name, sector, exchange, the year's range -- "
+              "so a screen can show it without making a lookup that takes "
+              "three seconds cold.",
      "open": [
          "Symbol autocomplete is blocked. It needs a public search endpoint on "
          "StockSaathi -- the instrument master is in their Supabase and their "
@@ -169,8 +172,6 @@ PHASES = [
          "Portfolio vs NIFTY is blocked: the index does not quote. NIFTY and "
          "^NSEI come back null and NIFTY50 returns some other instrument "
          "entirely. NIFTYBEES is the honest substitute if labelled as one.",
-         "Still to do and not blocked: the 52-week range, which needs to "
-         "come from the nightly snapshot rather than a lookup per row.",
          "The third nudge -- the goal-reached card -- is left for a "
          "decision. Goals renders inside Budgets, so it would put a link "
          "to a broker on a budgeting screen, which the plan's own rule "

@@ -174,12 +174,6 @@ one.
 
 ### What is left that is not blocked
 
-- The 52-week range. It already comes back from the instrument lookup and
-  is carried to the client; it is not drawn anywhere, because showing it
-  per row would mean a lookup per holding at up to three seconds each.
-  Storing it is the obvious answer and the wrong one -- it changes daily,
-  so a stored copy is wrong by definition. If it is wanted per row, it
-  belongs in the nightly snapshot beside the closes.
 - The savings-goal-reached card, which is the third and last placement,
   and which is **left undone on purpose** -- it needs a decision rather
   than typing. The plan says two things that collide here: that the nudges
@@ -193,6 +187,14 @@ one.
   is not mine to answer.
 - Phase 10, opt-in account linking, which is untouched and is the only
   feature that can damage a different product's data.
+
+The 52-week range is done, and so is the instrument store behind it:
+migration 013 keeps a symbol's name, sector, exchange and year's range,
+written by the nightly job and by the pricing route for a symbol just
+chosen. It is not derived from `quote_history` on purpose -- a range taken
+from daily closes is narrower than the real one, which comes from intraday
+highs and lows, so deriving it would produce a confident figure that
+disagrees with every other site.
 
 Sparklines are done, and not the way the plan described. It said to draw
 them from `/api/history`, which would be one request to StockSaathi per
