@@ -13,6 +13,7 @@ from server import currency, operations
 from server.auth import current_currency, remember_currency, require_user
 from server.errors import ValidationError
 from server.routes.api import api
+from server.validators import json_object
 
 
 @api.get("/settings/currencies")
@@ -41,7 +42,8 @@ def set_currency():
     rounded -- and the screen that offers it says exactly that.
     """
     user_id = require_user()
-    code = str((request.get_json(silent=True) or {}).get("currency") or "").upper()
+    payload = json_object(request.get_json(silent=True) or {})
+    code = str(payload.get("currency") or "").upper()
 
     if not currency.is_known(code):
         raise ValidationError({"currency": "Not a currency this app knows."})

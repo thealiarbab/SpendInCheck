@@ -11,7 +11,7 @@ from server import operations
 from server.auth import require_user
 from server.errors import ValidationError
 from server.routes.api import api
-from server.validators import Validator
+from server.validators import Validator, json_object
 
 # Enough for a few thousand rows of statement, small enough that a
 # mistyped upload cannot occupy the request for long.
@@ -45,7 +45,7 @@ def examine_import():
     afterwards.
     """
     user_id = require_user()
-    payload = request.get_json(silent=True) or {}
+    payload = json_object(request.get_json(silent=True) or {})
     text = _read_text(payload)
 
     fields = Validator(payload)
@@ -81,7 +81,7 @@ def commit_import():
     against this account again before anything is inserted.
     """
     user_id = require_user()
-    payload = request.get_json(silent=True) or {}
+    payload = json_object(request.get_json(silent=True) or {})
 
     rows = payload.get("rows")
     if not isinstance(rows, list) or not rows:

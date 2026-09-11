@@ -78,6 +78,23 @@ def _read_submission(payload):
     return values
 
 
+def _counting_number(raw, default):
+    """A positive integer from the query string, or the default.
+
+    The length is checked as well as the shape. int() raises on "abc", and
+    since Python 3.11 it also raises on a run of more than 4300 digits, so a
+    long enough string of digits is not a usable number either. Nine digits
+    is more page than any ledger has.
+
+    Unreadable means the default, never a 422 or a 500, for the same reason
+    _read_filters gives below: this comes off a URL somebody may have edited.
+    """
+    raw = (raw or "").strip()
+    if not raw.isdigit() or len(raw) > 9:
+        return default
+    return max(1, int(raw))
+
+
 def _read_filters():
     """Read the search parameters off the query string.
 
@@ -133,10 +150,9 @@ def list_transactions():
     user_id = require_user()
     filters = _read_filters()
 
-    page = max(1, int(request.args.get("page") or 1))
-    per_page = request.args.get("per_page")
-    per_page = int(per_page) if (per_page or "").isdigit() else operations.DEFAULT_PER_PAGE
-    per_page = max(1, min(per_page, operations.MAX_PER_PAGE))
+    page = _counting_number(request.args.get("page"), 1)
+    per_page = _counting_number(request.args.get("per_page"), operations.DEFAULT_PER_PAGE)
+    per_page = min(per_page, operations.MAX_PER_PAGE)
 
     rows, total = operations.search_transactions(user_id, filters, page, per_page)
 

@@ -10,7 +10,7 @@ from server import money, operations
 from server.auth import require_user
 from server.errors import NotFound, ValidationError
 from server.routes.api import api
-from server.validators import Validator
+from server.validators import Validator, json_object
 
 FIELDS = ["id", "name", "uses"]
 
@@ -76,7 +76,7 @@ def set_transaction_tags(transaction_id):
     expressible.
     """
     user_id = require_user()
-    payload = request.get_json(silent=True) or {}
+    payload = json_object(request.get_json(silent=True) or {})
     raw = payload.get("tag_ids")
     if not isinstance(raw, list):
         raise ValidationError({"tag_ids": "Send a list of tag ids."})

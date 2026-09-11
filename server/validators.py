@@ -30,6 +30,23 @@ MONTH_SHAPE = re.compile(r"^\d{4}-\d{2}$")
 DATE_SHAPE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
+def json_object(payload):
+    """The request body, once it is known to be a JSON object.
+
+    request.get_json returns whatever the client actually sent, so a body of
+    [1] arrives as a list -- and `or {}` does not catch it, because a
+    non-empty list is truthy. Every .get() on it then raises AttributeError,
+    which is a 500 for what is plainly a malformed request.
+
+    Routes that build a Validator get this check free from its constructor.
+    Routes that read the body directly need it here, and both report the same
+    sentence so the client cannot tell which kind of route it hit.
+    """
+    if not isinstance(payload, dict):
+        raise ValidationError({}, "Expected a JSON object.")
+    return payload
+
+
 class Validator:
     """Collects field errors, then raises them together.
 

@@ -62,7 +62,14 @@ def register():
 
     username = fields.text("username", max_length=30)
     email = fields.text("email", max_length=255)
-    password = payload.get("password") or ""
+    # Not fields.text(): a password is taken exactly as typed, spaces and all.
+    # But the type has to be settled before the length is. JSON will happily
+    # deliver a list here, and a list of eight items has a len() of eight --
+    # so it passes the check below and then raises inside the hasher.
+    password = payload.get("password")
+    if not isinstance(password, str):
+        fields.fail("password", "Enter a password.")
+        password = ""
 
     if username is not None:
         if len(username) < 3:
@@ -101,9 +108,13 @@ def sign_in_route():
     payload = request.get_json(silent=True) or {}
     fields = Validator(payload)
     login = fields.text("login", label="username or email")
-    password = payload.get("password") or ""
-    if not password:
+    # Same reason as register: a non-string password would reach
+    # check_password_hash and raise there, but only for a login that resolves
+    # to a real account -- which makes it look like an intermittent fault.
+    password = payload.get("password")
+    if not isinstance(password, str) or not password:
         fields.fail("password", "Enter a password.")
+        password = ""
     fields.raise_if_invalid()
 
     account = operations.get_user_by_login(login)
