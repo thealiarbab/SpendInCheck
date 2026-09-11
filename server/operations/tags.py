@@ -88,9 +88,12 @@ def add_tag(user_id, tag_name):
 def rename_tag(user_id, tag_id, tag_name):
     """Change a tag's name, keeping every transaction that carries it.
 
-    Returns True if saved, False if the new name collides with another of
-    this user's tags. A rowcount of 0 is followed by an existence check, so
-    renaming a tag to the case it already has is not reported as a failure.
+    Returns True if saved, False if it is not theirs or the new name collides
+    with another of this user's tags.
+
+    No existence check on a rowcount of 0: see update_transaction. Renaming a
+    tag to the name it already has still reports 1 on Postgres, which counts
+    matched rows rather than changed ones.
     """
     connection = None
     try:
@@ -100,9 +103,7 @@ def rename_tag(user_id, tag_id, tag_name):
                        " WHERE tag_id = %s AND user_id = %s",
                        (tag_name, tag_id, user_id))
         connection.commit()
-        if cursor.rowcount > 0:
-            return True
-        return tag_exists(user_id, tag_id)
+        return cursor.rowcount > 0
     except Error as e:
         if connection:
             connection.rollback()

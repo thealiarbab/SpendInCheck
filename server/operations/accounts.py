@@ -127,9 +127,11 @@ def update_account(user_id, account_id, account_name, account_kind, opening_bala
     """Rename an account, change its kind, or correct its opening balance.
 
     Returns True if it is this user's and was saved, False if the new name
-    collides with another of their accounts. As in rename_category, a
-    rowcount of 0 can simply mean nothing changed, so it is followed by an
-    existence check rather than reported as a failure.
+    collides with another of their accounts.
+
+    No existence check on a rowcount of 0: see update_transaction. Postgres
+    counts matched rows rather than changed ones, so nothing-changed already
+    reports 1 and the check only ever cost a second round trip.
     """
     connection = None
     try:
@@ -141,9 +143,7 @@ def update_account(user_id, account_id, account_name, account_kind, opening_bala
                        (account_name, account_kind, opening_balance,
                         account_id, user_id))
         connection.commit()
-        if cursor.rowcount > 0:
-            return True
-        return account_exists(user_id, account_id)
+        return cursor.rowcount > 0
     except Error as e:
         if connection:
             connection.rollback()
@@ -167,7 +167,7 @@ def set_archived(user_id, account_id, archived):
                        " WHERE account_id = %s AND user_id = %s",
                        (archived, account_id, user_id))
         connection.commit()
-        return cursor.rowcount > 0 or account_exists(user_id, account_id)
+        return cursor.rowcount > 0
     except Error as e:
         if connection:
             connection.rollback()

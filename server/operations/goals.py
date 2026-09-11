@@ -104,9 +104,14 @@ def update_goal(user_id, goal_id, goal_name, target_amount, target_date=None,
                 account_id=None):
     """Change a goal's name, target, deadline or account.
 
-    Returns True if it is this user's and was saved, False if the new name
-    collides. As elsewhere, a rowcount of 0 is followed by an existence
-    check so that "nothing changed" is not reported as a failure.
+    Returns True only if a row was written. False covers "no goal of theirs
+    has that id" and "that account_id was not theirs to attach it to", since
+    the WHERE clause refuses both the same way.
+
+    No existence check on a rowcount of 0: see update_transaction. Postgres
+    counts matched rows, not changed ones, so the check could not fire for
+    the reason it was written -- and because it looked the goal up without
+    the account guard, it turned a refused write into True.
     """
     connection = None
     try:
@@ -121,9 +126,7 @@ def update_goal(user_id, goal_id, goal_name, target_amount, target_date=None,
             (goal_name, target_amount, target_date, account_id, goal_id, user_id,
              account_id, account_id, user_id))
         connection.commit()
-        if cursor.rowcount > 0:
-            return True
-        return goal_exists(user_id, goal_id)
+        return cursor.rowcount > 0
     except Error as e:
         if connection:
             connection.rollback()
@@ -147,7 +150,7 @@ def set_goal_archived(user_id, goal_id, archived):
                        " WHERE goal_id = %s AND user_id = %s",
                        (archived, goal_id, user_id))
         connection.commit()
-        return cursor.rowcount > 0 or goal_exists(user_id, goal_id)
+        return cursor.rowcount > 0
     except Error as e:
         if connection:
             connection.rollback()

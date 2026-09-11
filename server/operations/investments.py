@@ -75,10 +75,12 @@ def update_investment_price(user_id, investment_id, new_current_price):
     """Update only the current_price of an investment (e.g. after checking
     today's market price).
 
-    Returns True if the investment exists and was saved, False if no
-    investment has that id. As in update_transaction, a rowcount of 0 can
-    simply mean the new price equalled the old one, so it is followed by an
-    existence check instead of being treated as a failure.
+    Returns True if the investment is this user's and was saved, False if no
+    investment of theirs has that id.
+
+    No existence check on a rowcount of 0: see update_transaction. A new
+    price equal to the old one still reports 1 on Postgres, which counts
+    matched rows rather than changed ones.
     """
     connection = None
     try:
@@ -88,11 +90,7 @@ def update_investment_price(user_id, investment_id, new_current_price):
                  "WHERE investment_id = %s AND user_id = %s")
         cursor.execute(query, (new_current_price, investment_id, user_id))
         connection.commit()
-        if cursor.rowcount > 0:
-            return True
-        cursor.execute("SELECT investment_id FROM investments "
-                       "WHERE investment_id = %s AND user_id = %s", (investment_id, user_id))
-        return cursor.fetchone() is not None
+        return cursor.rowcount > 0
     except Error as e:
         if connection:
             connection.rollback()
@@ -232,12 +230,10 @@ def set_investment_pricing(user_id, investment_id, ticker, exchange, isin,
         """, (ticker, exchange, isin, auto_price, auto_price,
               investment_id, user_id))
         connection.commit()
-        if cursor.rowcount > 0:
-            return True
-        # As in update_investment_price: a rowcount of 0 can mean the values
-        # were already what was asked for, so it is an existence check, not
-        # a failure.
-        return investment_exists(user_id, investment_id)
+        # As in update_investment_price: no existence check behind a rowcount
+        # of 0. Values already equal to what was asked for still match, and
+        # Postgres counts matched rows.
+        return cursor.rowcount > 0
     except Error as e:
         if connection:
             connection.rollback()

@@ -59,6 +59,26 @@ def test_a_goal_cannot_point_at_another_persons_account(make_api_account):
     assert set_goal(mine, "Laptop", account_id=an_account(theirs)).status_code == 422
 
 
+def test_a_goal_cannot_be_edited_onto_another_persons_account(make_api_account):
+    """Creating one this way was already refused; editing one onto it was not.
+
+    The UPDATE guards account_id against the signed-in user, so a foreign id
+    matched no row and rowcount was 0. The code then looked the goal up on
+    its own -- without that guard -- found it, and returned True. The caller
+    was told the edit saved; the goal never moved.
+    """
+    mine, theirs = make_api_account(), make_api_account()
+    set_goal(mine, "Laptop", account_id=an_account(mine))
+    goal_id = goals(mine)["Laptop"]["id"]
+    before = goals(mine)["Laptop"]
+
+    refused = mine.patch(f"/api/v1/goals/{goal_id}", headers=mine.headers,
+                         json={"name": "Laptop", "target": "40000.00",
+                               "account_id": an_account(theirs)})
+    assert refused.status_code in (404, 422), refused.get_json()
+    assert goals(mine)["Laptop"] == before, "refused edit must not have written"
+
+
 def test_two_goals_cannot_share_a_name(make_api_account):
     client = make_api_account()
     set_goal(client, "Laptop")

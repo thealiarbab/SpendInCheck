@@ -82,9 +82,11 @@ def rename_category(user_id, category_id, category_name, category_type):
     """Change a category's name and type.
 
     Returns True if the category is this user's and was saved, False if it
-    is not theirs or the new name collides with one they already have. As in
-    update_transaction, a rowcount of 0 can simply mean nothing changed, so
-    it is followed by an existence check rather than reported as a failure.
+    is not theirs or the new name collides with one they already have.
+
+    No existence check on a rowcount of 0: see update_transaction. Postgres
+    counts matched rows rather than changed ones, so nothing-changed already
+    reports 1 and the check only ever cost a second round trip.
     """
     connection = None
     try:
@@ -94,9 +96,7 @@ def rename_category(user_id, category_id, category_name, category_type):
                        "WHERE category_id = %s AND user_id = %s",
                        (category_name, category_type, category_id, user_id))
         connection.commit()
-        if cursor.rowcount > 0:
-            return True
-        return category_exists(user_id, category_id)
+        return cursor.rowcount > 0
     except Error as e:
         if connection:
             connection.rollback()

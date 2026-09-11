@@ -157,9 +157,7 @@ def update_rule(user_id, rule_id, description, category_id, amount, txn_type,
              day_of_month, next_run_on, ends_on, rule_id, user_id,
              category_id, user_id, account_id, account_id, user_id))
         connection.commit()
-        if cursor.rowcount > 0:
-            return True
-        return False
+        return cursor.rowcount > 0
     except Error as e:
         if connection:
             connection.rollback()
@@ -183,7 +181,7 @@ def set_rule_paused(user_id, rule_id, paused):
                        " WHERE rule_id = %s AND user_id = %s",
                        (paused, rule_id, user_id))
         connection.commit()
-        return cursor.rowcount > 0 or rule_exists(user_id, rule_id)
+        return cursor.rowcount > 0
     except Error as e:
         if connection:
             connection.rollback()
