@@ -52,10 +52,17 @@ def take_snapshot():
     Returns {"symbols", "closes", "backfilled", "described"} -- the counts
     the endpoint reports, so a run that silently did nothing is visible as
     a run that did nothing rather than as a 200.
+
+    The benchmark is always among the symbols, whether or not anybody holds
+    it: nothing else would ever fetch it, and the comparison chart needs
+    its side of the line.
     """
+    # The benchmark is always in the list, even when nobody holds it.
+    # Nothing else would ever fetch it -- it is not anybody's holding --
+    # and a comparison chart with one side missing is not a chart.
     symbols = operations.symbols_to_price()
-    if not symbols:
-        return {"symbols": 0, "closes": 0, "backfilled": 0}
+    if operations.BENCHMARK not in symbols:
+        symbols = symbols + [operations.BENCHMARK]
 
     known = operations.symbols_with_history()
     written = 0

@@ -153,3 +153,58 @@ def net_worth():
     user_id = require_user()
     rows = operations.net_worth_series(user_id, _months())
     return jsonify({"items": money.rows(NET_WORTH_FIELDS, rows, money_places())})
+
+
+# How far back the comparison runs. A year, like every other series on the
+# reporting screen, and as far as the upstream serves history anyway.
+BENCHMARK_MONTHS = 12
+
+
+@api.get("/reports/benchmark")
+def benchmark():
+    """This account's holdings against the market, both rebased to 100.
+
+    Rebasing is what makes the two comparable at all: a basket worth
+    180,000 and an ETF unit worth 267 share no axis until both are
+    expressed as "what a hundred rupees became".
+
+    The basket is valued at today's quantities in every month. Charting
+    the portfolio's real value against an index would compare two
+    different things -- buying more of something raises the value without
+    the market moving, so a month of heavy saving reads as a month of
+    spectacular returns.
+
+    Answers with an empty series rather than an error when there is
+    nothing to compare: an account holding only deposits has no market
+    return, and that is a fact about the account, not a failure.
+    """
+    user_id = require_user()
+    rows = operations.basket_against_benchmark(user_id, BENCHMARK_MONTHS)
+    if len(rows) < 2:
+        # One point is not a comparison, and zero is not a chart.
+        return jsonify({"items": [], "benchmark": operations.BENCHMARK,
+                        "benchmark_name": _benchmark_name()})
+
+    first_basket = rows[0][1]
+    first_market = rows[0][2]
+    if not first_basket or not first_market:
+        return jsonify({"items": [], "benchmark": operations.BENCHMARK,
+                        "benchmark_name": _benchmark_name()})
+
+    items = [{
+        "month": month,
+        # Two decimal places on an index, not on money: these are ratios,
+        # and money.serialise would round them to the currency's scale --
+        # which is zero places in yen, turning every point into 100.
+        "basket": str(round(basket / first_basket * 100, 2)),
+        "market": str(round(market / first_market * 100, 2)),
+    } for month, basket, market in rows]
+
+    return jsonify({"items": items, "benchmark": operations.BENCHMARK,
+                    "benchmark_name": _benchmark_name()})
+
+
+def _benchmark_name():
+    """The ETF's own name, so no screen can call it "the NIFTY"."""
+    known = operations.instruments_for([operations.BENCHMARK])
+    return (known.get(operations.BENCHMARK) or {}).get("name")

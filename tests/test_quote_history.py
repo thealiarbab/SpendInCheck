@@ -37,6 +37,11 @@ def clean_history():
             cursor = connection.cursor()
             cursor.execute("DELETE FROM quote_history WHERE ticker = %s", (TICKER,))
             cursor.execute("DELETE FROM instruments WHERE ticker = %s", (TICKER,))
+            # The benchmark's own history is seeded by these tests too, and
+            # it is a real symbol the nightly job also writes -- so it is
+            # cleared here rather than left to collide with a fixture.
+            cursor.execute("DELETE FROM quote_history WHERE ticker = %s",
+                           (operations.BENCHMARK,))
             connection.commit()
         finally:
             db.close_connection(connection)
@@ -271,3 +276,88 @@ def test_the_history_endpoint_carries_what_each_symbol_is(
     body = client.get("/api/v1/investments/history").get_json()
     assert body["instruments"][TICKER]["name"] == "Test Co Ltd"
     assert body["instruments"][TICKER]["low_52w"] == "10.00", "money as a string"
+
+
+# --- against the market -----------------------------------------------------
+
+def seed_benchmark(closes):
+    """Give the benchmark a price history for these (date, price) pairs."""
+    operations.record_closes(operations.BENCHMARK, closes)
+
+
+def test_the_basket_holds_quantities_constant(make_api_account, clean_history):
+    """The whole reason this is not just the portfolio's value.
+
+    Buying more of something raises what the holdings are worth without
+    the market having moved at all, so charting real value against an
+    index would make a month of heavy saving read as a month of
+    spectacular returns.
+    """
+    client = make_api_account()
+    holding = add_holding(client, quantity="10", current_price="100.00")
+    client.patch(f"/api/v1/investments/{holding['id']}/pricing",
+                 headers=client.headers,
+                 json={"ticker": TICKER, "auto_price": "0"})
+
+    today = date.today()
+    months = []
+    for back in (2, 1, 0):
+        year, month = today.year, today.month - back
+        while month < 1:
+            month += 12
+            year -= 1
+        months.append(date(year, month, 1))
+
+    # The price doubles; the quantity never changes.
+    operations.record_closes(TICKER, [(months[0], Decimal("100.00")),
+                                      (months[1], Decimal("150.00")),
+                                      (months[2], Decimal("200.00"))])
+    seed_benchmark([(months[0], Decimal("50.00")),
+                    (months[1], Decimal("55.00")),
+                    (months[2], Decimal("60.00"))])
+
+    rows = operations.basket_against_benchmark(
+        client.get("/api/v1/auth/session").get_json()["user"]["id"], months=3)
+    assert [month for month, _, _ in rows] == [d.strftime("%Y-%m") for d in months]
+    # Ten shares at each month's close.
+    assert [value for _, value, _ in rows] == [
+        Decimal("1000.000"), Decimal("1500.000"), Decimal("2000.000")]
+    assert [close for _, _, close in rows] == [
+        Decimal("50.000"), Decimal("55.000"), Decimal("60.000")]
+
+
+def test_a_deposit_takes_no_part(make_api_account, clean_history):
+    """It has no market return to compare, and including it at a flat
+    price would drag the line toward no movement at all."""
+    client = make_api_account()
+    add_holding(client, asset_name="A Deposit", asset_type="FD")
+    seed_benchmark([(date.today(), Decimal("50.00"))])
+
+    body = client.get("/api/v1/reports/benchmark").get_json()
+    assert body["items"] == []
+    assert body["benchmark"] == operations.BENCHMARK
+
+
+def test_both_sides_are_rebased_to_a_hundred(make_api_account, clean_history):
+    """A basket worth 180,000 and an ETF unit worth 267 share no axis
+    until both are expressed as what a hundred became."""
+    client = make_api_account()
+    holding = add_holding(client, quantity="10", current_price="100.00")
+    client.patch(f"/api/v1/investments/{holding['id']}/pricing",
+                 headers=client.headers,
+                 json={"ticker": TICKER, "auto_price": "0"})
+
+    today = date.today()
+    earlier = date(today.year - 1, today.month, 1) if today.month else today
+    operations.record_closes(TICKER, [(earlier, Decimal("100.00")),
+                                      (date(today.year, today.month, 1),
+                                       Decimal("50.00"))])
+    seed_benchmark([(earlier, Decimal("200.00")),
+                    (date(today.year, today.month, 1), Decimal("300.00"))])
+
+    items = client.get("/api/v1/reports/benchmark").get_json()["items"]
+    assert items[0]["basket"] == "100.0" or items[0]["basket"] == "100.00"
+    assert items[0]["market"] == "100.0" or items[0]["market"] == "100.00"
+    # Halved against the start; the market half again as much.
+    assert float(items[-1]["basket"]) == 50.0
+    assert float(items[-1]["market"]) == 150.0

@@ -216,6 +216,21 @@ export interface SymbolSaved {
   instrument: Instrument | null;
 }
 
+export interface BenchmarkPoint {
+  month: string;
+  /** The account's holdings, at today's quantities, rebased to 100. */
+  basket: string;
+  /** The benchmark, rebased to 100 on the same month. */
+  market: string;
+}
+
+export interface BenchmarkReport {
+  items: BenchmarkPoint[];
+  benchmark: string;
+  /** The instrument's own name, so nothing calls an ETF "the NIFTY". */
+  benchmark_name: string | null;
+}
+
 export interface PortfolioReport {
   items: Holding[];
   totals: { value: string; pnl: string; holdings: number };
@@ -664,6 +679,13 @@ export const api = {
   /** The opening screen in one request rather than two. */
   dashboard: () => request<DashboardPayload>("/reports/dashboard"),
   portfolio: () => request<PortfolioReport>("/reports/portfolio"),
+  /**
+   * Holdings against the market, both rebased to 100.
+   *
+   * Empty for an account with nothing quotable -- a deposit has no market
+   * return, and that is a fact about the account rather than an error.
+   */
+  benchmark: () => request<BenchmarkReport>("/reports/benchmark"),
   /* Seven queries behind one request. Splitting them into four calls the
      charts could each own would be tidier code and about a second slower,
      because what costs here is reaching the database at all. */

@@ -105,3 +105,21 @@
 }
 
 .nudgeBody a:hover { text-decoration: underline; }
+
+/* The attribution and the caveats under the comparison chart. Small, but
+   not optional: the benchmark is an ETF rather than the index it tracks,
+   and the basket holds quantities constant. A chart that does not say so
+   is a chart somebody will read wrongly. */
+.benchmarkNote {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+  color: var(--content-muted);
+}
+
+.benchmarkNote a {
+  color: var(--accent-invest);
+  text-decoration: none;
+}
+
+.benchmarkNote a:hover { text-decoration: underline; }

@@ -74,6 +74,28 @@ function shortMonth(month: string): string {
     .toLocaleDateString("en-IN", { month: "short" });
 }
 
+/**
+ * A scale that spans the data rather than starting at zero.
+ *
+ * For series where the interesting question is movement against a
+ * reference, not size against nothing. A tenth of the range is left as
+ * padding at each end so the line never touches the frame.
+ */
+function scaleAround(values: number[], plot: Shape["plot"]) {
+  const top = Math.max(...values);
+  const bottom = Math.min(...values);
+  const padding = (top - bottom || 1) * 0.1;
+  const highest = top + padding;
+  const lowest = bottom - padding;
+  return {
+    highest,
+    lowest,
+    y: (value: number) =>
+      plot.y + plot.height
+        - ((value - lowest) / (highest - lowest)) * plot.height,
+  };
+}
+
 /** A scale from data values to pixels, with a little headroom. */
 function scaleFor(values: number[], plot: Shape["plot"]) {
   const highest = Math.max(0, ...values);
@@ -106,7 +128,14 @@ export function ChartFrame(
 
 /** Horizontal guide lines and the figures that label them. */
 function Gridlines(
-  { scale, plot }: { scale: ReturnType<typeof scaleFor>; plot: Shape["plot"] },
+  { scale, plot, tick = (value: number) => formatCompact(Math.round(value)) }: {
+    scale: ReturnType<typeof scaleFor>;
+    plot: Shape["plot"];
+    /** How to label a value. Defaults to money, because most of these are
+     *  money -- but an index is not, and labelling 76.6 as "₹1" is worse
+     *  than labelling it not at all. */
+    tick?: (value: number) => string;
+  },
 ) {
   const steps = [0, 0.25, 0.5, 0.75, 1];
   return (
@@ -120,7 +149,7 @@ function Gridlines(
                   y1={y} y2={y} />
             <text className={styles.axis} x={plot.x - 6} y={y + 3}
                   textAnchor="end">
-              {formatCompact(Math.round(value))}
+              {tick(value)}
             </text>
           </g>
         );
@@ -287,6 +316,7 @@ const SWATCH = {
   income: styles.swatchIncome,
   expense: styles.swatchExpense,
   line: styles.swatchLine,
+  market: styles.swatchMarket,
 };
 
 /** A key, so the colours in a chart mean something without hovering. */
@@ -354,6 +384,72 @@ export function Sparkline(
     <svg className={styles.spark} viewBox={`0 0 ${width} ${height}`}
          role="img" aria-label={label} preserveAspectRatio="none">
       <path className={`${styles.sparkLine} ${tone}`} d={path} />
+    </svg>
+  );
+}
+
+
+/**
+ * Two series on one pair of axes, already rebased to a common start.
+ *
+ * Separate from LineChart because the shared scale is the whole point: the
+ * two lines have to be measured against each other, so they cannot each
+ * pick their own range the way two LineCharts side by side would. That is
+ * also why this takes numbers that have already been rebased -- a basket
+ * worth 180,000 and an ETF unit worth 267 share no axis until both are
+ * expressed as what a hundred became.
+ *
+ * The 100 line is drawn explicitly. Without it "above the start" and
+ * "below the start" have to be inferred from the gridline labels, which is
+ * the one thing anybody reads this chart for.
+ */
+export function Comparison(
+  { months, mine, market, mineLabel, marketLabel }: {
+    months: string[]; mine: number[]; market: number[];
+    mineLabel: string; marketLabel: string;
+  },
+) {
+  const shape = useShape();
+  const { plot } = shape;
+  // One scale across both series, with the start line inside it so the
+  // reference is never off the top or bottom of the plot.
+  //
+  // Not scaleFor, which anchors at zero. That is right for money -- a bar
+  // of spending cut off above zero lies about its size -- and wrong here:
+  // an index moving between 76 and 108 drawn from zero puts every point
+  // in the top quarter of the plot and flattens the only thing the chart
+  // is for. Nobody reads "how far is my portfolio from being worthless".
+  const scale = scaleAround([...mine, ...market, 100], plot);
+  const step = plot.width / Math.max(months.length, 1);
+  const at = (index: number) => plot.x + step * index + step / 2;
+
+  const path = (values: number[]) => values
+    .map((value, index) =>
+      `${index === 0 ? "M" : "L"} ${at(index)} ${scale.y(value)}`).join(" ");
+
+  return (
+    <svg className={styles.svg} viewBox={`0 0 ${shape.width} ${shape.height}`}
+         role="img"
+         aria-label={`${mineLabel} against ${marketLabel}, both from 100`}>
+      {/* Plain numbers: these are index points, not rupees. Left on the
+          money default they read "₹0 ₹0 ₹1 ₹1 ₹1", which is what
+          formatCompact does to the number 76. */}
+      <Gridlines scale={scale} plot={plot}
+                 tick={(value) => value.toFixed(0)} />
+      <line className={styles.zero} x1={plot.x} x2={plot.x + plot.width}
+            y1={scale.y(100)} y2={scale.y(100)} />
+      <path className={styles.lineMarket} d={path(market)} />
+      <path className={styles.line} d={path(mine)} />
+      {mine.map((value, index) => (
+        <g key={months[index]}>
+          <circle className={styles.point} cx={at(index)} cy={scale.y(value)} r="3" />
+          <title>
+            {shortMonth(months[index])}: {mineLabel} {value.toFixed(1)},{" "}
+            {marketLabel} {market[index]?.toFixed(1)}
+          </title>
+        </g>
+      ))}
+      <MonthAxis months={months} shape={shape} />
     </svg>
   );
 }

@@ -136,3 +136,16 @@
 .sparkUp { stroke: var(--money-credit); }
 .sparkDown { stroke: var(--money-debit); }
 .sparkFlat { stroke: var(--content-muted); }
+
+/* The benchmark line. Deliberately the quieter of the two: the reader's
+   own holdings are the subject and the market is the reference, so it is
+   dashed and muted rather than a second equal-weight line competing for
+   the eye. */
+.lineMarket {
+  fill: none;
+  stroke: var(--content-muted);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+
+.swatchMarket { background: var(--content-muted); }

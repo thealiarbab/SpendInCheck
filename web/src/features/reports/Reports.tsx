@@ -2,12 +2,12 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import { formatPercent, formatMoney, formatSigned, toMinor } from "../../lib/money";
-import { externalLinkProps, surplusHref } from "../../lib/links";
+import { externalLinkProps, investHref, surplusHref } from "../../lib/links";
 import {
   Card, Empty, Field, Loading, Notice, PageHead, Stat, StatRow, Table, cell,
 } from "../../ui";
 import {
-  ChartFrame, Legend, LineChart, PairedBars, RankedBars,
+  ChartFrame, Comparison, Legend, LineChart, PairedBars, RankedBars,
 } from "../../ui/charts";
 import { alignRunning, alignTo, monthName } from "./align";
 import { SurplusCard } from "./SurplusCard";
@@ -39,6 +39,12 @@ export function Reports() {
     queryKey: ["report", "category-spend", month],
     queryFn: () => api.categorySpend(month),
   });
+  // Holdings against the market. Its own query rather than part of the
+  // summary: it reads quote_history, which the summary never touches, and
+  // most accounts have nothing quotable in them -- so folding it in would
+  // make every reporting screen pay for a chart it cannot draw.
+  const versus = useQuery({ queryKey: ["benchmark"], queryFn: api.benchmark });
+
   const budget = useQuery({
     queryKey: ["report", "budget-vs-actual", month],
     queryFn: () => api.budgetVsActual(month),
@@ -122,12 +128,48 @@ export function Reports() {
           </Card>
 
           <Card>
-            <ChartFrame title="Net worth" note="holdings at today's prices, plus cash"
+            {/* The note changed with the query. Holdings used to be valued
+                at today's price in every month; they are valued at that
+                month's close now, and a caption saying otherwise is worse
+                than none. */}
+            <ChartFrame title="Net worth" note="holdings at each month's close, plus cash"
                         empty={nothingYet && worth.every((value) => value === 0)}>
               <LineChart months={months} values={worth}
                          label="Net worth at the end of each month" />
             </ChartFrame>
           </Card>
+
+          {versus.data && versus.data.items.length > 1 && (
+            <Card>
+              <ChartFrame
+                title="Your holdings against the market"
+                note="both from 100, at today's quantities"
+              >
+                <Comparison
+                  months={versus.data.items.map((row) => row.month)}
+                  mine={versus.data.items.map((row) => Number(row.basket))}
+                  market={versus.data.items.map((row) => Number(row.market))}
+                  mineLabel="Your holdings"
+                  marketLabel={versus.data.benchmark}
+                />
+                <Legend items={[
+                  { label: "Your holdings", kind: "line" },
+                  { label: versus.data.benchmark, kind: "market" },
+                ]} />
+              </ChartFrame>
+              <p className={styles.benchmarkNote}>
+                {/* Named as what it is. The NIFTY 50 index itself does not
+                    quote through this feed, and calling an ETF by the
+                    index's name would be a small lie repeated daily. */}
+                Against <strong>{versus.data.benchmark}</strong>
+                {versus.data.benchmark_name ? `, ${versus.data.benchmark_name}` : ""},
+                which tracks the index. Quantities are held at today's, so buying
+                more does not read as a gain, and only holdings with a symbol take
+                part — a deposit has no market return to compare. Prices by{" "}
+                <a href={investHref} {...externalLinkProps}>StockSaathi ↗</a>.
+              </p>
+            </Card>
+          )}
 
           <Card>
             <ChartFrame title="Where the money goes" note="last 3 months"

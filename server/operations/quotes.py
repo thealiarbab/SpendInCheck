@@ -210,3 +210,83 @@ def instruments_for(tickers):
         return {}
     finally:
         db.close_connection(connection)
+
+
+# The instrument the portfolio is measured against.
+#
+# Not the NIFTY 50 index, because the upstream cannot quote it: NIFTY and
+# ^NSEI both return null, and NIFTY50 returns some unrelated instrument at
+# around 8,095 that would draw a confident wrong line. This is the Nippon
+# India ETF that tracks the same index, it quotes, it has a full year of
+# daily closes, and every screen showing it says so rather than calling it
+# "the NIFTY".
+BENCHMARK = "NIFTYBEES"
+
+
+def basket_against_benchmark(user_id, months=12, benchmark=BENCHMARK):
+    """What this account's holdings did, beside what the market did.
+
+    Returns (month, basket_value, benchmark_close) oldest first, with
+    months that have no closes on either side left out.
+
+    The basket is valued at **today's quantities** throughout, which is the
+    whole point and the thing that is easy to get wrong. Charting the
+    portfolio's actual value against an index compares two different
+    things: buying more of something raises the value without the market
+    having moved at all, so a month of heavy saving looks like a month of
+    spectacular returns. Holding the quantities constant isolates what the
+    prices did, which is the only part a benchmark can fairly answer.
+
+    Only holdings with a ticker take part. A deposit has no market return
+    to compare, and including it at a flat price would quietly drag the
+    line toward zero movement.
+    """
+    connection = None
+    try:
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        cursor.execute("""
+            WITH calendar AS (
+                SELECT generate_series(
+                    date_trunc('month', CURRENT_DATE)
+                        - make_interval(months => %s),
+                    date_trunc('month', CURRENT_DATE),
+                    interval '1 month') AS month_start
+            ),
+            -- The closing price for one symbol at one month end, used for
+            -- both sides so they cannot be measured differently.
+            basket AS (
+                SELECT c.month_start,
+                       SUM(past.close * i.quantity) AS value
+                  FROM calendar c
+                  JOIN investments i
+                    ON i.user_id = %s AND i.ticker IS NOT NULL
+                  JOIN LATERAL (
+                      SELECT q.close FROM quote_history q
+                       WHERE q.ticker = i.ticker
+                         AND q.on_date < c.month_start + interval '1 month'
+                       ORDER BY q.on_date DESC LIMIT 1
+                  ) past ON TRUE
+                 GROUP BY c.month_start
+            ),
+            market AS (
+                SELECT c.month_start, past.close
+                  FROM calendar c
+                  JOIN LATERAL (
+                      SELECT q.close FROM quote_history q
+                       WHERE q.ticker = %s
+                         AND q.on_date < c.month_start + interval '1 month'
+                       ORDER BY q.on_date DESC LIMIT 1
+                  ) past ON TRUE
+            )
+            SELECT to_char(basket.month_start, 'YYYY-MM'),
+                   basket.value, market.close
+              FROM basket JOIN market ON market.month_start = basket.month_start
+             ORDER BY basket.month_start
+        """, (months - 1, user_id, benchmark))
+        return cursor.fetchall()
+    except Error as e:
+        print(f"Error comparing against the benchmark: {e}")
+        return []
+    finally:
+        db.close_connection(connection)
