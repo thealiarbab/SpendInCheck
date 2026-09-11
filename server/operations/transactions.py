@@ -270,7 +270,10 @@ def recent_and_holdings(user_id, limit):
     copy that can drift.
 
     Returns (recent_rows, holding_rows) in the shapes search_transactions
-    and portfolio_pnl return, so callers cannot tell the difference.
+    and portfolio_pnl return, so callers cannot tell the difference. That
+    is load-bearing rather than tidy: both holding shapes are serialised
+    with the same PNL_FIELDS list, and one being shorter than the other is
+    a column silently missing from whichever screen reads this one.
     """
     connection = None
     try:
@@ -286,7 +289,14 @@ def recent_and_holdings(user_id, limit):
             "   SELECT investment_id, asset_name, asset_type, buy_date::text, "
             "          buy_price::text, current_price::text, quantity::text, "
             "          ((current_price - buy_price) * quantity)::text AS pnl, "
-            "          (current_price * quantity)::text AS current_value "
+            "          (current_price * quantity)::text AS current_value, "
+            # The four the pricing work added. They are not drawn on the
+            # opening screen -- nothing market-flavoured is -- but this
+            # query and portfolio_pnl are serialised with one shared field
+            # list, so a column in one and not the other is a column zip()
+            # drops without saying anything.
+            "          ticker, exchange, auto_price, "
+            "          price_updated_at::text AS priced_at "
             "     FROM investments WHERE user_id = %s "
             "    ORDER BY (current_price - buy_price) * quantity DESC) "
             "SELECT "
@@ -295,7 +305,8 @@ def recent_and_holdings(user_id, limit):
             f"       account_name, transfer_group, {_TAGS_VALUE})) FROM page), "
             "  (SELECT json_agg(json_build_array(investment_id, asset_name, "
             "        asset_type, buy_date, buy_price, current_price, quantity, "
-            "        pnl, current_value)) FROM held)",
+            "        pnl, current_value, ticker, exchange, auto_price, "
+            "        priced_at)) FROM held)",
             (user_id, limit, user_id))
         recent, held = cursor.fetchone()
         return (_revive(recent, {3}), _revive(held, {4, 5, 6, 7, 8}))

@@ -24,7 +24,8 @@ list where it belongs, and this passes again.
 import pytest
 
 from server import operations
-from server.routes.api import accounts, budgets, categories, investments
+from server.routes.api import accounts, budgets, categories
+from server.routes.api import dashboard_payload, investments
 from server.routes.api import recurring, reports, transactions
 
 # operation -> the field names the route zips onto its rows.
@@ -55,6 +56,21 @@ def seeded_client(client):
                        headers={"X-CSRF-Token": token}).get_json()
     yield client
     operations.delete_demo_user(body["user"]["id"])
+
+
+def test_the_dashboards_holdings_match_the_same_field_names(seeded_client):
+    """recent_and_holdings is a different query serialised with the same
+    list as portfolio_pnl.
+
+    That coupling is easy to miss: the two are in different modules and
+    nothing connects them but the import. Widening one and not the other
+    does not fail -- zip drops the difference -- so the dashboard would
+    quietly stop carrying a column the holdings screen had gained.
+    """
+    user_id = seeded_client.get("/api/v1/auth/session").get_json()["user"]["id"]
+    _, holdings = operations.recent_and_holdings(user_id, 8)
+    assert holdings, "the demo seed should hold something"
+    assert len(holdings[0]) == len(dashboard_payload.PNL_FIELDS)
 
 
 @pytest.mark.parametrize("name", sorted(SERIALISED))

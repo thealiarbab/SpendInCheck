@@ -72,6 +72,14 @@ export function Holdings() {
   // The last month per symbol, out of this app's own records rather than
   // from StockSaathi. Only asked for once there is a symbol to ask about,
   // so an account of deposits costs nothing.
+  //
+  // A second round trip, which this project otherwise refuses. It is kept
+  // separate rather than folded into /reports/portfolio because that query
+  // shares its column list with the dashboard's, and widening it would put
+  // thirty closes per holding into the opening screen's payload to draw
+  // nothing. The cost is paid where it buys something, and it is not paid
+  // up front: the table renders from the portfolio query and the sparkline
+  // column fills in when this arrives, so nothing waits on it.
   const history = useQuery({
     queryKey: ["holdings-history"],
     queryFn: api.holdingsHistory,
