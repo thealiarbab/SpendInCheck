@@ -68,9 +68,10 @@ COMMIT_PHASE = {
     # and the commits disappear from the page. Left unlisted they would fall
     # into CURRENT_PHASE and claim phase 8 had started, when no Jinja has
     # been killed at all.
-    7: ["24f8a64", "146ea3d", "5a4534c", "53b3104", "51a8db6", "79eea4b",
-        "96d4087", "754576a", "a543936", "8a477cd", "72ca61f", "145318d",
-        "afd4d04", "7c157f7"],
+    7: ["4de90e9", "c90aa4e", "b4426b1",
+        "24f8a64", "146ea3d", "5a4534c", "53b3104", "1db16af",
+        "92222ef", "70d1f19", "6bff104", "11c3e89", "b1b0a63", "8ff1f04",
+        "ac0b0a0", "1d6588c"],
     # cf190d7 is a fix rather than a feature, and is counted here because it
     # is what made the phase possible: `npm run build` had not typechecked
     # for some time, which nobody had noticed while the site was served by
@@ -78,8 +79,8 @@ COMMIT_PHASE = {
     # The commit that closes this phase lands after this list is written and
     # so falls into CURRENT_PHASE -- same as 6501316 in phase 6. Pin it here
     # next time anything is added.
-    8: ["cf190d7", "00d171b", "4665ff9", "17c2947", "bebb16c", "a19006a",
-        "8a51adc", "c50015b"],
+    8: ["53e5db0", "84cb033", "7c09108", "f99979e", "727992b", "bda000e",
+        "f97eb7c", "ac1f776"],
 }
 
 PHASES = [
