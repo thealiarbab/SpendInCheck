@@ -230,16 +230,59 @@ def top_merchants(user_id, months=MERCHANT_MONTHS, limit=MERCHANT_LIMIT):
         db.close_connection(connection)
 
 
+# What the holdings were worth at the end of one month.
+#
+# Written once and used twice -- by net_worth_series below and by the
+# combined _SUMMARY statement -- because the two had the same subquery
+# copied out, and a valuation rule that exists in two places is one that
+# will be corrected in one of them.
+#
+# The lateral join is the whole point. For each holding it takes the last
+# close recorded on or before that month end, so March is valued at March's
+# price rather than at today's. A holding with no ticker -- a deposit, an
+# unlisted holding -- has no history to find, and one whose symbol was only
+# tracked recently has none that far back; both fall through to
+# current_price, which is the best figure available and is what this used to
+# do for everything.
+#
+# Interpolated rather than parameterised because both arguments are SQL
+# fragments named in this file, never anything from a request. Same rule as
+# the sort whitelist in search_transactions: identifiers and expressions are
+# chosen in code, values go through %s.
+def _holdings_at_month_end(month_end, user_param):
+    """The SQL for one month's holdings valuation."""
+    return f"""
+        COALESCE((
+            SELECT SUM(COALESCE(past.close, i.current_price) * i.quantity)
+              FROM investments i
+              LEFT JOIN LATERAL (
+                  SELECT q.close
+                    FROM quote_history q
+                   WHERE q.ticker = i.ticker
+                     AND q.on_date < {month_end}
+                   ORDER BY q.on_date DESC
+                   LIMIT 1
+              ) past ON TRUE
+             WHERE i.user_id = {user_param}
+               AND i.buy_date < {month_end}
+        ), 0)"""
+
 def net_worth_series(user_id, months=SERIES_MONTHS):
     """Net worth at the end of each month: holdings plus cash accumulated.
 
     Returns (month, holdings_value, cash, net_worth).
 
-    Holdings are valued at their current price for every month, not at what
-    they were worth at the time. This project stores one price per holding
-    and no history, so anything else would be invented. Phase 9 replaces
-    this with real historical closes from quote_history, and the shape of
-    the answer is the same so the chart will not have to change.
+    Each month values the holdings at what they actually closed at then,
+    from quote_history, rather than at today's price. The difference is not
+    cosmetic: valuing everything at today's price made a holding that has
+    doubled look as though it had always been worth double, so the line
+    described the portfolio's composition changing and nothing about the
+    market.
+
+    Anything with no recorded close for that month -- a deposit, an
+    unlisted holding, a symbol only tracked since last week -- still falls
+    back to current_price. That is the old behaviour, kept as the fallback
+    rather than as the rule.
     """
     connection = None
     try:
@@ -265,13 +308,8 @@ def net_worth_series(user_id, months=SERIES_MONTHS):
                 FROM months m
             ),
             held AS (
-                SELECT m.month_start,
-                       COALESCE((
-                           SELECT SUM(i.current_price * i.quantity)
-                           FROM investments i
-                           WHERE i.user_id = %s
-                             AND i.buy_date < m.month_start + interval '1 month'
-                       ), 0) AS value
+                SELECT m.month_start, """ + _holdings_at_month_end(
+                    "m.month_start + interval '1 month'", "%s") + """ AS value
                 FROM months m
             )
             SELECT to_char(cash.month_start, 'YYYY-MM'),
@@ -342,10 +380,8 @@ calendar AS (
 ),
 net_worth AS (
     SELECT to_char(c.month_start, 'YYYY-MM') AS month,
-           COALESCE((SELECT SUM(i.current_price * i.quantity)
-                       FROM investments i
-                      WHERE i.user_id = %(user_id)s
-                        AND i.buy_date < c.month_start + interval '1 month'), 0)
+           """ + _holdings_at_month_end(
+               "c.month_start + interval '1 month'", "%(user_id)s") + """
                AS holdings,
            COALESCE((SELECT SUM(CASE WHEN l.txn_type = 'Income'
                                      THEN l.amount ELSE -l.amount END)
