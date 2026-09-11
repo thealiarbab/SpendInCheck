@@ -36,8 +36,11 @@ BACKFILL_DAYS = 365
 # Enough to cover a long weekend plus a missed run.
 TOPUP_DAYS = 5
 
-# Nobody is waiting on this, so it can afford to be patient where a request
-# on a screen cannot.
+# Nobody is waiting on the nightly run, so it can afford to be patient where
+# a request on a screen cannot. It applies to take_snapshot's own calls and
+# to nothing else: ensure_history and describe below are reached only from
+# the pricing route, with somebody watching a spinner, so they keep
+# stocksaathi's own six.
 TIMEOUT_SECONDS = 20
 
 
@@ -114,8 +117,10 @@ def ensure_history(symbol):
     if not symbol or symbol in operations.symbols_with_history():
         return 0
 
-    closes = stocksaathi.closing_prices(symbol, days=BACKFILL_DAYS,
-                                        timeout=TIMEOUT_SECONDS)
+    # stocksaathi's own timeout, not the nightly one: this runs inside the
+    # save somebody is waiting on, and Vercel will end the request long
+    # before a twenty-second wait here does.
+    closes = stocksaathi.closing_prices(symbol, days=BACKFILL_DAYS)
     if not closes:
         return 0
     return operations.record_closes(
@@ -127,11 +132,18 @@ def describe(symbol, found=None):
 
     Called when somebody first points a holding at one, so the 52-week
     range and the company name are on the screen immediately instead of
-    after the next nightly run. `found` is passed in when the caller has
-    already done the lookup, which the pricing route has -- it is how a
-    symbol gets accepted at all -- so this normally costs nothing.
+    after the next nightly run. `found` is what the caller's own lookup
+    returned; the pricing route always has one, since it is how a symbol
+    gets accepted at all, so this costs nothing.
+
+    A `found` of None means that lookup came back empty. That is not a
+    reason to run it again. This used to do exactly that -- the same request
+    to the same endpoint that had just missed, and at the nightly timeout
+    rather than the request one -- so a symbol the fundamentals feed does
+    not carry bought a second wait for the same empty answer, inside a save
+    that had already been committed. There is nothing to write down, so it
+    writes nothing.
     """
-    if not symbol:
+    if not symbol or not found:
         return False
-    return operations.record_instrument(
-        found or stocksaathi.instrument(symbol, timeout=TIMEOUT_SECONDS))
+    return operations.record_instrument(found)
