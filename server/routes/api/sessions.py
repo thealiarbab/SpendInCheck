@@ -150,12 +150,23 @@ def start_demo():
 
 @api.post("/auth/sign-out")
 def sign_out_route():
-    """Abandon the session.
+    """Abandon the session, and the demonstration account with it.
 
     A POST, not a GET. As a GET this destroys data on any prefetch, link
     scan or <img src> pointed at it -- which is how the page version could
     be triggered by something that never meant to.
+
+    A demonstration account belongs to one visitor and one visit, and the
+    front page promises it is "discarded when you leave". So it is deleted
+    here rather than left for the nightly sweep, which would keep it for up
+    to a day after the person who made it was told it was gone. Everything
+    it owns cascades from the user row.
+
+    The sweep still runs, for the accounts abandoned by closing the tab --
+    that is the case it exists for, not this one.
     """
-    require_user()
+    user_id = require_user()
+    if is_demo():
+        operations.delete_demo_user(user_id)
     sign_out()
     return jsonify({"user": None, "csrf_token": csrf_token()})

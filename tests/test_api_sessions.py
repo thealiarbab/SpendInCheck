@@ -155,3 +155,31 @@ def test_a_fresh_demo_session_is_not_re_checked(client, monkeypatch):
         assert reads == [], "the account was re-checked inside the trusted window"
     finally:
         operations.delete_demo_user(body["user"]["id"])
+
+
+def test_signing_out_of_the_demo_deletes_the_account(client):
+    """The front page says it is discarded when you leave, so it is.
+
+    This was true of the Jinja sign-out and never of the API's, so every
+    demonstration account the client ever created lived until the next
+    nightly sweep -- up to a day after its owner was told it was gone.
+    """
+    token = client.get("/api/v1/auth/session").get_json()["csrf_token"]
+    body = client.post("/api/v1/auth/demo",
+                       headers={"X-CSRF-Token": token}).get_json()
+    user_id = body["user"]["id"]
+
+    client.post("/api/v1/auth/sign-out",
+                headers={"X-CSRF-Token": body["csrf_token"]})
+
+    assert not operations.user_exists(user_id), \
+        "the demo account outlived the session that owned it"
+
+
+def test_signing_out_of_a_real_account_deletes_nothing(api_account):
+    """The guard that matters. delete_demo_user checks is_demo as well, so
+    this is belt and braces -- and it is the failure nobody could undo."""
+    client = api_account["client"]
+    user_id = api_account["user"]["id"]
+    client.post("/api/v1/auth/sign-out", headers=api_account["headers"])
+    assert operations.user_exists(user_id)
