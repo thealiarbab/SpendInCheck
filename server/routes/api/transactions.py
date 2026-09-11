@@ -273,8 +273,7 @@ def export_transactions():
     convenience, and nobody wants a spreadsheet in instalments.
     """
     user_id = require_user()
-    rows, _ = operations.search_transactions(
-        user_id, _read_filters(), page=1, per_page=operations.MAX_PER_PAGE)
+    filters = _read_filters()
 
     places = money_places()
     code = current_currency()
@@ -293,22 +292,39 @@ def export_transactions():
     # wrong figures in the portfolio report in Phase 6.
     at = {name: index for index, name in enumerate(LIST_FIELDS)}
 
-    for row in rows:
-        writer.writerow([
-            row[at["date"]].isoformat(),
-            _inert(row[at["account"]] or ""),
-            _inert(row[at["category"]]),
-            row[at["type"]],
-            # The bare number, not the formatted one: a spreadsheet has to be
-            # able to sum this column, and "₹1,400.00" is a string to it.
-            money.serialise(row[at["amount"]], places),
-            code,
-            _inert(row[at["description"]]),
-            # Which two rows are one movement between accounts. Without it a
-            # transfer reads in a spreadsheet as unexplained money leaving
-            # one account and arriving in another.
-            row[at["transfer_group"]] or "",
-        ])
+    # Read in pages rather than in one call. "Every matching row" and "one
+    # page" used to be the same request here -- the export asked for a single
+    # page of MAX_PER_PAGE and stopped -- so an account with more than 200
+    # transactions silently downloaded a truncated file, with nothing in it
+    # to say that anything was missing. Paging keeps one page in memory at a
+    # time, which is what that cap was really protecting.
+    page = 1
+    while True:
+        rows, total = operations.search_transactions(
+            user_id, filters, page, operations.MAX_PER_PAGE)
+        if not rows:
+            break
+
+        for row in rows:
+            writer.writerow([
+                row[at["date"]].isoformat(),
+                _inert(row[at["account"]] or ""),
+                _inert(row[at["category"]]),
+                row[at["type"]],
+                # The bare number, not the formatted one: a spreadsheet has to
+                # be able to sum this column, and "₹1,400.00" is a string to it.
+                money.serialise(row[at["amount"]], places),
+                code,
+                _inert(row[at["description"]]),
+                # Which two rows are one movement between accounts. Without it
+                # a transfer reads in a spreadsheet as unexplained money
+                # leaving one account and arriving in another.
+                row[at["transfer_group"]] or "",
+            ])
+
+        if page * operations.MAX_PER_PAGE >= total:
+            break
+        page += 1
 
     stamp = datetime.now().strftime("%Y-%m-%d")
     return Response(
