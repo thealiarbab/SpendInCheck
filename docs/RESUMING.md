@@ -199,6 +199,48 @@ answers its own 404 page, that page carries no
 status -- `fetch` simply rejects. The hook counts consecutive failures and
 gives up after three rather than trusting a status it can never read.
 
+### Phase 10 needs rewriting before it is built
+
+Phase 10 is "opt-in account linking", and its headline deliverable is
+importing StockSaathi holdings into this ledger. **That should not be
+built as written**, and the reason is not a technical blocker.
+
+StockSaathi is a **paper trading simulator**. Its own description: "a free
+paper trading simulator for Indian teens 13-18 ... virtual money, real
+NSE prices, no broker, no risk. SEBI-disclaimed." Every account starts
+with `STARTING_CASH_PAISE`, which is a lakh of play money, and its FAQ
+says plainly that teens "cannot lose, deposit, or withdraw real money.
+There is no broker connection, no payment processor, and no real trades."
+
+So the holdings in a StockSaathi account are not holdings. Importing them
+here would put simulated positions into a real personal-finance ledger,
+where they would be counted in net worth, in the portfolio total, and in
+the benchmark chart -- and SpendInCheck's entire claim is that its figures
+answer "am I over or under, and by how much". A net worth inflated by
+imaginary shares is not a smaller version of that promise; it is the
+opposite of it.
+
+Two smaller points in the same direction. The audience is 13-18, which
+makes "link your identity across two products" a heavier ask than the plan
+treats it. And there is no authorisation flow to link *to*: their API has
+no OAuth, no token issuance, and no endpoint that reads one user's
+portfolio -- that data lives behind their own auth in their Supabase. The
+phase would need an authorisation server built in the other product
+first.
+
+What could be built instead, if the cross-product tie is still wanted:
+
+- **A watchlist import** -- symbols only, no quantities and no values.
+  Bringing over "the things I have been practising with" as candidate
+  tickers is useful and cannot inflate anything.
+- **Nothing else**, until StockSaathi has an authorisation flow. The
+  `Invest` link, the instrument search and the price feed already give the
+  integration everything it has actually delivered so far, and none of
+  them needed an account link.
+
+This is a decision, not a task, which is why it is written here rather
+than done.
+
 ### Deployment notes worth having before the push
 
 `vercel.json` declares two builds: `@vercel/python` for `app.py`, and

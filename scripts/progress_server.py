@@ -177,9 +177,21 @@ PHASES = [
          "says not to do.",
      ]},
     {"n": 10, "name": "Opt-in account linking", "state": "next",
-     "blurb": "Last, because it is the only feature that can damage a different "
-              "product's data.",
-     "open": []},
+     "blurb": "Planned last because it is the only feature that can damage a "
+              "different product's data. On investigation the risk runs the "
+              "other way: StockSaathi is a paper trading simulator for teens "
+              "13-18, virtual money, SEBI-disclaimed, every account starting "
+              "with a lakh of play cash. Importing its holdings would put "
+              "simulated positions into a real ledger and count them in net "
+              "worth -- the opposite of what this app claims to answer.",
+     "open": [
+         "Needs rewriting before it is built. A watchlist import -- symbols "
+         "only, no quantities, no values -- is the version that cannot "
+         "inflate anything.",
+         "There is also nothing to link to yet: StockSaathi has no OAuth, no "
+         "token issuance and no endpoint that reads a user's portfolio. That "
+         "authorisation flow would have to exist in the other product first.",
+     ]},
 ]
 
 
