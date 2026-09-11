@@ -73,7 +73,13 @@ def budget_vs_actual(user_id, month_year):
                 c.category_name,
                 b.budget_limit,
                 COALESCE(SUM(t.amount), 0) AS actual_spent,
-                b.budget_limit - COALESCE(SUM(t.amount), 0) AS difference
+                -- The allowance is the limit plus whatever the previous
+                -- month carried in, so an underspent June genuinely widens
+                -- July rather than merely being reported next to it.
+                b.budget_limit + b.rollover_in - COALESCE(SUM(t.amount), 0)
+                    AS difference,
+                b.rollover_in,
+                b.rollover
             FROM budgets b
             JOIN categories c ON b.category_id = c.category_id
             LEFT JOIN transactions t
@@ -83,7 +89,7 @@ def budget_vs_actual(user_id, month_year):
                 AND EXTRACT(YEAR FROM t.txn_date) = %s
                 AND EXTRACT(MONTH FROM t.txn_date) = %s
             WHERE b.user_id = %s AND b.month_year = %s
-            GROUP BY c.category_name, b.budget_limit
+            GROUP BY c.category_name, b.budget_limit, b.rollover_in, b.rollover
             ORDER BY difference ASC
         """
         cursor.execute(query, (year_part, month_part, user_id, month_year))

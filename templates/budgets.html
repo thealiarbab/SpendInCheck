@@ -32,13 +32,17 @@
   <h2>All budgets</h2>
   {% if budgets %}
   <table>
-    <tr><th>ID</th><th>Category</th><th>Month</th><th class="num">Limit</th></tr>
-    {% for id, category, month, limit in budgets %}
+    <tr><th>ID</th><th>Category</th><th>Month</th><th class="num">Limit</th>
+        <th class="num">Carried in</th></tr>
+    {# Seven columns since rollover landed. category_id is unpacked and unused
+       here; the React page needs it to preselect a picker. #}
+    {% for id, category, month, limit, rollover, carried, category_id in budgets %}
     <tr>
       <td>{{ id }}</td>
-      <td>{{ category }}</td>
+      <td>{{ category }}{% if rollover %} <span class="pill">carries</span>{% endif %}</td>
       <td>{{ month }}</td>
       <td class="num">{{ "%.2f"|format(limit) }}</td>
+      <td class="num">{{ "%+.2f"|format(carried) if carried else "—" }}</td>
     </tr>
     {% endfor %}
   </table>

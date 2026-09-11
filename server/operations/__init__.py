@@ -34,7 +34,8 @@ from .goals import (add_contribution, add_goal, delete_contribution,
 from .recurring import (CADENCES, MAX_CATCHUP, add_rule, delete_rule,
                         list_rules, materialise_due, next_date_after,
                         rule_exists, set_rule_paused, update_rule)
-from .budgets import get_all_budgets, set_budget
+from .budgets import (categories_with_rollover, get_all_budgets,
+                      refresh_rollover, set_budget)
 from .reports import (SERIES_MONTHS, budget_vs_actual, cashflow_series,
                       category_wise_spend, dashboard_summary, monthly_trend,
                       net_worth_series, top_merchants)
@@ -68,7 +69,8 @@ __all__ = [
     "CADENCES", "MAX_CATCHUP", "add_rule", "delete_rule", "list_rules",
     "materialise_due", "next_date_after", "rule_exists", "set_rule_paused",
     "update_rule",
-    "get_all_budgets", "set_budget",
+    "categories_with_rollover", "get_all_budgets", "refresh_rollover",
+    "set_budget",
     "SERIES_MONTHS", "budget_vs_actual", "cashflow_series",
     "category_wise_spend", "dashboard_summary", "monthly_trend",
     "net_worth_series", "top_merchants",

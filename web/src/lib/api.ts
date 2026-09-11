@@ -266,13 +266,21 @@ export interface BudgetRow {
   category: string;
   month: string;
   limit: string;
+  /** Whether what is left over carries into the next month. */
+  rollover: boolean;
+  /** What the previous month carried in. Negative when it overspent. */
+  rollover_in: string;
+  category_id: number;
 }
 
 export interface BudgetVsActualRow {
   category: string;
   limit: string;
   actual: string;
+  /** limit + rollover_in - actual, so it already accounts for the carry. */
   difference: string;
+  rollover_in: string;
+  rollover: boolean;
 }
 
 /* The reporting series. Each is a month plus figures, oldest first, because
@@ -476,8 +484,12 @@ export const api = {
     request<void>("/transactions/" + id, { method: "DELETE" }),
 
   budgets: () => request<{ items: BudgetRow[] }>("/budgets"),
-  setBudget: (category_id: number, month: string, limit: string) =>
-    request<void>("/budgets", { method: "PUT", body: { category_id, month, limit } }),
+  setBudget: (category_id: number, month: string, limit: string,
+              rollover = false) =>
+    request<void>("/budgets", {
+      method: "PUT",
+      body: { category_id, month, limit, rollover: rollover ? "1" : "0" },
+    }),
 
   investments: () => request<{ items: InvestmentRow[] }>("/investments"),
   addInvestment: (body: Record<string, string>) =>

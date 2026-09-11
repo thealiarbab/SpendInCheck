@@ -14,7 +14,8 @@ from server.routes.api.dashboard_payload import dashboard_payload
 from server.validators import Validator
 
 SPEND_FIELDS = ["category", "total"]
-BUDGET_FIELDS = ["category", "limit", "actual", "difference"]
+BUDGET_FIELDS = ["category", "limit", "actual", "difference",
+                 "rollover_in", "rollover"]
 PNL_FIELDS = ["id", "asset_name", "asset_type", "buy_date", "buy_price",
               "current_price", "quantity", "pnl", "current_value"]
 

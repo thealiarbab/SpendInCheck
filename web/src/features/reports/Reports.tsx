@@ -204,11 +204,27 @@ export function Reports() {
             {budgetRows.map((row) => {
               const gap = toMinor(row.difference);
               const limit = toMinor(row.limit);
-              const used = limit === 0 ? 0 : Math.min(toMinor(row.actual) / limit, 1);
+              // The bar measures spending against the allowance actually
+              // available -- the limit plus whatever was carried in.
+              // Measuring against the bare limit would show a category as
+              // over when its carry had covered it.
+              const allowance = limit + toMinor(row.rollover_in);
+              const used = allowance <= 0 ? 1
+                : Math.min(toMinor(row.actual) / allowance, 1);
               return (
                 <tr key={row.category}>
                   <td className={cell.primary}>{row.category}</td>
-                  <td className={cell.numeric}>{formatMoney(limit)}</td>
+                  <td className={cell.numeric}>
+                  {formatMoney(limit)}
+                  {/* The difference already accounts for this, so it has to
+                      be visible -- otherwise the arithmetic in the row does
+                      not add up on the page. */}
+                  {toMinor(row.rollover_in) !== 0 && (
+                    <span className={styles.carried}>
+                      {formatSigned(toMinor(row.rollover_in))} carried in
+                    </span>
+                  )}
+                </td>
                   <td className={cell.numeric}>{formatMoney(toMinor(row.actual))}</td>
                   <td className={
                     cell.numeric + " " + (gap < 0 ? cell.debit : gap > 0 ? cell.credit : "")
@@ -220,7 +236,7 @@ export function Reports() {
                         matter of degree, and "under budget" reads the same
                         at 99% spent as at 5%. */}
                     <div className={styles.gauge} role="img"
-                         aria-label={`${formatPercent(toMinor(row.actual), limit)} of the limit spent`}>
+                         aria-label={`${formatPercent(toMinor(row.actual), allowance)} of the allowance spent`}>
                       <div
                         className={gap < 0 ? styles.barOver : styles.bar}
                         style={{ width: `${Math.round(used * 100)}%` }}

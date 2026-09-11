@@ -70,3 +70,42 @@ def test_a_signed_out_visitor_is_sent_to_the_front(client):
     for path in ("/dashboard", "/transactions", "/reports"):
         response = client.get(path)
         assert response.status_code in (302, 303), path
+
+
+# --- the shape the templates unpack ------------------------------------------
+#
+# Three templates have now broken the same way: an operation grew a column,
+# the template kept unpacking the old count, and the page raised on every
+# render. The parametrised tests above catch it, but only after somebody
+# runs them and only by rendering a whole page. These say the same thing
+# directly, so a change to a query fails against the number it changed.
+
+EXPECTED_COLUMNS = {
+    # operation                     columns  what the last change added
+    "get_all_transactions": (8, "account_name and transfer_group"),
+    "get_all_budgets": (7, "rollover, rollover_in and category_id"),
+    "portfolio_pnl": (9, "investment_id and buy_date"),
+    "get_all_categories": (3, ""),
+    "list_accounts": (7, ""),
+    "list_rules": (14, ""),
+}
+
+
+@pytest.mark.parametrize("name", sorted(EXPECTED_COLUMNS))
+def test_the_row_shape_is_what_the_templates_unpack(demo_page_client, name):
+    """Fails when a query gains or loses a column.
+
+    Deliberately brittle: that is the point. A template unpacking a tuple
+    has no way to notice a column arriving, so this is where the noticing
+    happens. When it fails, update the count here and the templates that
+    unpack it -- the failure is the reminder that they exist.
+    """
+    user_id = demo_page_client.get("/api/v1/auth/session").get_json()["user"]["id"]
+    rows = getattr(operations, name)(user_id)
+    assert rows, f"{name} returned nothing; the demo seed should have rows"
+
+    expected, added = EXPECTED_COLUMNS[name]
+    assert len(rows[0]) == expected, (
+        f"{name} now returns {len(rows[0])} columns, not {expected}"
+        + (f" (last change added {added})" if added else "")
+        + ". Update the Jinja templates that unpack it, then this count.")

@@ -19,3 +19,46 @@
   font-size: 0.875rem;
   color: var(--content-secondary);
 }
+
+/* The rollover control carries its own explanation: "carry the difference
+   forward" is not self-evident, and a limit that behaves differently from
+   the one beside it needs to say so before it is set, not after. */
+.rollover {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  font-size: 0.875rem;
+  color: var(--content-secondary);
+  cursor: pointer;
+}
+
+.rollover input { margin-top: 3px; accent-color: var(--accent-default); cursor: pointer; }
+
+.rollover em {
+  display: block;
+  margin-top: 2px;
+  font-style: normal;
+  font-size: 0.75rem;
+  color: var(--content-muted);
+}
+
+/* Marks a budget that carries, in a list where most do not. */
+.carries {
+  margin-left: var(--space-2);
+  padding: 1px 6px;
+  border: 1px solid var(--line-default);
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--content-muted);
+}
+
+/* What last month did to this month's allowance, under the limit itself. */
+.carried {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.6875rem;
+  color: var(--content-muted);
+}

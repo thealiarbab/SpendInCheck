@@ -55,3 +55,13 @@
 }
 
 .gap { height: var(--space-5); }
+
+/* What the previous month carried into this one, under the limit it
+   modifies. The difference column already accounts for it, so leaving it
+   invisible would make the row's arithmetic look wrong. */
+.carried {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.6875rem;
+  color: var(--content-muted);
+}

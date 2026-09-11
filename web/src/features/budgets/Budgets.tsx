@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, api } from "../../lib/api";
 import type { BudgetRow } from "../../lib/api";
-import { formatMoney, toMinor } from "../../lib/money";
+import { formatMoney, formatSigned, toMinor } from "../../lib/money";
 import {
   Button, Card, Empty, Field, Form, FormActions, Loading, Notice, PageHead, Picker,
   RowActions, Table, cell, row as rowStyle,
@@ -38,6 +38,7 @@ export function Budgets() {
   const [month, setMonth] = useState(thisMonth);
   const [category, setCategory] = useState("");
   const [limit, setLimit] = useState("");
+  const [rollover, setRollover] = useState(false);
 
   const categories = useQuery({ queryKey: ["categories"], queryFn: api.categories });
   const budgets = useQuery({ queryKey: ["budgets"], queryFn: api.budgets });
@@ -52,12 +53,13 @@ export function Budgets() {
     (row) => chosen !== undefined && row.category === chosen.name && row.month === month);
 
   const save = useMutation({
-    mutationFn: () => api.setBudget(chosen!.id, month, limit),
+    mutationFn: () => api.setBudget(chosen!.id, month, limit, rollover),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: ["budgets"] });
       client.invalidateQueries({ queryKey: ["report"] });
       setLimit("");
       setCategory("");
+      setRollover(false);
     },
   });
 
@@ -68,6 +70,7 @@ export function Budgets() {
     setMonth(row.month);
     setCategory(String(match.id));
     setLimit(row.limit);
+    setRollover(row.rollover);
     save.reset();
   }
 
@@ -107,6 +110,19 @@ export function Budgets() {
             value={limit} error={fields.limit} placeholder="0.00"
             onChange={(event) => setLimit(event.target.value)}
           />
+          <label className={styles.rollover}>
+            <input
+              type="checkbox" checked={rollover}
+              onChange={(event) => setRollover(event.target.checked)}
+            />
+            <span>
+              Carry the difference forward
+              <em>
+                What is left over widens next month, and what is overspent
+                narrows it.
+              </em>
+            </span>
+          </label>
           <FormActions>
             <Button
               onClick={() => save.mutate()}
@@ -155,8 +171,25 @@ export function Budgets() {
                       key={row.id}
                       className={row.id === existing?.id ? rowStyle.editing : undefined}
                     >
-                      <td className={cell.primary}>{row.category}</td>
-                      <td className={cell.numeric}>{formatMoney(toMinor(row.limit))}</td>
+                      <td className={cell.primary}>
+                        {row.category}
+                        {row.rollover && (
+                          <span className={styles.carries} title="Carries forward">
+                            carries
+                          </span>
+                        )}
+                      </td>
+                      <td className={cell.numeric}>
+                        {formatMoney(toMinor(row.limit))}
+                        {/* Shown beside the limit rather than folded into
+                            it: the limit is what was set, and the carry is
+                            what last month did to it. */}
+                        {toMinor(row.rollover_in) !== 0 && (
+                          <span className={styles.carried}>
+                            {formatSigned(toMinor(row.rollover_in))} carried
+                          </span>
+                        )}
+                      </td>
                       <td>
                         <RowActions>
                           <Button kind="quiet" small onClick={() => edit(row)}>Change</Button>

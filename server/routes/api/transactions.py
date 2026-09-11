@@ -18,6 +18,26 @@ from server.errors import NotFound, ValidationError
 from server.routes.api import api
 from server.validators import Validator
 
+
+def _keep_rollover_honest(user_id, *category_ids):
+    """Recompute carried-in budget figures after a transaction moved.
+
+    rollover_in is a stored derived value, so every write that changes what
+    it was derived from has to follow it. Most accounts use rollover on
+    nothing, so the set of categories that need it is asked for first and is
+    usually empty.
+
+    Both the old and the new category are passed when a row is edited: a
+    transaction moved out of Groceries changes what Groceries carried
+    forward just as much as it changes the category it moved into.
+    """
+    wanted = {one for one in category_ids if one}
+    if not wanted:
+        return
+    affected = operations.categories_with_rollover(user_id)
+    for category_id in wanted & affected:
+        operations.refresh_rollover(user_id, category_id)
+
 LIST_FIELDS = ["id", "date", "category", "amount", "type", "description",
                "account", "transfer_group"]
 RECORD_FIELDS = ["id", "date", "category_id", "amount", "type", "description",
@@ -170,6 +190,7 @@ def create_transaction():
 
     if values["tag_ids"]:
         operations.set_transaction_tags(user_id, transaction_id, values["tag_ids"])
+    _keep_rollover_honest(user_id, values["category_id"])
     return jsonify({"ok": True, "id": transaction_id}), 201
 
 
@@ -178,6 +199,10 @@ def edit_transaction(transaction_id):
     """Replace a transaction's fields."""
     user_id = require_user()
     values = _read_submission(request.get_json(silent=True) or {})
+    # Read before the write: once it has moved, there is no way to find out
+    # which category it came from.
+    was = operations.get_transaction_by_id(user_id, transaction_id)
+    previous_category = was[2] if was else None
     if not operations.update_transaction(user_id, transaction_id, values["txn_date"],
                                          values["category_id"], values["amount"],
                                          values["txn_type"], values["description"],
@@ -191,6 +216,7 @@ def edit_transaction(transaction_id):
     # clear them.
     if values["tag_ids"] is not None:
         operations.set_transaction_tags(user_id, transaction_id, values["tag_ids"])
+    _keep_rollover_honest(user_id, values["category_id"], previous_category)
     return jsonify({"ok": True})
 
 
@@ -198,8 +224,10 @@ def edit_transaction(transaction_id):
 def remove_transaction(transaction_id):
     """Delete a transaction."""
     user_id = require_user()
+    was = operations.get_transaction_by_id(user_id, transaction_id)
     if not operations.delete_transaction(user_id, transaction_id):
         raise NotFound()
+    _keep_rollover_honest(user_id, was[2] if was else None)
     return jsonify({"ok": True})
 
 
