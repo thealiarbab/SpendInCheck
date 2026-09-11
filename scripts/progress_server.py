@@ -163,15 +163,13 @@ PHASES = [
               "requests to somebody else's. Migration 013 keeps what a "
               "symbol is -- name, sector, exchange, the year's range -- "
               "so a screen can show it without making a lookup that takes "
-              "three seconds cold.",
+              "three seconds cold. Holdings are charted against NIFTYBEES, the ETF that tracks the NIFTY 50 -- the index itself does not quote -- with the basket held at today's quantities so that buying more does not read as a gain.",
      "open": [
-         "Symbol autocomplete is blocked. It needs a public search endpoint on "
-         "StockSaathi -- the instrument master is in their Supabase and their "
-         "anon key returns [] for it, which is correct of them. Until then a "
-         "symbol is typed rather than chosen, and checked before it is used.",
-         "Portfolio vs NIFTY is blocked: the index does not quote. NIFTY and "
-         "^NSEI come back null and NIFTY50 returns some other instrument "
-         "entirely. NIFTYBEES is the honest substitute if labelled as one.",
+         "Symbol autocomplete needs one deploy that is not in this repo: "
+         "the search endpoint is written at StockSaathi/app/api/search.py "
+         "and uncommitted there, because that repository is on a kotlin "
+         "branch with app/ untracked. The client half is live and degrades "
+         "to a plain text box until it answers.",
          "The third nudge -- the goal-reached card -- is left for a "
          "decision. Goals renders inside Budgets, so it would put a link "
          "to a broker on a budgeting screen, which the plan's own rule "

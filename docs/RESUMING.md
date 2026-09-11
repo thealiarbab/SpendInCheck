@@ -148,60 +148,56 @@ live database and the real API:
 - The nightly snapshot backfills a year for a symbol it has never seen and
   tops up five days for one it has.
 
-### Two things Phase 9 cannot finish from this repository
+### The two things I called blocked, and what became of them
 
-**Symbol autocomplete is blocked, and the plan wanted it first.** It was
-meant to complete against StockSaathi's instrument master. There is no
-public endpoint for it: their API serves `live-quote`, `quote`, `history`,
-`mf-history`, `screener` and `universe-quotes`, and none of them search.
-The master lives in their Supabase as `dhan_instruments`, and their anon
-key returns `[]` for it -- RLS is on with no policy, which is correct of
-them and closes the door to us.
+Both are cleared. Neither was as blocked as it looked.
 
-So it needs **a new endpoint on StockSaathi**, something like
-`GET /api/search?q=reli` returning symbol, name, exchange and ISIN. That
-is a change to the other repository and a deploy of a second production
-site, which is not mine to make. Until then a symbol is typed rather than
-chosen -- and it is still checked: a symbol that does not quote cannot be
-switched on.
+**Portfolio against the market: done.** Only the NIFTY 50 *index* is
+unreachable -- `NIFTY` and `^NSEI` return null, and `NIFTY50` returns some
+unrelated instrument near 8,095 that would have drawn a confident wrong
+line. `NIFTYBEES`, the Nippon India ETF tracking the same index, quotes
+and has a full year of closes. The chart names it rather than calling it
+"the NIFTY", the snapshot always fetches it whether or not anybody holds
+it, and both sides are rebased to 100.
 
-**Portfolio vs NIFTY is blocked for the same kind of reason.** The index
-does not quote: `NIFTY` and `^NSEI` both come back null, and `NIFTY50`
-returns about 8,095, which is some other instrument and not the index --
-using it would draw a confident wrong line. `NIFTYBEES`, the ETF that
-tracks the index, does quote and is the honest substitute if labelled as
-one.
+The part worth not breaking: the basket is valued at **today's quantities
+in every month**. Charting the portfolio's real value against an index
+compares two different things -- buying more raises the value without the
+market moving, so a month of heavy saving reads as spectacular returns.
 
-### What is left that is not blocked
+**Symbol autocomplete: built, and waiting on one deploy that is not
+mine.** The search genuinely has to live on StockSaathi's side: the
+instrument master is `dhan_instruments` in their Supabase, behind RLS with
+no anon policy, which is correct and should stay that way.
 
-- The savings-goal-reached card, which is the third and last placement,
-  and which is **left undone on purpose** -- it needs a decision rather
-  than typing. The plan says two things that collide here: that the nudges
-  may have three placements, one of them a goal-reached card, and that
-  "markets content is contained to Investments and Reports; everywhere
-  else the app is about money in and money out". Goals renders inside the
-  Budgets screen, so that card would be a link to a broker on a budgeting
-  screen. The investments empty state and the surplus prompt are done and
-  both sit where the second rule allows. Two of three is not a shortfall;
-  the third is a question about how commercial this app should feel, which
-  is not mine to answer.
-- Phase 10, opt-in account linking, which is untouched and is the only
-  feature that can damage a different product's data.
+So the endpoint is written, at:
 
-The 52-week range is done, and so is the instrument store behind it:
-migration 013 keeps a symbol's name, sector, exchange and year's range,
-written by the nightly job and by the pricing route for a symbol just
-chosen. It is not derived from `quote_history` on purpose -- a range taken
-from daily closes is narrower than the real one, which comes from intraday
-highs and lows, so deriving it would produce a confident figure that
-disagrees with every other site.
+    G:\StockSaathi\app\api\search.py
 
-Sparklines are done, and not the way the plan described. It said to draw
-them from `/api/history`, which would be one request to StockSaathi per
-holding every time the screen opened. They read `quote_history` instead --
-the snapshot has already written those closes down -- so six holdings are
-one statement against this app's own database and the chart does not
-depend on anybody else's server being up.
+It is **uncommitted there on purpose** -- that repository is currently on
+a `kotlin` branch with `app/` untracked, so committing into it would have
+been a mess somebody else has to unpick. To ship it:
+
+1. Check out the branch that owns `app/`.
+2. Commit `app/api/search.py` and deploy. No config change is needed;
+   their `vercel.json` already routes `api/*.py`, and it uses
+   `SUPABASE_SERVICE_ROLE_KEY`, which is already set there.
+3. Nothing in FinTrack needs changing. The client side is already live and
+   will start suggesting the moment that endpoint answers.
+
+Until then the symbol box is an ordinary text field, which is what it was
+before -- and the server still verifies every symbol on save, so
+correctness never depended on the list. What could not be tested from here
+is the one live query, because `SUPABASE_SERVICE_ROLE_KEY` is blank in the
+local `.env.imported`. The ranking, the filter escaping and the failure
+paths were all tested offline.
+
+One thing the browser caught that is worth remembering: **a missing
+cross-origin endpoint does not present as a readable 404.** The host
+answers its own 404 page, that page carries no
+`Access-Control-Allow-Origin`, and the browser will not let script see the
+status -- `fetch` simply rejects. The hook counts consecutive failures and
+gives up after three rather than trusting a status it can never read.
 
 ### Deployment notes worth having before the push
 
