@@ -78,7 +78,8 @@ COMMIT_PHASE = {
     # The commit that closes this phase lands after this list is written and
     # so falls into CURRENT_PHASE -- same as 6501316 in phase 6. Pin it here
     # next time anything is added.
-    8: ["cf190d7", "00d171b", "4665ff9", "17c2947", "bebb16c"],
+    8: ["cf190d7", "00d171b", "4665ff9", "17c2947", "bebb16c", "a19006a",
+        "8a51adc"],
 }
 
 PHASES = [
