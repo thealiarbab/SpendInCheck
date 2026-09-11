@@ -39,6 +39,13 @@ static files, and `index.html` for any path that is not one — so a deep
 link, a hard refresh and the production bundle can all be checked before a
 deploy. Run `npm --prefix web run build` first; it does not build for you.
 
+**Judge speed there, never on 5173.** Vite serves every source file as its
+own request, so a cold dev page makes hundreds of them and an API call
+queues behind the lot. Same click, same server, same database: opening the
+demo measured 2,588ms cold on 5173, 803ms warm, and **267ms on the built
+bundle** — the POST alone went 1,311ms to 170ms purely from warming up.
+5173 is for building; 4173 is for believing.
+
 ## 3. After a power cut, check for corruption first
 
 NTFS commits a file's size before its contents, so an interrupted write
