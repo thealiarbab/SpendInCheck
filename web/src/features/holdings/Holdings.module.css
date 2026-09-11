@@ -128,3 +128,106 @@
   color: var(--content-muted);
   white-space: nowrap;
 }
+
+/* --- symbol suggestions ------------------------------------------------------
+   A combo box, not a datalist: the native one can only show the value, and
+   the whole point here is the company name beside the symbol. RELIANCE,
+   RELIABLE and RELINFRA are indistinguishable without it. */
+
+.symbolField {
+  position: relative;
+}
+
+.suggestions {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 2px);
+  left: 0;
+  min-width: 20rem;
+  max-width: 26rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--surface-overlay);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-overlay);
+  max-height: 16rem;
+  overflow-y: auto;
+}
+
+.suggestion {
+  display: grid;
+  grid-template-columns: 6.5rem 1fr;
+  grid-template-areas: "symbol name" "symbol sector";
+  gap: 0 var(--space-3);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  color: var(--content-primary);
+}
+
+.suggestionActive {
+  background: var(--surface-hover);
+}
+
+.suggestionSymbol {
+  grid-area: symbol;
+  align-self: center;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--accent-invest);
+}
+
+.suggestionName {
+  grid-area: name;
+  font-size: var(--text-sm);
+  /* One line: a company's legal name can run to eight words and a list
+     that reflows per row is unreadable at a glance. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.suggestionSector {
+  grid-area: sector;
+  font-size: var(--text-xs);
+  color: var(--content-muted);
+}
+
+/* Named, because the list is theirs. */
+.suggestionCredit {
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--line-soft);
+  font-size: var(--text-xs);
+  color: var(--content-muted);
+}
+
+/* The symbol slot in the add form. It cannot use Field, because Field owns
+   its own <input> and this one needs a combo box under the same label and
+   in the same grid cell. */
+.symbolSlot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.symbolLabel {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--content-secondary);
+}
+
+.symbolSlot .tickerInput {
+  width: 100%;
+}
+
+.symbolError {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--state-error);
+}

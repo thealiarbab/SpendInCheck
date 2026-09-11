@@ -10,6 +10,7 @@ import {
   PageHead, Picker, RowActions, Stat, StatRow, Table, cell,
 } from "../../ui";
 import { Sparkline } from "../../ui/charts";
+import { SymbolField } from "./SymbolField";
 import styles from "./Holdings.module.css";
 
 const ASSET_TYPES = ["Stock", "Mutual Fund", "FD"];
@@ -212,14 +213,28 @@ export function Holdings() {
             placeholder="same as buy"
             onChange={(e) => setDraft({ ...draft, current_price: e.target.value })}
           />
-          <Field
-            label="NSE symbol" name="ticker" maxLength={32}
-            value={draft.ticker} error={fields.ticker} placeholder="optional — RELIANCE"
-            /* Uppercased as it is typed, because that is how it is stored
-               and how it will be shown, and a field that silently changes
-               what you typed after you leave it is unsettling. */
-            onChange={(e) => setDraft({ ...draft, ticker: e.target.value.toUpperCase() })}
-          />
+          <div className={styles.symbolSlot}>
+            <label className={styles.symbolLabel} htmlFor="add-ticker">
+              NSE symbol
+            </label>
+            <SymbolField
+              id="add-ticker"
+              label="NSE symbol"
+              placeholder="optional — RELIANCE"
+              value={draft.ticker}
+              onChange={(ticker) => setDraft({ ...draft, ticker })}
+              /* Taking a suggestion fills the asset name too, but only
+                 when it is still empty. Somebody who typed "my Infosys
+                 shares" first meant it, and overwriting that with the
+                 legal name is the app correcting their own records. */
+              onPick={(found) => setDraft((current) => ({
+                ...current,
+                ticker: found.symbol,
+                asset_name: current.asset_name.trim() || found.name || found.symbol,
+              }))}
+            />
+            {fields.ticker && <p className={styles.symbolError}>{fields.ticker}</p>}
+          </div>
           <FormActions>
             <Button
               onClick={() => add.mutate()}
@@ -420,11 +435,11 @@ export function Holdings() {
                       />
                     ) : tracking === holding.id ? (
                       <div>
-                        <input
-                          className={styles.tickerInput}
-                          value={ticker} placeholder="RELIANCE"
-                          aria-label={`Symbol for ${holding.asset_name}`}
-                          onChange={(e) => setTicker(e.target.value.toUpperCase())}
+                        <SymbolField
+                          value={ticker}
+                          onChange={setTicker}
+                          label={`Symbol for ${holding.asset_name}`}
+                          id={`symbol-${holding.id}`}
                         />
                         <label className={styles.trackRow}>
                           <input
