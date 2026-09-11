@@ -136,6 +136,54 @@ def test_editing_and_deleting(make_api_account):
     assert client.get("/api/v1/transactions").get_json()["items"] == []
 
 
+def test_an_edit_onto_someone_elses_category_is_refused(make_api_account):
+    """It used to answer 200 {"ok": true} and write nothing.
+
+    The UPDATE guards the category against the signed-in account, so a
+    foreign id matches no row and rowcount is 0. The code then looked the
+    transaction up on its own -- without either ownership guard -- found it,
+    and returned True. The caller was told their edit was saved; the ledger
+    still held the old figures.
+    """
+    mine, theirs = make_api_account(), make_api_account()
+    ours = categories_of(mine)[0]
+    foreign = categories_of(theirs)[0]["id"]
+
+    add_transaction(mine, ours["id"], type=ours["type"])
+    transaction_id = mine.get("/api/v1/transactions").get_json()["items"][0]["id"]
+    before = mine.get("/api/v1/transactions").get_json()["items"][0]
+
+    refused = mine.patch("/api/v1/transactions/" + str(transaction_id),
+                         headers=mine.headers,
+                         json={"date": "2026-09-01", "category_id": foreign,
+                               "amount": "4242.00", "type": ours["type"],
+                               "description": "moved"})
+    assert refused.status_code == 404
+
+    after = mine.get("/api/v1/transactions").get_json()["items"][0]
+    assert after == before, "refused edit must not have written anything"
+
+
+def test_re_saving_a_row_unchanged_still_succeeds(make_api_account):
+    """The guard against the above must not break a genuine no-op.
+
+    This is what the removed existence check was written for, and on MySQL it
+    would be needed: rowcount there counts rows *changed*. Postgres counts
+    rows *matched*, so an unaltered save still reports 1.
+    """
+    client = make_api_account()
+    category = categories_of(client)[0]
+    add_transaction(client, category["id"], type=category["type"])
+    transaction_id = client.get("/api/v1/transactions").get_json()["items"][0]["id"]
+
+    same = {"date": "2026-08-01", "category_id": category["id"],
+            "amount": "100.00", "type": category["type"], "description": "same"}
+    assert client.patch("/api/v1/transactions/" + str(transaction_id),
+                        headers=client.headers, json=same).status_code == 200
+    assert client.patch("/api/v1/transactions/" + str(transaction_id),
+                        headers=client.headers, json=same).status_code == 200
+
+
 def test_deleting_the_same_row_twice_is_not_found(make_api_account):
     client = make_api_account()
     category = categories_of(client)[0]

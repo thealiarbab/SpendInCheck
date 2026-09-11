@@ -367,11 +367,22 @@ def update_transaction(user_id, transaction_id, txn_date, category_id, amount,
                        txn_type, description, account_id=None):
     """Update every field of an existing transaction.
 
-    Returns True if the transaction exists and was saved, False if no
-    transaction has that id.
+    Returns True only if a row was actually written. False covers both "no
+    transaction of theirs has that id" and "the category or account id was
+    not theirs to use", because the WHERE clause below refuses all three the
+    same way -- and the route answers them identically on purpose, so that
+    neither confirms another account's ids.
 
-    A rowcount of 0 is followed by an existence check so that "nothing
-    needed changing" is not reported as a failure.
+    There used to be an existence check after a rowcount of 0, so that
+    "nothing needed changing" would not read as a failure. That is a MySQL
+    habit, and this is PostgreSQL: MySQL's rowcount counts rows it *changed*,
+    so re-saving a row unaltered really does report 0 there, but Postgres
+    counts rows it *matched* and reports 1 whether or not a value moved. So
+    the check could never fire for the reason it was written, and what it did
+    instead was look up the transaction alone, ignoring the two ownership
+    guards -- turning every rejected write into True. Saving a transaction
+    against somebody else's category answered 200 {"ok": true} and changed
+    nothing.
 
     account_id of None leaves the row where it is rather than clearing it,
     so a caller that knows nothing about accounts cannot move a row out of
@@ -398,11 +409,7 @@ def update_transaction(user_id, transaction_id, txn_date, category_id, amount,
                                category_id, user_id,
                                account_id, account_id, user_id))
         connection.commit()
-        if cursor.rowcount > 0:
-            return True
-        cursor.execute("SELECT transaction_id FROM transactions "
-                       "WHERE transaction_id = %s AND user_id = %s", (transaction_id, user_id))
-        return cursor.fetchone() is not None
+        return cursor.rowcount > 0
     except Error as e:
         if connection:
             connection.rollback()
