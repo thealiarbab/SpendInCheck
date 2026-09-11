@@ -174,13 +174,25 @@ one.
 
 ### What is left that is not blocked
 
-- Sparklines per holding from `/api/history`, and the 52-week range.
+- The 52-week range. It already comes back from the instrument lookup and
+  is carried to the client; it is not drawn anywhere, because showing it
+  per row would mean a lookup per holding at up to three seconds each.
+  Storing it is the obvious answer and the wrong one -- it changes daily,
+  so a stored copy is wrong by definition. If it is wanted per row, it
+  belongs in the nightly snapshot beside the closes.
 - The two remaining contextual nudges: the surplus prompt when a month
   closes under budget, and the savings-goal-reached card. The investments
   empty state is done. Three placements is the cap -- more reads as
   advertising.
 - Phase 10, opt-in account linking, which is untouched and is the only
   feature that can damage a different product's data.
+
+Sparklines are done, and not the way the plan described. It said to draw
+them from `/api/history`, which would be one request to StockSaathi per
+holding every time the screen opened. They read `quote_history` instead --
+the snapshot has already written those closes down -- so six holdings are
+one statement against this app's own database and the chart does not
+depend on anybody else's server being up.
 
 ### Deployment notes worth having before the push
 
