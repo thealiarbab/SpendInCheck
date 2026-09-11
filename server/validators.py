@@ -13,7 +13,7 @@ what makes filling it in a single pass possible.
 """
 
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from .errors import ValidationError
 from .money import quantise, to_decimal
@@ -204,11 +204,20 @@ class Validator:
 
         Logging tomorrow's spending is almost always a typo in the year, and
         it silently corrupts every month-based report until someone notices.
+
+        The allowance is one day rather than none. date.today() is the
+        server's day and the server keeps UTC, while the form sends the
+        reader's own local day -- and for part of every day those are not the
+        same date. A reader at UTC+5:30 is a day ahead of UTC from midnight
+        until 05:30, so their own today came back "Cannot be in the future"
+        on a field they never touched. No zone is more than a day ahead of
+        UTC, so a day of slack covers every reader and still catches the
+        mistyped year this exists to catch.
         """
         value = self.date(field, required=required)
         if value is None:
             return None
-        if value > date.today():
+        if value > date.today() + timedelta(days=1):
             return self.fail(field, "Cannot be in the future.")
         return value
 

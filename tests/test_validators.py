@@ -52,12 +52,30 @@ def test_amount_rejects_zero_and_negatives_with_distinct_messages():
 
 def test_future_dates_are_rejected():
     """A date in the future is nearly always a mistyped year, and it corrupts
-    every month-based report until somebody notices."""
-    tomorrow = (date.today() + timedelta(days=1)).isoformat()
-    assert collect({"d": tomorrow}, lambda v: v.past_date("d"))["d"] == "Cannot be in the future."
+    every month-based report until somebody notices.
 
-    today = date.today().isoformat()
-    assert collect({"d": today}, lambda v: v.past_date("d")) == {}
+    Rejection starts two days out, not one. This test used to assert that
+    tomorrow was refused, which was wrong for anybody east of UTC: the server
+    keeps UTC and the form sends the reader's own local day, so a reader at
+    UTC+5:30 was told their own today was in the future every night between
+    midnight and 05:30. One day of slack is the widest any zone runs ahead of
+    UTC, and the mistyped year this guards against is still caught.
+    """
+    today = date.today()
+
+    assert collect({"d": today.isoformat()}, lambda v: v.past_date("d")) == {}
+    assert collect({"d": (today - timedelta(days=1)).isoformat()},
+                   lambda v: v.past_date("d")) == {}
+
+    # Tomorrow in UTC is today for a reader far enough east, so it is allowed.
+    tomorrow = (today + timedelta(days=1)).isoformat()
+    assert collect({"d": tomorrow}, lambda v: v.past_date("d")) == {}
+
+    # Two days out is nobody's today, whatever zone they are in.
+    for ahead in (timedelta(days=2), timedelta(days=365)):
+        stamp = (today + ahead).isoformat()
+        assert collect({"d": stamp},
+                       lambda v: v.past_date("d"))["d"] == "Cannot be in the future."
 
 
 def test_quantity_keeps_fractional_units():
