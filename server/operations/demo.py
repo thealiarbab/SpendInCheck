@@ -48,6 +48,13 @@ DEMO_TRANSFERS = [
     ("2026-08-03", 6000.00, "Cash withdrawal"),
 ]
 
+# The one repeating rule the demo carries: rent, due next month rather than
+# already overdue, so it shows as something upcoming instead of immediately
+# posting a row the visitor did not ask for.
+#
+# (description, category, amount, type, cadence, day of month)
+DEMO_RULE = ("Rent", "Rent", 15000.00, "Expense", "monthly", 1)
+
 # (date, category name, amount, type, description)
 DEMO_TRANSACTIONS = [
     ("2026-06-01", "Salary", 55000.00, "Income", "June salary"),
@@ -157,6 +164,18 @@ def _seed(cursor, user_id):
             (user_id, transfer_date, transfer_category, transfer_amount,
              transfer_note, account_ids["Current"], account_ids["Cash"]))
 
+    description, category, amount, txn_type, cadence, day = DEMO_RULE
+    cursor.execute(
+        "INSERT INTO recurring_rules (user_id, description, category_id, "
+        "        account_id, amount, txn_type, cadence, day_of_month, next_run_on) "
+        # date_trunc to the first of next month, computed in the database so
+        # the demo is never seeded with a rule that is already overdue on a
+        # machine whose clock disagrees with the server's.
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, "
+        "        (date_trunc('month', CURRENT_DATE) + interval '1 month')::date)",
+        (user_id, description, category_ids[category], account_ids["Current"],
+         amount, txn_type, cadence, day))
+
     execute_values(
         cursor,
         "INSERT INTO budgets (user_id, category_id, month_year, budget_limit) "
@@ -181,10 +200,19 @@ def reset_demo_data(user_id):
     try:
         connection = db.get_connection()
         cursor = connection.cursor()
-        # Children first: transactions point at both categories and
-        # accounts, and both foreign keys are RESTRICT, so the rows have to
-        # go before the things they reference.
+        # Children first, and the order matters: transactions point at
+        # categories and accounts, and recurring rules point at categories
+        # too. Both of those foreign keys are RESTRICT, so anything a
+        # visitor made in the demo has to go before the things it
+        # references -- a demo that grew a recurring rule would otherwise
+        # refuse to reset, which is exactly when it needs to.
+        #
+        # tags, transaction_tags and goal_contributions are not listed
+        # because they cascade: from transactions, and from goals.
         cursor.execute("DELETE FROM transactions WHERE user_id = %s", (user_id,))
+        cursor.execute("DELETE FROM recurring_rules WHERE user_id = %s", (user_id,))
+        cursor.execute("DELETE FROM goals WHERE user_id = %s", (user_id,))
+        cursor.execute("DELETE FROM tags WHERE user_id = %s", (user_id,))
         cursor.execute("DELETE FROM budgets WHERE user_id = %s", (user_id,))
         cursor.execute("DELETE FROM investments WHERE user_id = %s", (user_id,))
         cursor.execute("DELETE FROM categories WHERE user_id = %s", (user_id,))

@@ -31,6 +31,9 @@ from .tags import (MAX_TAG_LENGTH, add_tag, delete_tag, list_tags, rename_tag,
 from .goals import (add_contribution, add_goal, delete_contribution,
                     delete_goal, goal_exists, list_contributions, list_goals,
                     set_goal_archived, update_goal)
+from .recurring import (CADENCES, MAX_CATCHUP, add_rule, delete_rule,
+                        list_rules, materialise_due, next_date_after,
+                        rule_exists, set_rule_paused, update_rule)
 from .budgets import get_all_budgets, set_budget
 from .reports import (SERIES_MONTHS, budget_vs_actual, cashflow_series,
                       category_wise_spend, dashboard_summary, monthly_trend,
@@ -62,6 +65,9 @@ __all__ = [
     "add_contribution", "add_goal", "delete_contribution", "delete_goal",
     "goal_exists", "list_contributions", "list_goals", "set_goal_archived",
     "update_goal",
+    "CADENCES", "MAX_CATCHUP", "add_rule", "delete_rule", "list_rules",
+    "materialise_due", "next_date_after", "rule_exists", "set_rule_paused",
+    "update_rule",
     "get_all_budgets", "set_budget",
     "SERIES_MONTHS", "budget_vs_actual", "cashflow_series",
     "category_wise_spend", "dashboard_summary", "monthly_trend",

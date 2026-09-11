@@ -211,6 +211,28 @@ export interface Contribution {
   note: string | null;
 }
 
+export type Cadence = "weekly" | "monthly" | "yearly";
+
+/** A transaction template with a schedule. It writes ordinary rows marked
+ *  with its id; it does not own them. */
+export interface RecurringRule {
+  id: number;
+  description: string;
+  amount: string;
+  type: "Income" | "Expense";
+  cadence: Cadence;
+  day_of_month: number | null;
+  next_run_on: string;
+  ends_on: string | null;
+  paused: boolean;
+  category_id: number;
+  category: string;
+  account_id: number | null;
+  account: string | null;
+  /** How many transactions it has written so far. */
+  written: number;
+}
+
 export type AccountKind = "Bank" | "Cash" | "Card" | "Wallet" | "Other";
 
 /** An account and its balance. The balance is derived by the server on
@@ -370,6 +392,20 @@ export const api = {
     request<void>("/categories/" + id +
       (reassignTo === undefined ? "" : query({ reassign_to: String(reassignTo) })),
       { method: "DELETE" }),
+
+  recurring: () => request<{ items: RecurringRule[] }>("/recurring"),
+  addRule: (body: Record<string, unknown>) =>
+    request<{ id: number }>("/recurring", { method: "POST", body }),
+  editRule: (id: number, body: Record<string, unknown>) =>
+    request<void>("/recurring/" + id, { method: "PATCH", body }),
+  pauseRule: (id: number, paused: boolean) =>
+    request<void>("/recurring/" + id + "/pause",
+      { method: "POST", body: { paused: paused ? "1" : "0" } }),
+  deleteRule: (id: number) => request<void>("/recurring/" + id, { method: "DELETE" }),
+  /** Post whatever this account's rules currently owe. */
+  runRules: () =>
+    request<{ rules: number; transactions: number }>("/recurring/run",
+      { method: "POST" }),
 
   goals: (includeArchived = false) =>
     request<{ items: Goal[] }>("/goals" + (includeArchived ? "?archived=1" : "")),

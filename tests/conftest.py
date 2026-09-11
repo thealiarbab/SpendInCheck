@@ -116,3 +116,18 @@ def make_api_account():
 
     for user_id in created:
         delete_user(user_id)
+
+
+@pytest.fixture
+def api_user_id():
+    """The user id behind a client from make_api_account.
+
+    The recurring sweep is called directly rather than through an endpoint,
+    because what is under test is what happens on a given day and the
+    endpoint always uses today's. That needs the id, which the fixture that
+    made the client deliberately does not expose -- so it is read back from
+    the session the client already holds.
+    """
+    def _id(client):
+        return client.get("/api/v1/auth/session").get_json()["user"]["id"]
+    return _id

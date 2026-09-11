@@ -56,3 +56,16 @@ def clear_demos():
     _require_cron_secret()
     removed = operations.delete_stale_demo_users(DEMO_MAX_AGE_HOURS)
     return jsonify({"removed": removed, "older_than_hours": DEMO_MAX_AGE_HOURS})
+
+
+@api.post("/cron/recurring")
+def post_recurring():
+    """Write the transactions every due recurring rule owes.
+
+    Safe to call twice. The scheduler is at-least-once -- a run that times
+    out after writing may be retried, and two can overlap -- so the sweep is
+    made idempotent by a unique index on (rule_id, txn_date) rather than by
+    hoping it is never repeated. A second run conflicts and does nothing.
+    """
+    _require_cron_secret()
+    return jsonify(operations.materialise_due())

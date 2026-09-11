@@ -5,6 +5,7 @@ import { ApiError, api } from "../../lib/api";
 import type { Category, TransactionFilters, TransactionSubmission } from "../../lib/api";
 import { FilterBar } from "./FilterBar";
 import { TagChooser } from "../tags/TagChooser";
+import { Recurring } from "../recurring/Recurring";
 import { Pager } from "./Pager";
 import styles from "./Transactions.module.css";
 import { formatMoney, toMinor } from "../../lib/money";
@@ -296,6 +297,13 @@ export function Transactions() {
         {failure && !failure.isValidation && <Notice>{failure.message}</Notice>}
         {save.isSuccess && <Notice ok>Saved.</Notice>}
       </Card>
+
+      <div style={{ height: "var(--space-5)" }} />
+
+      {/* Above the ledger, because the rows a rule writes appear in it --
+          setting one up and immediately seeing what it produced is the
+          whole point. */}
+      <Recurring categories={categories.data?.items ?? []} />
 
       <div style={{ height: "var(--space-5)" }} />
 
