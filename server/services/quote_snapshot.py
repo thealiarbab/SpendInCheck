@@ -79,3 +79,27 @@ def take_snapshot():
 
     return {"symbols": len(symbols), "closes": written,
             "backfilled": backfilled}
+
+
+def ensure_history(symbol):
+    """Fetch a year for a symbol this database has never seen. Returns rows.
+
+    Called when somebody first points a holding at a symbol, so the chart
+    for it has something to draw immediately rather than being a flat line
+    until the next nightly run. A year of closes costs about four hundred
+    milliseconds -- less than the lookup that has already happened in the
+    same request -- so it is not worth deferring.
+
+    Does nothing for a symbol already on record: the nightly job keeps
+    those up to date, and re-fetching a year on every save would be four
+    hundred milliseconds to write nothing.
+    """
+    if not symbol or symbol in operations.symbols_with_history():
+        return 0
+
+    closes = stocksaathi.closing_prices(symbol, days=BACKFILL_DAYS,
+                                        timeout=TIMEOUT_SECONDS)
+    if not closes:
+        return 0
+    return operations.record_closes(
+        symbol, [(_as_date(at), price) for at, price in closes])

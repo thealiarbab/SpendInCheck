@@ -43,11 +43,13 @@ from .budgets import (categories_with_rollover, get_all_budgets,
 from .reports import (SERIES_MONTHS, budget_vs_actual, cashflow_series,
                       category_wise_spend, dashboard_summary, monthly_trend,
                       net_worth_series, top_merchants)
-from .quotes import close_on, record_closes, symbols_with_history
+from .quotes import (close_on, recent_closes, record_closes,
+                     symbols_with_history)
 from .investments import (add_investment, apply_prices, delete_investment,
                           get_all_investments, investment_exists,
                           portfolio_pnl, set_investment_pricing,
-                          symbols_to_price, update_investment_price)
+                          symbols_held, symbols_to_price,
+                          update_investment_price)
 
 # Named explicitly rather than star-imported so that deleting a function
 # anywhere below breaks this import loudly instead of silently shrinking
@@ -84,6 +86,8 @@ __all__ = [
     "net_worth_series", "top_merchants",
     "add_investment", "delete_investment", "get_all_investments",
     "investment_exists", "portfolio_pnl", "update_investment_price",
-    "apply_prices", "set_investment_pricing", "symbols_to_price",
-    "close_on", "record_closes", "symbols_with_history",
+    "apply_prices", "set_investment_pricing", "symbols_held",
+    "symbols_to_price",
+    "close_on", "recent_closes", "record_closes",
+    "symbols_with_history",
 ]

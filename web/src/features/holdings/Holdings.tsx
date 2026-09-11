@@ -9,6 +9,7 @@ import {
   Button, Card, Confirm, Empty, Field, Form, FormActions, Loading, Money, Notice,
   PageHead, Picker, RowActions, Stat, StatRow, Table, cell,
 } from "../../ui";
+import { Sparkline } from "../../ui/charts";
 import styles from "./Holdings.module.css";
 
 const ASSET_TYPES = ["Stock", "Mutual Fund", "FD"];
@@ -68,9 +69,19 @@ export function Holdings() {
   const symbols = rows.map((row) => row.ticker).filter((t): t is string => !!t);
   const market = useLiveQuotes(symbols);
 
+  // The last month per symbol, out of this app's own records rather than
+  // from StockSaathi. Only asked for once there is a symbol to ask about,
+  // so an account of deposits costs nothing.
+  const history = useQuery({
+    queryKey: ["holdings-history"],
+    queryFn: api.holdingsHistory,
+    enabled: symbols.length > 0,
+  });
+
   const refresh = () => {
     client.invalidateQueries({ queryKey: ["investments"] });
     client.invalidateQueries({ queryKey: ["portfolio"] });
+    client.invalidateQueries({ queryKey: ["holdings-history"] });
     // The opening screen shows the same holdings and their totals.
     client.invalidateQueries({ queryKey: ["dashboard"] });
   };
@@ -291,6 +302,7 @@ export function Holdings() {
                 <th className={cell.numeric}>Qty</th>
                 <th className={cell.numeric}>Valued at</th>
                 <th className={cell.numeric}>Live</th>
+                <th>Month</th>
                 <th className={cell.numeric}>P&amp;L</th>
                 <th />
               </tr>
@@ -298,6 +310,12 @@ export function Holdings() {
           >
             {rows.map((holding) => {
               const quote = holding.ticker ? market.quotes[holding.ticker] : undefined;
+              // Minor units, because that is what every other figure on
+              // this screen is measured in and the chart only needs the
+              // shape to be to scale.
+              const closes = (holding.ticker
+                ? history.data?.items[holding.ticker] ?? []
+                : []).map((point) => toMinor(point.close));
               return (
                 <tr key={holding.id}>
                   <td className={cell.primary}>
@@ -347,6 +365,12 @@ export function Holdings() {
                         </span>
                       </>
                     ) : "—"}
+                  </td>
+                  <td>
+                    {closes.length > 1
+                      ? <Sparkline values={closes}
+                                   label={`${holding.ticker} over the last month`} />
+                      : null}
                   </td>
                   <td className={cell.numeric}>
                     <Money value={holding.pnl} signed />

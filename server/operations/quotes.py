@@ -105,3 +105,38 @@ def close_on(ticker, on_date):
         return None
     finally:
         db.close_connection(connection)
+
+
+def recent_closes(tickers, days=30):
+    """Recent closes for several symbols at once, as {ticker: [(date, close)]}.
+
+    One statement for the whole screen rather than one per holding: six
+    holdings would otherwise be six round trips to Mumbai for a chart the
+    width of a thumbnail.
+
+    Oldest first per symbol, so a caller can draw it without sorting.
+    """
+    wanted = sorted({t for t in (tickers or []) if t})
+    if not wanted:
+        return {}
+
+    connection = None
+    try:
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        cursor.execute("""
+            SELECT ticker, on_date, close
+              FROM quote_history
+             WHERE ticker = ANY(%s::varchar[])
+               AND on_date > CURRENT_DATE - make_interval(days => %s)
+             ORDER BY ticker, on_date
+        """, (wanted, days))
+        series = {}
+        for ticker, on_date, close in cursor.fetchall():
+            series.setdefault(ticker, []).append((on_date, close))
+        return series
+    except Error as e:
+        print(f"Error reading recent closes: {e}")
+        return {}
+    finally:
+        db.close_connection(connection)

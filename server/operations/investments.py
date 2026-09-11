@@ -274,6 +274,31 @@ def symbols_to_price(user_id=None):
         db.close_connection(connection)
 
 
+def symbols_held(user_id):
+    """Every symbol this account holds, whether or not it is priced from one.
+
+    Distinct from symbols_to_price, which asks a narrower question: what
+    the refresh is allowed to overwrite. Somebody who recorded a ticker
+    without switching on automatic pricing still wants to see what it has
+    been doing, so the chart reads from here.
+    """
+    connection = None
+    try:
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        cursor.execute("""
+            SELECT DISTINCT ticker FROM investments
+             WHERE user_id = %s AND ticker IS NOT NULL
+             ORDER BY ticker
+        """, (user_id,))
+        return [row[0] for row in cursor.fetchall()]
+    except Error as e:
+        print(f"Error listing symbols held: {e}")
+        return []
+    finally:
+        db.close_connection(connection)
+
+
 def apply_prices(prices, user_id=None):
     """Write fetched prices onto every holding that asked for them.
 

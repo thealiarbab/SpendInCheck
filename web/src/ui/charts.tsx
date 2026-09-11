@@ -304,3 +304,56 @@ export function Legend(
     </ul>
   );
 }
+
+/**
+ * A holding's recent shape, at the size of a table cell.
+ *
+ * Deliberately not a small LineChart. At 72 by 22 the axes, gridlines and
+ * per-point circles that make a real chart readable are all noise, and the
+ * only thing that survives being this small is the shape -- so that is all
+ * this draws.
+ *
+ * It scales to its own range rather than to zero. A stock that moved
+ * between 1,240 and 1,260 is a flat line against a zero baseline, which is
+ * true of the price and useless as a picture of the month.
+ *
+ * Colour comes from first against last, not from the day's move, because a
+ * line drawn over thirty days should be coloured by those thirty days.
+ */
+export function Sparkline(
+  { values, label }: { values: number[]; label: string },
+) {
+  // Two points is the fewest that can be a line. One is a dot nobody can
+  // read anything from, and none is nothing.
+  if (values.length < 2) return null;
+
+  const width = 72;
+  const height = 22;
+  const pad = 2;
+  const lowest = Math.min(...values);
+  const highest = Math.max(...values);
+  // A flat series would divide by zero; drawing it down the middle is the
+  // honest picture of a price that did not move.
+  const span = highest - lowest || 1;
+
+  const step = (width - pad * 2) / (values.length - 1);
+  const y = (value: number) =>
+    height - pad - ((value - lowest) / span) * (height - pad * 2);
+
+  const path = values
+    .map((value, index) =>
+      `${index === 0 ? "M" : "L"} ${(pad + step * index).toFixed(1)} ${y(value).toFixed(1)}`)
+    .join(" ");
+
+  const first = values[0]!;
+  const last = values[values.length - 1]!;
+  const tone = last > first ? styles.sparkUp
+    : last < first ? styles.sparkDown : styles.sparkFlat;
+
+  return (
+    <svg className={styles.spark} viewBox={`0 0 ${width} ${height}`}
+         role="img" aria-label={label} preserveAspectRatio="none">
+      <path className={`${styles.sparkLine} ${tone}`} d={path} />
+    </svg>
+  );
+}

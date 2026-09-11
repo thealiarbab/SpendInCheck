@@ -202,6 +202,12 @@ export interface Instrument {
   high_52w: string | null;
 }
 
+/** One day's close. Money as a string, as everywhere else. */
+export interface ClosePoint {
+  date: string;
+  close: string;
+}
+
 export interface SymbolSaved {
   ticker: string | null;
   auto_price: boolean;
@@ -626,6 +632,16 @@ export const api = {
   refreshPrices: () =>
     request<{ priced: number }>("/investments/refresh-prices",
       { method: "POST" }),
+  /**
+   * Recent closes per symbol, for the sparklines.
+   *
+   * Read out of this app's own quote_history, not fetched from
+   * StockSaathi: the nightly snapshot has already written them down, so a
+   * chart does not depend on their server being up and six holdings are
+   * one request rather than six.
+   */
+  holdingsHistory: () =>
+    request<{ items: Record<string, ClosePoint[]> }>("/investments/history"),
   /**
    * Quotes through this server rather than from the browser.
    *

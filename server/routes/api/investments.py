@@ -6,7 +6,7 @@ from server import money, operations
 from server.auth import money_places, require_user
 from server.errors import ApiError, NotFound, ValidationError
 from server.routes.api import api
-from server.services import stocksaathi
+from server.services import quote_snapshot, stocksaathi
 from server.validators import Validator
 
 FIELDS = ["id", "asset_name", "asset_type", "buy_date", "buy_price", "quantity",
@@ -175,6 +175,12 @@ def set_pricing(investment_id):
                                              exchange, isin or None, auto):
         raise ApiError("Could not save that.", code="update_failed")
 
+    if symbol:
+        # So the holding has a line to draw from the moment it is tracked,
+        # rather than being flat until tonight's run. A no-op for a symbol
+        # somebody else already tracks, which is most of them.
+        quote_snapshot.ensure_history(symbol)
+
     return jsonify({"ok": True, "ticker": symbol, "auto_price": auto,
                     "priced": _refresh(user_id) if auto else 0,
                     # So the screen can say which company that symbol turned
@@ -244,4 +250,33 @@ def quotes():
             "source": quote["source"],
         }
         for symbol, quote in stocksaathi.live_quotes(asked).items()
+    }})
+
+
+# How much of a holding's recent past the sparkline shows. Thirty days is
+# about a month of trading, which is enough to read a direction from and
+# short enough that a thumbnail is not a smear.
+SPARK_DAYS = 30
+
+
+@api.get("/investments/history")
+def holdings_history():
+    """Recent closes for every symbol this account holds.
+
+    From quote_history, which means no call to StockSaathi at all: the
+    nightly snapshot has already written these down, and drawing a chart
+    should not depend on somebody else's server being up. One statement for
+    every symbol on the screen, rather than one request per holding.
+
+    Money as strings, like everywhere else.
+    """
+    user_id = require_user()
+    places = money_places()
+    series = operations.recent_closes(operations.symbols_held(user_id),
+                                      days=SPARK_DAYS)
+    return jsonify({"items": {
+        ticker: [{"date": on_date.isoformat(),
+                  "close": money.serialise(close, places)}
+                 for on_date, close in closes]
+        for ticker, closes in series.items()
     }})

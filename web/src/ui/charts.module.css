@@ -111,3 +111,28 @@
 .swatchIncome { background: var(--chart-2); }
 .swatchExpense { background: var(--chart-3); }
 .swatchLine { background: var(--chart-1); }
+
+/* --- sparkline --------------------------------------------------------------
+   A thumbnail in a table cell, not a chart. No axes, no gridlines, no
+   points: at this size every one of them is noise competing with the only
+   thing it is there to show, which is the shape. */
+
+.spark {
+  display: block;
+  width: 72px;
+  height: 22px;
+  overflow: visible;
+}
+
+.sparkLine {
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Coloured by where it ended against where it started, which is the one
+   fact a shape this small can carry reliably. */
+.sparkUp { stroke: var(--money-credit); }
+.sparkDown { stroke: var(--money-debit); }
+.sparkFlat { stroke: var(--content-muted); }
