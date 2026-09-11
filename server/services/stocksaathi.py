@@ -6,7 +6,7 @@ traps are encoded once here rather than rediscovered per caller:
 **Two endpoints, two units.** /api/live-quote returns prices as rupee
 floats (1274.0); /api/history returns them as integer paise (132200).
 Everything below hands back Decimal rupees, because that is what the rest
-of this codebase means by an amount.
+of this codebase means by an amount. /api/fundamentals is rupees again.
 
 **change_pct is a fraction, not a percentage.** -0.0039 is a fifth of a
 percent down, not four. Multiplying it by 100 at the point of display is
@@ -149,6 +149,47 @@ def live_quotes(symbols, timeout=TIMEOUT_SECONDS):
                 "source": quote.get("source"),
             }
     return found
+
+
+def instrument(symbol, timeout=TIMEOUT_SECONDS):
+    """What this symbol actually is, or None if it is not one.
+
+    The nearest thing to a lookup their API offers. There is no search
+    endpoint -- nothing takes "reli" and suggests RELIANCE -- but given a
+    symbol this says whose it is, which is most of what the searching was
+    for. Somebody who types a ticker into a box has no way to tell a
+    correct guess from a wrong one that happens to exist, and RELIANCE,
+    RELIABLE and RELINFRA are all real companies.
+
+    Returns {"symbol", "name", "exchange", "sector", "price", "low_52w",
+    "high_52w"} with the money as Decimal rupees.
+
+    Slower than a quote -- a symbol the upstream has not cached takes a few
+    seconds -- so this belongs on a deliberate act like saving a symbol,
+    never in a list or a keystroke handler.
+    """
+    clean = normalise(symbol)
+    if not clean:
+        return None
+
+    # An unknown symbol comes back as an HTTP error rather than a body
+    # saying so, which _get already turns into None.
+    body = _get("/fundamentals", {"symbol": clean}, timeout)
+    if not body:
+        return None
+
+    name = body.get("name")
+    return {
+        "symbol": clean,
+        # Without a name this is no more use than the symbol itself, which
+        # the caller already had.
+        "name": name if isinstance(name, str) and name.strip() else None,
+        "exchange": body.get("exchange"),
+        "sector": body.get("sector"),
+        "price": _rupees(body.get("price")),
+        "low_52w": _rupees(body.get("fifty_two_week_low")),
+        "high_52w": _rupees(body.get("fifty_two_week_high")),
+    }
 
 
 def closing_prices(symbol, days=30, timeout=TIMEOUT_SECONDS):

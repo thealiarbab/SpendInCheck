@@ -101,6 +101,12 @@ export function Holdings() {
     },
   });
 
+  // What the last saved symbol turned out to be. Shown once, above the
+  // table, because it is the answer to a question nobody can check for
+  // themselves: RELIANCE, RELIABLE and RELINFRA are three real companies
+  // and a wrong guess prices the holding plausibly every day.
+  const saved = setPricing.data;
+
   const updatePrices = useMutation({
     mutationFn: api.refreshPrices,
     onSuccess: refresh,
@@ -240,6 +246,18 @@ export function Holdings() {
                 <a href={investHref} {...externalLinkProps}>StockSaathi ↗</a>
               </span>
             </span>
+          </div>
+        )}
+
+        {setPricing.isSuccess && saved?.ticker && (
+          <div style={{ padding: "0 var(--space-5)" }}>
+            <Notice ok>
+              {saved.instrument?.name
+                ? `${saved.ticker} — ${saved.instrument.name}${
+                    saved.instrument.sector ? `, ${saved.instrument.sector}` : ""}.`
+                : `${saved.ticker} saved.`}
+              {saved.priced > 0 && " Priced from the market."}
+            </Notice>
           </div>
         )}
 

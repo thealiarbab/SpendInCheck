@@ -19,33 +19,56 @@ HOLDING = {"asset_name": "Reliance Industries", "asset_type": "Stock",
            "quantity": "10", "current_price": "1200.00"}
 
 
+NAMES = {"RELIANCE": ("Reliance Industries Ltd", "Energy"),
+         "TCS": ("Tata Consultancy Services Ltd", "Information Technology")}
+
+
 @pytest.fixture
 def feed(monkeypatch):
     """Stand in for StockSaathi, and record what was asked for.
 
-    Patched on the service module, which is the single place both the route
-    and the refresh reach it through.
+    Both endpoints the routes use: the quote, and the lookup that says whose
+    symbol it is. Patched on the service module, which is the single place
+    the route and the refresh both reach them through.
     """
+    from decimal import Decimal
+
     class Feed:
         def __init__(self):
             self.prices = {"RELIANCE": "1274.00", "TCS": "2204.10"}
             self.asked = []
+            self.looked_up = []
             self.reachable = True
+            # Set false to test the fallback: the lookup is the slower,
+            # richer endpoint and can be down while quotes still work.
+            self.lookup_works = True
 
-        def __call__(self, symbols, timeout=None):
+        def quotes(self, symbols, timeout=None):
             self.asked.append(list(symbols))
             if not self.reachable:
                 return {}
-            from decimal import Decimal
             return {symbol: {"price": Decimal(self.prices[symbol]),
                              "prev_close": Decimal("1279.00"),
                              "change": -0.0039, "as_of": 1789033500000,
                              "source": "yahoo"}
                     for symbol in symbols if symbol in self.prices}
 
+        def instrument(self, symbol, timeout=None):
+            self.looked_up.append(symbol)
+            if not self.reachable or not self.lookup_works:
+                return None
+            if symbol not in NAMES:
+                return None
+            name, sector = NAMES[symbol]
+            return {"symbol": symbol, "name": name, "sector": sector,
+                    "exchange": "NSE", "price": Decimal(self.prices[symbol]),
+                    "low_52w": Decimal("1000.00"),
+                    "high_52w": Decimal("1600.00")}
+
     stub = Feed()
-    monkeypatch.setattr(stocksaathi, "live_quotes", stub)
-    monkeypatch.setattr(investments_route.stocksaathi, "live_quotes", stub)
+    for module in (stocksaathi, investments_route.stocksaathi):
+        monkeypatch.setattr(module, "live_quotes", stub.quotes)
+        monkeypatch.setattr(module, "instrument", stub.instrument)
     return stub
 
 
@@ -154,7 +177,7 @@ def test_something_that_is_not_a_symbol_never_reaches_the_feed(
         f"/api/v1/investments/{holding['id']}/pricing", headers=client.headers,
         json={"ticker": "my shares", "auto_price": "1"})
     assert response.status_code == 422
-    assert feed.asked == []
+    assert feed.asked == [] and feed.looked_up == []
 
 
 def test_a_symbol_can_be_recorded_without_being_fetched(make_api_account, feed):
@@ -338,3 +361,56 @@ def test_quotes_refuses_an_empty_or_oversized_request(make_api_account, feed):
     assert client.get("/api/v1/quotes?symbols=").status_code == 422
     too_many = ",".join(f"SYM{n}" for n in range(stocksaathi.MAX_SYMBOLS + 1))
     assert client.get(f"/api/v1/quotes?symbols={too_many}").status_code == 422
+
+# --- which company is that, actually ----------------------------------------
+
+def test_saving_a_symbol_says_which_company_it_turned_out_to_be(
+        make_api_account, feed):
+    """The nearest thing to the symbol search this integration cannot have.
+
+    Somebody typing a ticker has no way to tell a correct guess from a
+    wrong one that also exists, and a holding quietly tracking the wrong
+    company still shows a plausible price every day.
+    """
+    client = make_api_account()
+    add_holding(client)
+    holding = only_holding(client)
+
+    body = client.patch(f"/api/v1/investments/{holding['id']}/pricing",
+                        headers=client.headers,
+                        json={"ticker": "RELIANCE", "auto_price": "1"}).get_json()
+    assert body["instrument"]["name"] == "Reliance Industries Ltd"
+    assert body["instrument"]["sector"] == "Energy"
+    assert body["instrument"]["low_52w"] == "1000.00", "money as a string"
+
+
+def test_the_exchange_comes_from_the_upstream_not_the_form(
+        make_api_account, feed):
+    """A form can only offer a guess between two options. The lookup knows."""
+    client = make_api_account()
+    add_holding(client)
+    holding = only_holding(client)
+
+    client.patch(f"/api/v1/investments/{holding['id']}/pricing",
+                 headers=client.headers,
+                 json={"ticker": "RELIANCE", "exchange": "BSE",
+                       "auto_price": "1"})
+    assert only_holding(client)["exchange"] == "NSE"
+
+
+def test_a_quotable_symbol_is_accepted_when_the_lookup_is_down(
+        make_api_account, feed):
+    """The fallback. The lookup is the slower, richer endpoint, and their
+    outage must not stop somebody switching on a symbol that works."""
+    client = make_api_account()
+    add_holding(client)
+    holding = only_holding(client)
+    feed.lookup_works = False
+
+    body = client.patch(f"/api/v1/investments/{holding['id']}/pricing",
+                        headers=client.headers,
+                        json={"ticker": "RELIANCE", "auto_price": "1"})
+    assert body.status_code == 200
+    assert body.get_json()["instrument"] is None, "nothing to describe it with"
+    assert only_holding(client)["auto_price"] is True
+    assert feed.asked == [["RELIANCE"]] + feed.asked[1:], "asked for a quote instead"

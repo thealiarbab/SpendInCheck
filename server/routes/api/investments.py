@@ -48,9 +48,11 @@ def create_investment():
     auto = fields.choice("auto_price", ["1", "0"], required=False) == "1"
     fields.raise_if_invalid()
 
-    symbol = _checked_symbol(ticker, auto) if ticker else None
+    symbol, found = _resolve_symbol(ticker, auto) if ticker else (None, None)
     if symbol is None:
         auto = False
+    # The exchange the upstream names beats the one a form guessed at.
+    exchange = (found or {}).get("exchange") or exchange
 
     if not operations.add_investment(user_id, name, asset_type, buy_date,
                                      buy_price, quantity, current_price,
@@ -60,26 +62,64 @@ def create_investment():
     return jsonify({"ok": True}), 201
 
 
-def _checked_symbol(ticker, must_quote):
-    """The symbol as the API wants it, having checked that it is real.
+def _resolve_symbol(ticker, must_quote):
+    """The symbol as the API wants it, and what it turns out to be.
 
-    Two different standards on purpose. A symbol stored but not fetched
-    only has to look like one -- somebody recording a ticker for their own
+    Returns (symbol, instrument-or-None).
+
+    The lookup is the closest this integration gets to the symbol search
+    the plan wanted: their API has no endpoint that takes "reli" and
+    suggests RELIANCE, but given a symbol it will say whose it is. That
+    matters because somebody typing a ticker has no way to tell a correct
+    guess from a wrong one that also exists -- RELIANCE, RELIABLE and
+    RELINFRA are three different companies -- and a holding quietly
+    tracking the wrong one still shows a plausible price every day.
+
+    Two different standards, on purpose. A symbol stored but not fetched
+    only has to look like one: somebody recording a ticker for their own
     reference should not be blocked because a feed is down. A symbol the
-    holding is about to be *priced* from has to actually return a price,
-    because the alternative is a holding that silently never updates and
-    somebody who believes it does.
+    holding is about to be *priced* from has to resolve to something,
+    because the alternative is a holding that silently never updates and an
+    owner who believes it does.
     """
     symbol = stocksaathi.normalise(ticker)
     if symbol is None:
         raise ValidationError(
             {"ticker": "That does not look like a symbol. Use the NSE code, "
                        "like RELIANCE."})
-    if must_quote and symbol not in stocksaathi.live_quotes([symbol]):
+
+    found = stocksaathi.instrument(symbol)
+    if found or not must_quote:
+        return symbol, found
+
+    # The lookup is the slower, richer endpoint, so a symbol it cannot
+    # answer for might still be quotable -- their own outage should not
+    # stop somebody switching on a symbol that works. Asking the quote
+    # endpoint is the cheaper second opinion.
+    if symbol not in stocksaathi.live_quotes([symbol]):
         raise ValidationError(
             {"ticker": "No price found for " + symbol + ". Check the symbol, "
                        "or leave automatic pricing off."})
-    return symbol
+    return symbol, None
+
+
+def _described(found):
+    """The instrument as the client shows it back, or None.
+
+    Money as strings, like everywhere else. This is confirmation, not
+    record: none of it is stored, because the name belongs to the company
+    and asset_name belongs to whoever wrote it down.
+    """
+    if not found:
+        return None
+    places = money_places()
+    return {
+        "name": found["name"],
+        "sector": found["sector"],
+        "exchange": found["exchange"],
+        "low_52w": money.serialise(found["low_52w"], places),
+        "high_52w": money.serialise(found["high_52w"], places),
+    }
 
 
 @api.patch("/investments/<int:investment_id>/price")
@@ -126,16 +166,20 @@ def set_pricing(investment_id):
     if not operations.investment_exists(user_id, investment_id):
         raise NotFound()
 
-    symbol = _checked_symbol(ticker, auto) if ticker else None
+    symbol, found = _resolve_symbol(ticker, auto) if ticker else (None, None)
     if symbol is None:
         auto = False
+    exchange = (found or {}).get("exchange") or exchange
 
     if not operations.set_investment_pricing(user_id, investment_id, symbol,
                                              exchange, isin or None, auto):
         raise ApiError("Could not save that.", code="update_failed")
 
     return jsonify({"ok": True, "ticker": symbol, "auto_price": auto,
-                    "priced": _refresh(user_id) if auto else 0})
+                    "priced": _refresh(user_id) if auto else 0,
+                    # So the screen can say which company that symbol turned
+                    # out to be, rather than echoing back what was typed.
+                    "instrument": _described(found)})
 
 
 @api.post("/investments/refresh-prices")

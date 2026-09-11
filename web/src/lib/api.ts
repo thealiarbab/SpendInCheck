@@ -187,6 +187,29 @@ export interface Quote {
   source: string | null;
 }
 
+/**
+ * What a symbol turned out to be.
+ *
+ * Null when the upstream's lookup could not say -- it is the slower of
+ * their two endpoints and can be down while quotes still work, in which
+ * case the symbol is accepted on the strength of the quote alone.
+ */
+export interface Instrument {
+  name: string | null;
+  sector: string | null;
+  exchange: string | null;
+  low_52w: string | null;
+  high_52w: string | null;
+}
+
+export interface SymbolSaved {
+  ticker: string | null;
+  auto_price: boolean;
+  /** How many holdings the market answered for as a result. */
+  priced: number;
+  instrument: Instrument | null;
+}
+
 export interface PortfolioReport {
   items: Holding[];
   totals: { value: string; pnl: string; holdings: number };
@@ -595,7 +618,7 @@ export const api = {
    * redrawing.
    */
   setPricing: (id: number, ticker: string, auto: boolean, exchange?: string) =>
-    request<{ ticker: string | null; auto_price: boolean; priced: number }>(
+    request<SymbolSaved>(
       "/investments/" + id + "/pricing",
       { method: "PATCH", body: { ticker, auto_price: auto ? "1" : "0",
                                  ...(exchange ? { exchange } : {}) } }),
