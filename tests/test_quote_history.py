@@ -165,3 +165,58 @@ def test_both_query_paths_give_the_same_answer(make_api_account, clean_history):
 
     assert [tuple(str(value) for value in row) for row in separate] == \
            [tuple(str(value) for value in row) for row in combined]
+
+
+# --- what the sparkline reads -----------------------------------------------
+
+def test_the_history_endpoint_reads_our_own_records(make_api_account, clean_history):
+    """Not StockSaathi. The snapshot has already written these down, so a
+    chart must not depend on their server being up."""
+    client = make_api_account()
+    holding = add_holding(client)
+    client.patch(f"/api/v1/investments/{holding['id']}/pricing",
+                 headers=client.headers,
+                 json={"ticker": TICKER, "auto_price": "0"})
+    operations.record_closes(TICKER, [(date(2026, 9, 1), Decimal("10.00")),
+                                      (date(2026, 9, 2), Decimal("11.00"))])
+
+    items = client.get("/api/v1/investments/history").get_json()["items"]
+    assert TICKER in items
+    assert [point["close"] for point in items[TICKER]] == ["10.00", "11.00"]
+    assert [point["date"] for point in items[TICKER]] == ["2026-09-01", "2026-09-02"]
+
+
+def test_a_symbol_recorded_but_not_priced_still_gets_a_chart(
+        make_api_account, clean_history):
+    """symbols_held, not symbols_to_price. Somebody who wrote down a ticker
+    without switching on automatic pricing still wants to see it."""
+    client = make_api_account()
+    holding = add_holding(client)
+    client.patch(f"/api/v1/investments/{holding['id']}/pricing",
+                 headers=client.headers,
+                 json={"ticker": TICKER, "auto_price": "0"})
+    operations.record_closes(TICKER, [(date.today(), Decimal("10.00"))])
+
+    held = client.get("/api/v1/investments").get_json()["items"][0]
+    assert held["auto_price"] is False, "the point of the test"
+    assert TICKER in client.get("/api/v1/investments/history").get_json()["items"]
+
+
+def test_an_account_of_deposits_asks_for_nothing(make_api_account, clean_history):
+    client = make_api_account()
+    add_holding(client, asset_name="A Deposit", asset_type="FD")
+    assert client.get("/api/v1/investments/history").get_json()["items"] == {}
+
+
+def test_one_account_cannot_read_which_symbols_another_holds(
+        make_api_account, clean_history):
+    """The closes themselves are public -- a price is a fact about the
+    market. Which symbols somebody holds is not."""
+    owner, stranger = make_api_account(), make_api_account()
+    holding = add_holding(owner)
+    owner.patch(f"/api/v1/investments/{holding['id']}/pricing",
+                headers=owner.headers, json={"ticker": TICKER, "auto_price": "0"})
+    operations.record_closes(TICKER, [(date.today(), Decimal("10.00"))])
+
+    assert TICKER in owner.get("/api/v1/investments/history").get_json()["items"]
+    assert stranger.get("/api/v1/investments/history").get_json()["items"] == {}
