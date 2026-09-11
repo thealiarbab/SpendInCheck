@@ -80,7 +80,16 @@ optimising means counting statements, not tuning SQL.
 
 `server/db.py` pools connections and keeps them in autocommit, because a
 plain SELECT otherwise leaves a transaction open that costs a full round
-trip to roll back. Anything needing several statements to succeed or fail
+trip to roll back.
+
+**The pool holds three connections and the reports screen opens five
+requests.** That is fine because `_checkout` waits for one rather than
+failing -- but it is only fine for that reason. psycopg2's own pool raises
+"connection pool exhausted" the instant it is empty, which is how that
+screen served a 400 to whichever request lost the race. If a screen ever
+grows past a burst that three connections can absorb within
+`POOL_WAIT_SECONDS`, raise `DB_MAX_CONNECTIONS` -- the measured ceiling is
+sixteen usable client connections. Anything needing several statements to succeed or fail
 together uses `db.transaction()`. Every read endpoint is one round trip;
 opening the demo is three.
 
