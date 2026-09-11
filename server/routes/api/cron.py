@@ -14,6 +14,7 @@ from flask import jsonify, request
 from server import config, operations
 from server.errors import ApiError
 from server.routes.api import api
+from server.services import quote_snapshot
 
 # Vercel sends the secret as a bearer token. The explicit header is accepted
 # too so the job can be triggered by hand with curl while testing.
@@ -69,3 +70,20 @@ def post_recurring():
     """
     _require_cron_secret()
     return jsonify(operations.materialise_due())
+
+
+@api.post("/cron/snapshot-prices")
+def post_snapshot_prices():
+    """Write down what every tracked symbol closed at today.
+
+    The only job here that cannot be caught up later. Demonstration
+    accounts can be swept tomorrow and a recurring rule posts whatever it
+    owes whenever it next runs, but a closing price nobody recorded on the
+    day is gone -- the upstream keeps about a year and this is what makes
+    the year after that exist.
+
+    Safe to call twice, like the others: writes are upserts on
+    (ticker, on_date) and only today's row is allowed to move.
+    """
+    _require_cron_secret()
+    return jsonify(quote_snapshot.take_snapshot())
