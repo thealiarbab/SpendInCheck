@@ -140,3 +140,73 @@ def recent_closes(tickers, days=30):
         return {}
     finally:
         db.close_connection(connection)
+
+
+def record_instrument(found):
+    """Write down what a symbol is. Returns True when a row landed.
+
+    `found` is what services.stocksaathi.instrument returns. Overwrites on
+    conflict, unlike a close: a company's sector can be reclassified and
+    its 52-week range moves every day, so the newest answer is the right
+    one. That is the opposite rule from quote_history, and the difference
+    is that one records what happened on a day and this records what is
+    true now.
+    """
+    if not found or not found.get("symbol"):
+        return False
+
+    connection = None
+    try:
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        cursor.execute("""
+            INSERT INTO instruments (ticker, name, sector, exchange,
+                                     low_52w, high_52w)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON CONFLICT (ticker) DO UPDATE
+               SET name = COALESCE(EXCLUDED.name, instruments.name),
+                   sector = COALESCE(EXCLUDED.sector, instruments.sector),
+                   exchange = COALESCE(EXCLUDED.exchange, instruments.exchange),
+                   -- COALESCE throughout so a partial answer tops up what
+                   -- is known rather than blanking it. A feed that has
+                   -- momentarily lost the sector should not erase it.
+                   low_52w = COALESCE(EXCLUDED.low_52w, instruments.low_52w),
+                   high_52w = COALESCE(EXCLUDED.high_52w, instruments.high_52w),
+                   updated_at = now()
+        """, (found["symbol"], found.get("name"), found.get("sector"),
+              found.get("exchange"), found.get("low_52w"),
+              found.get("high_52w")))
+        connection.commit()
+        return True
+    except Error as e:
+        if connection:
+            connection.rollback()
+        print(f"Error recording instrument {found.get('symbol')}: {e}")
+        return False
+    finally:
+        db.close_connection(connection)
+
+
+def instruments_for(tickers):
+    """What these symbols are, as {ticker: row}. One statement, not one each."""
+    wanted = sorted({t for t in (tickers or []) if t})
+    if not wanted:
+        return {}
+
+    connection = None
+    try:
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        cursor.execute("""
+            SELECT ticker, name, sector, exchange, low_52w, high_52w
+              FROM instruments
+             WHERE ticker = ANY(%s::varchar[])
+        """, (wanted,))
+        return {row[0]: {"name": row[1], "sector": row[2], "exchange": row[3],
+                         "low_52w": row[4], "high_52w": row[5]}
+                for row in cursor.fetchall()}
+    except Error as e:
+        print(f"Error reading instruments: {e}")
+        return {}
+    finally:
+        db.close_connection(connection)

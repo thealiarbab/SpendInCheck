@@ -49,9 +49,9 @@ def _as_date(ts_ms):
 def take_snapshot():
     """Record closes for every symbol somebody prices automatically.
 
-    Returns {"symbols": n, "closes": n, "backfilled": n} -- the counts the
-    endpoint reports, so a run that silently did nothing is visible as a
-    run that did nothing rather than as a 200.
+    Returns {"symbols", "closes", "backfilled", "described"} -- the counts
+    the endpoint reports, so a run that silently did nothing is visible as
+    a run that did nothing rather than as a 200.
     """
     symbols = operations.symbols_to_price()
     if not symbols:
@@ -60,6 +60,7 @@ def take_snapshot():
     known = operations.symbols_with_history()
     written = 0
     backfilled = 0
+    described = 0
 
     for symbol in symbols:
         first_time = symbol not in known
@@ -77,8 +78,17 @@ def take_snapshot():
         if first_time and landed:
             backfilled += 1
 
+        # And what the symbol is. The lookup takes up to three seconds cold,
+        # which is why no screen may call it per holding -- but nobody is
+        # waiting on this job, and the 52-week range it carries moves every
+        # day. Writing it here is what lets a screen show the range without
+        # asking anybody.
+        if operations.record_instrument(
+                stocksaathi.instrument(symbol, timeout=TIMEOUT_SECONDS)):
+            described += 1
+
     return {"symbols": len(symbols), "closes": written,
-            "backfilled": backfilled}
+            "backfilled": backfilled, "described": described}
 
 
 def ensure_history(symbol):
@@ -103,3 +113,18 @@ def ensure_history(symbol):
         return 0
     return operations.record_closes(
         symbol, [(_as_date(at), price) for at, price in closes])
+
+
+def describe(symbol, found=None):
+    """Write down what a symbol is, now rather than tonight.
+
+    Called when somebody first points a holding at one, so the 52-week
+    range and the company name are on the screen immediately instead of
+    after the next nightly run. `found` is passed in when the caller has
+    already done the lookup, which the pricing route has -- it is how a
+    symbol gets accepted at all -- so this normally costs nothing.
+    """
+    if not symbol:
+        return False
+    return operations.record_instrument(
+        found or stocksaathi.instrument(symbol, timeout=TIMEOUT_SECONDS))

@@ -117,3 +117,14 @@
   font-size: var(--text-xs);
   color: var(--content-secondary);
 }
+
+/* The 52-week range, under the month's shape. Quiet and small: it is
+   context for the line above it, not a figure anybody reads on its own. */
+.range {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--content-muted);
+  white-space: nowrap;
+}

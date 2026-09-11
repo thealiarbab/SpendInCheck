@@ -26,15 +26,17 @@ TICKER = "TESTCO"
 def clean_history():
     """Remove this symbol's rows before and after.
 
-    quote_history is shared -- a price is a fact about the market, not about
-    a user -- so it is the one table a test cannot clean up by deleting its
-    user. TESTCO is not a real NSE symbol, so nothing else can be using it.
+    quote_history and instruments are both shared -- a price and a company
+    name are facts about the market, not about a user -- so they are the
+    two tables a test cannot clean up by deleting its user. TESTCO is not
+    a real NSE symbol, so nothing else can be using it.
     """
     def wipe():
         connection = db.get_connection()
         try:
             cursor = connection.cursor()
             cursor.execute("DELETE FROM quote_history WHERE ticker = %s", (TICKER,))
+            cursor.execute("DELETE FROM instruments WHERE ticker = %s", (TICKER,))
             connection.commit()
         finally:
             db.close_connection(connection)
@@ -220,3 +222,52 @@ def test_one_account_cannot_read_which_symbols_another_holds(
 
     assert TICKER in owner.get("/api/v1/investments/history").get_json()["items"]
     assert stranger.get("/api/v1/investments/history").get_json()["items"] == {}
+
+
+# --- what a symbol is -------------------------------------------------------
+
+def test_a_partial_answer_tops_up_rather_than_blanks(clean_history):
+    """The opposite rule from a close, and for a reason.
+
+    A close records what happened on a day and is settled. This records
+    what is true now -- a sector gets reclassified, and the 52-week range
+    moves daily -- so the newest answer wins. But a feed that has
+    momentarily lost the sector must not erase the one already known.
+    """
+    operations.record_instrument({
+        "symbol": TICKER, "name": "Test Co Ltd", "sector": "Energy",
+        "exchange": "NSE", "low_52w": Decimal("10.00"),
+        "high_52w": Decimal("20.00")})
+    operations.record_instrument({
+        "symbol": TICKER, "name": None, "sector": None, "exchange": None,
+        "low_52w": None, "high_52w": Decimal("25.00")})
+
+    facts = operations.instruments_for([TICKER])[TICKER]
+    assert facts["name"] == "Test Co Ltd", "not erased by a blank"
+    assert facts["sector"] == "Energy"
+    assert facts["high_52w"] == Decimal("25.000"), "but a new figure wins"
+
+
+def test_nothing_is_recorded_for_a_symbol_that_resolved_to_nothing():
+    assert operations.record_instrument(None) is False
+    assert operations.record_instrument({}) is False
+
+
+def test_the_history_endpoint_carries_what_each_symbol_is(
+        make_api_account, clean_history):
+    """From the same request as the closes. A separate endpoint for four
+    fields that change once a day would be a third round trip on a screen
+    that already justifies its second."""
+    client = make_api_account()
+    holding = add_holding(client)
+    client.patch(f"/api/v1/investments/{holding['id']}/pricing",
+                 headers=client.headers,
+                 json={"ticker": TICKER, "auto_price": "0"})
+    operations.record_instrument({
+        "symbol": TICKER, "name": "Test Co Ltd", "sector": "Energy",
+        "exchange": "NSE", "low_52w": Decimal("10.00"),
+        "high_52w": Decimal("20.00")})
+
+    body = client.get("/api/v1/investments/history").get_json()
+    assert body["instruments"][TICKER]["name"] == "Test Co Ltd"
+    assert body["instruments"][TICKER]["low_52w"] == "10.00", "money as a string"

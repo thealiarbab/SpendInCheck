@@ -310,7 +310,7 @@ export function Holdings() {
                 <th className={cell.numeric}>Qty</th>
                 <th className={cell.numeric}>Valued at</th>
                 <th className={cell.numeric}>Live</th>
-                <th>Month</th>
+                <th>Month · 52 weeks</th>
                 <th className={cell.numeric}>P&amp;L</th>
                 <th />
               </tr>
@@ -324,6 +324,12 @@ export function Holdings() {
               const closes = (holding.ticker
                 ? history.data?.items[holding.ticker] ?? []
                 : []).map((point) => toMinor(point.close));
+              // What the symbol is, written down by the nightly job. The
+              // lookup behind it takes three seconds cold, which is why
+              // this is read from our own table and not asked for here.
+              const what = holding.ticker
+                ? history.data?.instruments[holding.ticker]
+                : undefined;
               return (
                 <tr key={holding.id}>
                   <td className={cell.primary}>
@@ -334,6 +340,12 @@ export function Holdings() {
                             Industries" does not exist, and the symbol is
                             what their router matches. */}
                         <a className={styles.tickerLink} href={stockHref(holding.ticker)}
+                           /* The company the symbol belongs to, on hover.
+                              Not in the cell: asset_name is what its owner
+                              called it, and printing both would be the app
+                              correcting somebody's own records. */
+                           title={[what?.name, what?.sector]
+                             .filter(Boolean).join(" · ") || undefined}
                            {...externalLinkProps}>
                           {holding.ticker} ↗
                         </a>
@@ -375,10 +387,26 @@ export function Holdings() {
                     ) : "—"}
                   </td>
                   <td>
-                    {closes.length > 1
-                      ? <Sparkline values={closes}
-                                   label={`${holding.ticker} over the last month`} />
-                      : null}
+                    {closes.length > 1 && (
+                      <Sparkline values={closes}
+                                 label={`${holding.ticker} over the last month`} />
+                    )}
+                    {what?.low_52w && what.high_52w && (
+                      /* Under the month's shape rather than in a column of
+                         its own: the table is already wide, and a year's
+                         range is context for the line above it rather
+                         than a figure anybody reads on its own. */
+                      <span className={styles.range}
+                            title="52-week range">
+                        {/* Whole rupees, not compact: 1,728 becomes "1.7K"
+                            in compact notation, and the digits it drops
+                            are the ones a price range is read for. The
+                            paise are dropped instead -- nobody compares a
+                            year's high to two decimal places. */}
+                        {formatMoney(toMinor(what.low_52w), { whole: true })} –{" "}
+                        {formatMoney(toMinor(what.high_52w), { whole: true })}
+                      </span>
+                    )}
                   </td>
                   <td className={cell.numeric}>
                     <Money value={holding.pnl} signed />

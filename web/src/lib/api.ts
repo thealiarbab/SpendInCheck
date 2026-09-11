@@ -641,7 +641,8 @@ export const api = {
    * one request rather than six.
    */
   holdingsHistory: () =>
-    request<{ items: Record<string, ClosePoint[]> }>("/investments/history"),
+    request<{ items: Record<string, ClosePoint[]>;
+              instruments: Record<string, Instrument> }>("/investments/history"),
   /**
    * Quotes through this server rather than from the browser.
    *

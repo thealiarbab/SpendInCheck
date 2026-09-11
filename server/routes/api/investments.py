@@ -180,6 +180,10 @@ def set_pricing(investment_id):
         # rather than being flat until tonight's run. A no-op for a symbol
         # somebody else already tracks, which is most of them.
         quote_snapshot.ensure_history(symbol)
+        # The lookup has already happened -- it is how the symbol was
+        # accepted -- so keeping its answer costs nothing and saves every
+        # later screen from asking.
+        quote_snapshot.describe(symbol, found)
 
     return jsonify({"ok": True, "ticker": symbol, "auto_price": auto,
                     "priced": _refresh(user_id) if auto else 0,
@@ -261,22 +265,37 @@ SPARK_DAYS = 30
 
 @api.get("/investments/history")
 def holdings_history():
-    """Recent closes for every symbol this account holds.
+    """Recent closes, and what each symbol is.
 
-    From quote_history, which means no call to StockSaathi at all: the
-    nightly snapshot has already written these down, and drawing a chart
-    should not depend on somebody else's server being up. One statement for
-    every symbol on the screen, rather than one request per holding.
+    Both from this app's own tables, which means no call to StockSaathi at
+    all: the nightly snapshot has already written them down, and drawing a
+    chart should not depend on somebody else's server being up. Two
+    statements for every symbol on the screen, rather than two requests per
+    holding -- and the instrument lookup in particular takes three seconds
+    cold, which is why no screen may make it.
 
     Money as strings, like everywhere else.
     """
     user_id = require_user()
     places = money_places()
-    series = operations.recent_closes(operations.symbols_held(user_id),
-                                      days=SPARK_DAYS)
-    return jsonify({"items": {
-        ticker: [{"date": on_date.isoformat(),
-                  "close": money.serialise(close, places)}
-                 for on_date, close in closes]
-        for ticker, closes in series.items()
-    }})
+    held = operations.symbols_held(user_id)
+    series = operations.recent_closes(held, days=SPARK_DAYS)
+    known = operations.instruments_for(held)
+    return jsonify({
+        "items": {
+            ticker: [{"date": on_date.isoformat(),
+                      "close": money.serialise(close, places)}
+                     for on_date, close in closes]
+            for ticker, closes in series.items()
+        },
+        # What each symbol is, from the same request. A separate endpoint
+        # for four fields that change once a day would be a third round
+        # trip on a screen that already justifies its second.
+        "instruments": {
+            ticker: {"name": facts["name"], "sector": facts["sector"],
+                     "exchange": facts["exchange"],
+                     "low_52w": money.serialise(facts["low_52w"], places),
+                     "high_52w": money.serialise(facts["high_52w"], places)}
+            for ticker, facts in known.items()
+        },
+    })
