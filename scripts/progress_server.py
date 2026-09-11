@@ -158,7 +158,9 @@ PHASES = [
               "worth is now valued month by month at what things actually "
               "closed at, where before every month was valued at today's price "
               "and the line described the portfolio changing rather than the "
-              "market.",
+              "market. Sparklines read that same table, so six holdings are "
+              "one statement against our own database rather than six "
+              "requests to somebody else's.",
      "open": [
          "Symbol autocomplete is blocked. It needs a public search endpoint on "
          "StockSaathi -- the instrument master is in their Supabase and their "
@@ -167,8 +169,9 @@ PHASES = [
          "Portfolio vs NIFTY is blocked: the index does not quote. NIFTY and "
          "^NSEI come back null and NIFTY50 returns some other instrument "
          "entirely. NIFTYBEES is the honest substitute if labelled as one.",
-         "Still to do and not blocked: sparklines per holding, the 52-week "
-         "range, and the two remaining nudges (surplus, goal reached).",
+         "Still to do and not blocked: the 52-week range, which needs to "
+         "come from the nightly snapshot rather than a lookup per row, and "
+         "the goal-reached card, which is the third and last nudge.",
      ]},
     {"n": 10, "name": "Opt-in account linking", "state": "next",
      "blurb": "Last, because it is the only feature that can damage a different "

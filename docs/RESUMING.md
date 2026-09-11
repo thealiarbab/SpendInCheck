@@ -180,10 +180,9 @@ one.
   Storing it is the obvious answer and the wrong one -- it changes daily,
   so a stored copy is wrong by definition. If it is wanted per row, it
   belongs in the nightly snapshot beside the closes.
-- The two remaining contextual nudges: the surplus prompt when a month
-  closes under budget, and the savings-goal-reached card. The investments
-  empty state is done. Three placements is the cap -- more reads as
-  advertising.
+- The savings-goal-reached card, which is the third and last placement.
+  The investments empty state and the surplus prompt are done. Three is
+  the cap -- more reads as advertising.
 - Phase 10, opt-in account linking, which is untouched and is the only
   feature that can damage a different product's data.
 
