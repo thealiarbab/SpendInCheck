@@ -67,11 +67,23 @@ function useShape(): Shape {
   };
 }
 
+/* Built once, and each answer kept. toLocaleDateString constructs a
+   formatter on every call, and the Reports screen draws four charts from the
+   same twelve months -- every tick label and every tooltip title asking for
+   one of twelve strings that never change. Constructing the formatter is the
+   expensive part of that, and none of it depended on anything per-render. */
+const MONTH_LABEL = new Intl.DateTimeFormat("en-IN", { month: "short" });
+const shortMonths = new Map<string, string>();
+
 /** "2026-08" as "Aug", which is all that fits under a tick. */
 function shortMonth(month: string): string {
+  const known = shortMonths.get(month);
+  if (known !== undefined) return known;
+
   const [year, index] = month.split("-");
-  return new Date(Number(year), Number(index) - 1, 1)
-    .toLocaleDateString("en-IN", { month: "short" });
+  const label = MONTH_LABEL.format(new Date(Number(year), Number(index) - 1, 1));
+  shortMonths.set(month, label);
+  return label;
 }
 
 /**
