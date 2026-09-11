@@ -297,7 +297,15 @@ def net_worth_series(user_id, months=SERIES_MONTHS):
             ),
             cash AS (
                 SELECT m.month_start,
-                       COALESCE((
+                       -- What the accounts opened with, before a single row
+                       -- was written. Without it this line is the ledger's
+                       -- movement rather than the money, and disagrees with
+                       -- the total the Accounts screen shows -- which counts
+                       -- opening balances, because that is where the money
+                       -- actually starts.
+                       (SELECT COALESCE(SUM(a.opening_balance), 0)
+                          FROM accounts a WHERE a.user_id = %s)
+                       + COALESCE((
                            SELECT SUM(CASE WHEN t.txn_type = 'Income'
                                            THEN t.amount ELSE -t.amount END)
                            FROM transactions t
@@ -316,7 +324,7 @@ def net_worth_series(user_id, months=SERIES_MONTHS):
                    held.value, cash.running, held.value + cash.running
             FROM cash JOIN held ON held.month_start = cash.month_start
             ORDER BY cash.month_start
-        """, (months - 1, user_id, user_id))
+        """, (months - 1, user_id, user_id, user_id))
         return cursor.fetchall()
     except Error as e:
         print(f"Error generating the net worth series: {e}")
@@ -383,7 +391,14 @@ net_worth AS (
            """ + _holdings_at_month_end(
                "c.month_start + interval '1 month'", "%(user_id)s") + """
                AS holdings,
-           COALESCE((SELECT SUM(CASE WHEN l.txn_type = 'Income'
+           -- The opening balances, exactly as net_worth_series counts them
+           -- and for the same reason. This query and that one answer the
+           -- same question by different routes, and a test asserts they
+           -- agree row for row -- which is how the first version of this
+           -- fix, applied to only one of them, was caught.
+           (SELECT COALESCE(SUM(a.opening_balance), 0)
+              FROM accounts a WHERE a.user_id = %(user_id)s)
+           + COALESCE((SELECT SUM(CASE WHEN l.txn_type = 'Income'
                                      THEN l.amount ELSE -l.amount END)
                        FROM ledger l
                       WHERE l.txn_date < c.month_start + interval '1 month'), 0)

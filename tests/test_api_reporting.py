@@ -111,6 +111,29 @@ def test_net_worth_is_holdings_plus_accumulated_cash(make_api_account):
     assert Decimal(june["net_worth"]) == Decimal(june["cash"]) + Decimal(june["holdings"])
 
 
+def test_net_worth_cash_counts_what_the_accounts_opened_with(make_api_account):
+    """The two screens have to agree, and they did not.
+
+    Net worth summed transactions only, so an account opened with money
+    already in it showed that money on the Accounts screen and none of it
+    here. Anybody reconciling the two found a gap exactly the size of every
+    opening balance they had ever entered -- and the Accounts screen was the
+    one telling the truth.
+    """
+    client = make_api_account()
+    client.post("/api/v1/accounts", headers=client.headers,
+                json={"name": "Savings", "kind": "Bank",
+                      "opening_balance": "50000.00"})
+    add(client, "2026-06-05", "1000.00", "Income", "pay")
+
+    across = sum(Decimal(one["balance"])
+                 for one in client.get("/api/v1/accounts").get_json()["items"])
+    assert across == Decimal("51000.00")
+
+    rows = client.get("/api/v1/reports/net-worth?months=24").get_json()["items"]
+    assert Decimal(month_of(rows, "2026-06")["cash"]) == across
+
+
 def test_a_holding_is_not_counted_before_it_was_bought(make_api_account):
     client = make_api_account()
     client.post("/api/v1/investments", headers=client.headers,
