@@ -137,16 +137,19 @@ Two things to know before that push.
 
 **`vercel.json` changed shape and has never run.** It now declares two
 builds instead of one: `@vercel/python` for `app.py` as before, and
-`@vercel/static-build` on `web/package.json` for the client. Only `/api`
-reaches Python; everything else is served from the edge, with
-`index.html` as the fallback for any path that is not a file.
+`@vercel/static-build` for the client. Only `/api` reaches Python;
+everything else is served from the edge, with `index.html` as the fallback
+for any path that is not a file.
 
-The risk is the one line that cannot be checked locally: a legacy build
-mounts its output under the directory of its entrypoint, so the client's
-files are addressed as `/web/...` in `dest`. If that prefix is wrong the
-symptom is unmissable — the site 404s on every path — and the fix is one
-word. Read the deployment's build log rather than assuming, and if it is
-wrong, `vercel build` locally reproduces the same layout.
+The static build's entrypoint is the **root** `package.json`, whose only
+job is `npm --prefix web ci && npm --prefix web run build`. That is
+deliberate: a legacy build mounts its output under the directory of its
+entrypoint, so pointing it at `web/package.json` would have addressed
+every file as `/web/...` — a prefix that cannot be checked without
+deploying. From the root there is no prefix to get wrong, and `handle:
+filesystem` then serves whatever the build produced without anything
+having to name it. `npm run build` at the repo root is exactly what
+Vercel runs, and it works.
 
 **An unknown URL answers 200, not 404.** The catch-all serves
 `index.html`, and React renders "Not found" inside it. That is how a

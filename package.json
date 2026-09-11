@@ -1,0 +1,8 @@
+{
+  "name": "spendincheck",
+  "private": true,
+  "description": "Build entrypoint for the deployment. The application lives in web/; this exists so the static build's output mounts at the site root rather than under a directory name. See vercel.json.",
+  "scripts": {
+    "build": "npm --prefix web ci && npm --prefix web run build"
+  }
+}

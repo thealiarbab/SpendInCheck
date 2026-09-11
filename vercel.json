@@ -11,18 +11,17 @@
       }
     },
     {
-      "src": "web/package.json",
+      "src": "package.json",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": "dist"
+        "distDir": "web/dist"
       }
     }
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "app.py" },
-    { "src": "/assets/(.*)", "dest": "/web/assets/$1" },
-    { "src": "/(.+[.][A-Za-z0-9]+)$", "dest": "/web/$1" },
-    { "src": "/(.*)", "dest": "/web/index.html" }
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ],
   "crons": [
     {
