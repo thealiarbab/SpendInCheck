@@ -81,12 +81,20 @@ class Validator:
         article = "an" if name[:1].lower() in takes_an else "a"
         raw = self.payload.get(field)
 
-        if raw is None or str(raw).strip() == "":
+        # NUL is stripped before the empty check, not after, so a value that
+        # is only NUL bytes counts as empty rather than slipping past the
+        # required gate and reaching the database as "". PostgreSQL cannot
+        # store a NUL in a text column at all -- it arrives as a ValueError,
+        # which is a 500 on input a person could paste by accident. Cleaned
+        # here, at the one gate every string field passes through.
+        cleaned = "" if raw is None else str(raw).replace(chr(0), "")
+
+        if cleaned.strip() == "":
             if required:
                 return self.fail(field, f"Enter {article} {name}.")
             return None
 
-        value = str(raw).strip()
+        value = cleaned.strip()
         if max_length and len(value) > max_length:
             return self.fail(field, f"Keep this to {max_length} characters or fewer.")
         return value

@@ -51,9 +51,20 @@ def to_decimal(raw_value):
         return None
 
     try:
-        return Decimal(text)
+        value = Decimal(text)
     except InvalidOperation:
         return None
+
+    # "NaN" and "Infinity" are valid Decimal syntax and parse without error,
+    # then blow up the moment anything compares or quantises them -- which is
+    # a 500, deep in a query, on input that should have been refused at the
+    # door. is_finite() is false for both, and for sNaN. A 400-digit integer
+    # is finite and legitimate as syntax, but it is not a sum of money; the
+    # scale of the largest real balance is comfortably inside fifteen digits,
+    # so anything past that is a fuzzing payload, not an amount.
+    if not value.is_finite() or abs(value.adjusted()) > 15:
+        return None
+    return value
 
 
 def quantise(amount, places=2):
