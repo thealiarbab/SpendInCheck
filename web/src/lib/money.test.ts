@@ -5,6 +5,7 @@ import {
   toApiString,
   formatMoney,
   formatSigned,
+  formatChange,
   formatCompact,
   formatPercent,
   formatQuantity,
@@ -139,4 +140,39 @@ test("tone follows the sign", () => {
   assert.equal(moneyTone(1), "credit");
   assert.equal(moneyTone(-1), "debit");
   assert.equal(moneyTone(0), "level");
+});
+
+// --- a day's move ------------------------------------------------------------
+//
+// The upstream sends a fraction. Everything here is about the one
+// multiplication by a hundred, and about it happening once.
+
+test("a fraction becomes a percentage, once", () => {
+  setCurrency("INR");
+  assert.equal(formatChange(-0.0039), "−0.39%");
+  assert.equal(formatChange(0.0212), "+2.12%");
+});
+
+test("a flat day is not dressed up with a sign", () => {
+  assert.equal(formatChange(0), "0.00%");
+});
+
+test("two places, because a tenth of a percent is real money", () => {
+  // At one place this is 0.0%, which reads as "nothing happened" on a
+  // holding where it is several hundred rupees.
+  assert.equal(formatChange(0.0004), "+0.04%");
+});
+
+test("no change to report is a dash, not a zero", () => {
+  // 0.00% is a claim that the price did not move. Null is the absence of
+  // any claim at all, and they must not look the same.
+  assert.equal(formatChange(null), "—");
+  assert.equal(formatChange(undefined), "—");
+  assert.equal(formatChange(NaN), "—");
+});
+
+test("a minus sign, not a hyphen", () => {
+  // U+2212 lines up with the digits in a column of figures; the hyphen
+  // sits high and short and makes a table look ragged.
+  assert.ok(formatChange(-0.05).startsWith("−"));
 });

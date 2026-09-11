@@ -146,6 +146,34 @@ export function formatSigned(minor: Minor, options?: { whole?: boolean }): strin
 }
 
 /**
+ * A day's move, as a percentage.
+ *
+ * The upstream sends this as a FRACTION -- -0.0039 is a fifth of a percent
+ * down, not four -- and this is the only place in the app that multiplies
+ * by a hundred. Doing it twice is how a quiet day gets rendered as a crash,
+ * and the two spots that would each do it once are a price column and a
+ * tooltip, which nobody compares.
+ *
+ * Two decimal places, because a tenth of a percent on a large holding is
+ * real money and rounding it to a whole number hides the entire move on a
+ * flat day.
+ *
+ * Not formatPercent, which is a different question: that one takes two
+ * amounts and works out what share the first is of the second. This one is
+ * handed a ratio somebody else computed and only has to render it -- with a
+ * sign, because a day's move that does not say which way it went is not
+ * worth printing.
+ */
+export function formatChange(fraction: number | null | undefined): string {
+  if (fraction === null || fraction === undefined || !Number.isFinite(fraction)) {
+    return "\u2014";
+  }
+  const percent = fraction * 100;
+  const sign = percent > 0 ? "+" : percent < 0 ? "\u2212" : "";
+  return `${sign}${Math.abs(percent).toFixed(2)}%`;
+}
+
+/**
  * Compact form for tight spaces.
  *
  * Lakh and crore for the rupee, because that is how the figures are spoken

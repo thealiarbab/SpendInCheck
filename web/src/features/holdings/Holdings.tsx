@@ -2,8 +2,9 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, api } from "../../lib/api";
 import type { Holding } from "../../lib/api";
-import { formatQuantity, formatMoney, toMinor } from "../../lib/money";
-import { discoverHref, externalLinkProps, stockHref } from "../../lib/links";
+import { formatChange, formatQuantity, formatMoney, toMinor } from "../../lib/money";
+import { discoverHref, externalLinkProps, investHref, stockHref } from "../../lib/links";
+import { useLiveQuotes } from "../../hooks/useLiveQuotes";
 import {
   Button, Card, Confirm, Empty, Field, Form, FormActions, Loading, Money, Notice,
   PageHead, Picker, RowActions, Stat, StatRow, Table, cell,
@@ -20,17 +21,26 @@ function today(): string {
 
 const blank = () => ({
   asset_name: "", asset_type: "Stock", buy_date: today(),
-  buy_price: "", quantity: "", current_price: "",
+  buy_price: "", quantity: "", current_price: "", ticker: "", auto_price: "0",
 });
 
 /**
  * Holdings: what is owned, what it cost, and what it is worth now.
  *
- * Two queries rather than one. /investments is the editable record --
- * prices and quantities as entered; /reports/portfolio is the same rows
- * with profit and loss worked out. The report is what the table shows and
- * the record is what the repricing writes to, so both are needed and the
- * arithmetic stays in SQL rather than being redone here.
+ * This screen is the markets zone, and the only one. Live prices, day
+ * moves, symbols and links out to StockSaathi are confined here on
+ * purpose -- the dashboard, the ledger and the budgets stay about money in
+ * and money out, and a ticker tape in the shell would quietly turn a
+ * budgeting app into a half-broker.
+ *
+ * Two prices per row, deliberately. "Valued at" is the figure stored
+ * against the holding, which is what the profit and loss and every total on
+ * this page are worked out from. "Live" is what the market says this
+ * minute, fetched by the browser and never written anywhere. They differ
+ * until somebody presses Update prices, which is the one action that makes
+ * the stored figure the live one. Showing a live number and a P&L computed
+ * from a different one, in the same row, is how a screen stops being
+ * believed.
  */
 export function Holdings() {
   const client = useQueryClient();
@@ -38,12 +48,25 @@ export function Holdings() {
   const [confirming, setConfirming] = useState<number | null>(null);
   const [repricing, setRepricing] = useState<number | null>(null);
   const [price, setPrice] = useState("");
+  const [tracking, setTracking] = useState<number | null>(null);
+  const [ticker, setTicker] = useState("");
+  const [trackAuto, setTrackAuto] = useState(true);
 
   // One request. The portfolio report carries the editable fields as well
   // as the worked-out profit and loss, so asking /investments separately
   // was a second trip to Mumbai for columns already on the way back.
   const portfolio = useQuery({ queryKey: ["portfolio"], queryFn: api.portfolio });
   const holdings = portfolio;
+
+  const rows = portfolio.data?.items ?? [];
+  const totals = portfolio.data?.totals;
+  const pnl = totals ? toMinor(totals.pnl) : 0;
+
+  // Every symbol on the screen, whether or not it is being written to the
+  // database. Somebody who recorded a ticker without switching on automatic
+  // pricing still wants to see what it is doing.
+  const symbols = rows.map((row) => row.ticker).filter((t): t is string => !!t);
+  const market = useLiveQuotes(symbols);
 
   const refresh = () => {
     client.invalidateQueries({ queryKey: ["investments"] });
@@ -69,6 +92,20 @@ export function Holdings() {
     },
   });
 
+  const setPricing = useMutation({
+    mutationFn: (id: number) => api.setPricing(id, ticker.trim(), trackAuto),
+    onSuccess: () => {
+      refresh();
+      setTracking(null);
+      setTicker("");
+    },
+  });
+
+  const updatePrices = useMutation({
+    mutationFn: api.refreshPrices,
+    onSuccess: refresh,
+  });
+
   const remove = useMutation({
     mutationFn: (id: number) => api.deleteInvestment(id),
     onSuccess: () => {
@@ -79,16 +116,25 @@ export function Holdings() {
 
   const failure = add.error instanceof ApiError ? add.error : null;
   const fields = failure?.isValidation ? failure.fields : {};
-
-  const rows = portfolio.data?.items ?? [];
-  const totals = portfolio.data?.totals;
-  const pnl = totals ? toMinor(totals.pnl) : 0;
+  const pricingFailure = setPricing.error instanceof ApiError ? setPricing.error : null;
 
   function startReprice(holding: Holding) {
     setRepricing(holding.id);
     setPrice(holding.current_price);
+    setTracking(null);
     setConfirming(null);
   }
+
+  function startTracking(holding: Holding) {
+    setTracking(holding.id);
+    setTicker(holding.ticker ?? "");
+    setTrackAuto(holding.auto_price || !holding.ticker);
+    setRepricing(null);
+    setConfirming(null);
+    setPricing.reset();
+  }
+
+  const automatic = rows.filter((row) => row.auto_price).length;
 
   return (
     <>
@@ -141,6 +187,14 @@ export function Holdings() {
             placeholder="same as buy"
             onChange={(e) => setDraft({ ...draft, current_price: e.target.value })}
           />
+          <Field
+            label="NSE symbol" name="ticker" maxLength={32}
+            value={draft.ticker} error={fields.ticker} placeholder="optional — RELIANCE"
+            /* Uppercased as it is typed, because that is how it is stored
+               and how it will be shown, and a field that silently changes
+               what you typed after you leave it is unsettling. */
+            onChange={(e) => setDraft({ ...draft, ticker: e.target.value.toUpperCase() })}
+          />
           <FormActions>
             <Button
               onClick={() => add.mutate()}
@@ -153,7 +207,8 @@ export function Holdings() {
         </Form>
         <p className={styles.hint}>
           Leave the current price empty and the holding is worth what it cost until
-          you reprice it.
+          you reprice it. Give it a symbol and you can have the price fetched for
+          you instead — that is off until you turn it on, per holding.
         </p>
         {failure && !failure.isValidation && <Notice>{failure.message}</Notice>}
         {add.isSuccess && <Notice ok>Saved.</Notice>}
@@ -162,6 +217,47 @@ export function Holdings() {
       <div style={{ height: "var(--space-5)" }} />
 
       <Card title="All holdings" flush>
+        {rows.length > 0 && (
+          <div className={styles.marketLine}>
+            <span>
+              {automatic === 0
+                ? "No holding is priced automatically yet."
+                : market.unreachable
+                ? "Cannot reach the market right now — showing the last prices fetched."
+                : market.marketOpen
+                ? `Live for ${symbols.length} symbol${symbols.length === 1 ? "" : "s"}.`
+                : "Market closed — these are the last traded prices."}
+            </span>
+            <span style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+              {automatic > 0 && (
+                <Button kind="quiet" small disabled={updatePrices.isPending}
+                        onClick={() => updatePrices.mutate()}>
+                  {updatePrices.isPending ? "Updating…" : "Update prices"}
+                </Button>
+              )}
+              <span className={styles.attribution}>
+                Prices by{" "}
+                <a href={investHref} {...externalLinkProps}>StockSaathi ↗</a>
+              </span>
+            </span>
+          </div>
+        )}
+
+        {updatePrices.isSuccess && (
+          <div style={{ padding: "0 var(--space-5)" }}>
+            <Notice ok>
+              {/* "Priced", not "revalued": the count is how many holdings
+                  the market answered for, and on a quiet day that is the
+                  same number with nothing changed. Claiming a revaluation
+                  that did not happen is worse than saying less. */}
+              {updatePrices.data.priced === 0
+                ? "Nothing to price — no holding is set to fetch its own."
+                : `Priced ${updatePrices.data.priced} holding${
+                    updatePrices.data.priced === 1 ? "" : "s"} from the market.`}
+            </Notice>
+          </div>
+        )}
+
         {holdings.isPending && !holdings.data ? (
           <Loading what="holdings" />
         ) : holdings.error ? (
@@ -175,25 +271,34 @@ export function Holdings() {
                 <th>Bought</th>
                 <th className={cell.numeric}>Buy price</th>
                 <th className={cell.numeric}>Qty</th>
-                <th className={cell.numeric}>Now</th>
+                <th className={cell.numeric}>Valued at</th>
+                <th className={cell.numeric}>Live</th>
                 <th className={cell.numeric}>P&amp;L</th>
                 <th />
               </tr>
             }
           >
             {rows.map((holding) => {
-              const figures = holding;
+              const quote = holding.ticker ? market.quotes[holding.ticker] : undefined;
               return (
                 <tr key={holding.id}>
                   <td className={cell.primary}>
-                    {holding.asset_type === "Stock" ? (
-                      // Only a stock has a page to deep-link to; a fixed
-                      // deposit has no ticker and never will.
-                      <a className={styles.symbol} href={stockHref(holding.asset_name)}
-                         {...externalLinkProps}>
-                        {holding.asset_name} <span aria-hidden="true">↗</span>
-                      </a>
-                    ) : holding.asset_name}
+                    {holding.asset_name}
+                    {holding.ticker && (
+                      <span className={styles.tickerLine}>
+                        {/* By ticker, not by name: a page for "Reliance
+                            Industries" does not exist, and the symbol is
+                            what their router matches. */}
+                        <a className={styles.tickerLink} href={stockHref(holding.ticker)}
+                           {...externalLinkProps}>
+                          {holding.ticker} ↗
+                        </a>
+                        {holding.auto_price && (
+                          <span className={styles.tracking}
+                                title="Priced automatically">●</span>
+                        )}
+                      </span>
+                    )}
                   </td>
                   <td>{holding.asset_type}</td>
                   <td className={cell.numeric} style={{ textAlign: "left" }}>
@@ -214,7 +319,19 @@ export function Holdings() {
                     ) : formatMoney(toMinor(holding.current_price))}
                   </td>
                   <td className={cell.numeric}>
-                    {figures ? <Money value={figures.pnl} signed /> : "—"}
+                    {quote ? (
+                      <>
+                        {formatMoney(toMinor(quote.price))}
+                        <span className={`${styles.live} ${
+                          (quote.change ?? 0) > 0 ? styles.up
+                          : (quote.change ?? 0) < 0 ? styles.down : ""}`}>
+                          {formatChange(quote.change)}
+                        </span>
+                      </>
+                    ) : "—"}
+                  </td>
+                  <td className={cell.numeric}>
+                    <Money value={holding.pnl} signed />
                   </td>
                   <td>
                     {confirming === holding.id ? (
@@ -223,6 +340,37 @@ export function Holdings() {
                         onYes={() => remove.mutate(holding.id)}
                         onNo={() => setConfirming(null)}
                       />
+                    ) : tracking === holding.id ? (
+                      <div>
+                        <input
+                          className={styles.tickerInput}
+                          value={ticker} placeholder="RELIANCE"
+                          aria-label={`Symbol for ${holding.asset_name}`}
+                          onChange={(e) => setTicker(e.target.value.toUpperCase())}
+                        />
+                        <label className={styles.trackRow}>
+                          <input
+                            type="checkbox" checked={trackAuto}
+                            disabled={ticker.trim() === ""}
+                            onChange={(e) => setTrackAuto(e.target.checked)}
+                          />
+                          Fetch the price for me
+                        </label>
+                        <RowActions>
+                          <Button small disabled={setPricing.isPending}
+                                  onClick={() => setPricing.mutate(holding.id)}>
+                            {setPricing.isPending ? "Checking…" : "Save"}
+                          </Button>
+                          <Button kind="quiet" small onClick={() => setTracking(null)}>
+                            Cancel
+                          </Button>
+                        </RowActions>
+                        {pricingFailure && (
+                          <p className={styles.trackRow} style={{ color: "var(--state-error)" }}>
+                            {pricingFailure.fields.ticker ?? pricingFailure.message}
+                          </p>
+                        )}
+                      </div>
                     ) : repricing === holding.id ? (
                       <RowActions>
                         <Button small disabled={reprice.isPending}
@@ -235,11 +383,14 @@ export function Holdings() {
                       </RowActions>
                     ) : (
                       <RowActions>
+                        <Button kind="quiet" small onClick={() => startTracking(holding)}>
+                          {holding.ticker ? "Symbol" : "Add symbol"}
+                        </Button>
                         <Button kind="quiet" small onClick={() => startReprice(holding)}>
                           Reprice
                         </Button>
                         <Button kind="danger" small
-                                onClick={() => { setRepricing(null);
+                                onClick={() => { setRepricing(null); setTracking(null);
                                                  setConfirming(holding.id); }}>
                           Delete
                         </Button>
@@ -253,11 +404,12 @@ export function Holdings() {
         ) : (
           <Empty>
             Nothing held yet.{" "}
-            <a href={discoverHref} {...externalLinkProps}>Find something to buy ↗</a>
+            <a href={discoverHref} {...externalLinkProps}>Find something worth holding ↗</a>
           </Empty>
         )}
         {reprice.error && <Notice>{(reprice.error as Error).message}</Notice>}
         {remove.error && <Notice>{(remove.error as Error).message}</Notice>}
+        {updatePrices.error && <Notice>{(updatePrices.error as Error).message}</Notice>}
       </Card>
     </>
   );

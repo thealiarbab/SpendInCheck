@@ -27,3 +27,93 @@
   width: 8rem;
   text-align: right;
 }
+
+/* --- the markets zone -------------------------------------------------------
+   Everything price-fed is confined to this screen. Nothing here appears on
+   the dashboard, the ledger or the budgets: this app is about money in and
+   money out, and a ticker tape in the shell would quietly make it something
+   else. */
+
+/* The symbol under the asset name. Smaller and quieter than the name --
+   it is how the machine knows the holding, not how its owner does. */
+.tickerLine {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: 2px;
+  font-size: var(--text-xs);
+}
+
+.tickerLink {
+  color: var(--accent-invest);
+  text-decoration: none;
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+}
+
+.tickerLink:hover { text-decoration: underline; }
+
+/* A holding whose price arrives on its own. A dot rather than a word,
+   because it repeats on every row and the word does not survive being read
+   fifty times. */
+.tracking {
+  color: var(--accent-default);
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+.live {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--content-muted);
+  margin-top: 2px;
+}
+
+.up { color: var(--money-credit); }
+.down { color: var(--money-debit); }
+
+/* The bar above the table: where the prices came from and when. */
+.marketLine {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--line-soft);
+  font-size: var(--text-sm);
+  color: var(--content-secondary);
+}
+
+.attribution {
+  color: var(--content-muted);
+}
+
+.attribution a {
+  color: var(--accent-invest);
+  text-decoration: none;
+}
+
+.attribution a:hover { text-decoration: underline; }
+
+/* The per-row pricing editor, in the cell it is about. */
+.tickerInput {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  color: var(--content-primary);
+  background: var(--surface-inset);
+  border: 1px solid var(--line-focus);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+  width: 9rem;
+}
+
+.trackRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--content-secondary);
+}

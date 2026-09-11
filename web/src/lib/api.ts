@@ -163,6 +163,28 @@ export interface Holding {
   quantity: string;
   pnl: string;
   current_value: string;
+  /** The NSE symbol, when this holding has one. Null for a deposit. */
+  ticker: string | null;
+  exchange: string | null;
+  /** Whether current_price is allowed to be overwritten by the market. */
+  auto_price: boolean;
+  /** When the market last wrote it. Null if a person typed it. */
+  priced_at: string | null;
+}
+
+/**
+ * One symbol's current price.
+ *
+ * `change` is the fraction the upstream sends -- -0.0039 is a fifth of a
+ * percent down, not four. It is turned into a percentage in exactly one
+ * place, formatChange in lib/money, so it cannot be done twice.
+ */
+export interface Quote {
+  price: string;
+  prev_close: string | null;
+  change: number | null;
+  as_of: number | null;
+  source: string | null;
 }
 
 export interface PortfolioReport {
@@ -366,6 +388,12 @@ export interface InvestmentRow {
   buy_price: string;
   quantity: string;
   current_price: string;
+  ticker: string | null;
+  exchange: string | null;
+  isin: string | null;
+  auto_price: boolean;
+  price_source: "manual" | "stocksaathi";
+  priced_at: string | null;
 }
 
 /** How much still points at a category, so a delete can say what it moves. */
@@ -558,6 +586,34 @@ export const api = {
   reprice: (id: number, current_price: string) =>
     request<void>("/investments/" + id + "/price",
       { method: "PATCH", body: { current_price } }),
+  /**
+   * Point a holding at a market symbol, or stop pointing it at one.
+   *
+   * Pass an empty ticker to disconnect it. The server prices the holding in
+   * the same request when auto is on, and answers with how many rows that
+   * touched, so the screen can say what happened rather than silently
+   * redrawing.
+   */
+  setPricing: (id: number, ticker: string, auto: boolean, exchange?: string) =>
+    request<{ ticker: string | null; auto_price: boolean; priced: number }>(
+      "/investments/" + id + "/pricing",
+      { method: "PATCH", body: { ticker, auto_price: auto ? "1" : "0",
+                                 ...(exchange ? { exchange } : {}) } }),
+  /** Fetch today's price for every holding that asked for one. */
+  refreshPrices: () =>
+    request<{ priced: number }>("/investments/refresh-prices",
+      { method: "POST" }),
+  /**
+   * Quotes through this server rather than from the browser.
+   *
+   * The fallback path. While a screen is open the client fetches
+   * StockSaathi directly -- see hooks/useLiveQuotes -- because their API is
+   * CORS-open and routing the tick through Flask would bill a serverless
+   * invocation every few seconds.
+   */
+  quotes: (symbols: string[]) =>
+    request<{ items: Record<string, Quote> }>(
+      "/quotes" + query({ symbols: symbols.join(",") })),
 
   currencies: () => request<{ items: string[]; current: string }>(
     "/settings/currencies"),
