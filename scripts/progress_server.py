@@ -170,8 +170,12 @@ PHASES = [
          "^NSEI come back null and NIFTY50 returns some other instrument "
          "entirely. NIFTYBEES is the honest substitute if labelled as one.",
          "Still to do and not blocked: the 52-week range, which needs to "
-         "come from the nightly snapshot rather than a lookup per row, and "
-         "the goal-reached card, which is the third and last nudge.",
+         "come from the nightly snapshot rather than a lookup per row.",
+         "The third nudge -- the goal-reached card -- is left for a "
+         "decision. Goals renders inside Budgets, so it would put a link "
+         "to a broker on a budgeting screen, which the plan's own rule "
+         "about containing markets content to Investments and Reports "
+         "says not to do.",
      ]},
     {"n": 10, "name": "Opt-in account linking", "state": "next",
      "blurb": "Last, because it is the only feature that can damage a different "

@@ -180,9 +180,17 @@ one.
   Storing it is the obvious answer and the wrong one -- it changes daily,
   so a stored copy is wrong by definition. If it is wanted per row, it
   belongs in the nightly snapshot beside the closes.
-- The savings-goal-reached card, which is the third and last placement.
-  The investments empty state and the surplus prompt are done. Three is
-  the cap -- more reads as advertising.
+- The savings-goal-reached card, which is the third and last placement,
+  and which is **left undone on purpose** -- it needs a decision rather
+  than typing. The plan says two things that collide here: that the nudges
+  may have three placements, one of them a goal-reached card, and that
+  "markets content is contained to Investments and Reports; everywhere
+  else the app is about money in and money out". Goals renders inside the
+  Budgets screen, so that card would be a link to a broker on a budgeting
+  screen. The investments empty state and the surplus prompt are done and
+  both sit where the second rule allows. Two of three is not a shortfall;
+  the third is a question about how commercial this app should feel, which
+  is not mine to answer.
 - Phase 10, opt-in account linking, which is untouched and is the only
   feature that can damage a different product's data.
 
