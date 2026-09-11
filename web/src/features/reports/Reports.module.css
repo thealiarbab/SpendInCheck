@@ -65,3 +65,43 @@
   font-size: 0.6875rem;
   color: var(--content-muted);
 }
+
+/* --- the surplus card -------------------------------------------------------
+   One of three placements in the whole app. It is deliberately quieter
+   than a Card: no border on the accent side shouting for attention, no
+   colour it has not earned. A nudge that looks like an advertisement is
+   one, however carefully it is worded. */
+
+.nudge {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-top: var(--space-5);
+  padding: var(--space-5);
+  border: 1px solid var(--line-soft);
+  border-left: 2px solid var(--accent-invest);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+}
+
+.nudgeLead {
+  margin: 0;
+  color: var(--content-primary);
+}
+
+.nudgeBody {
+  margin: var(--space-2) 0 0;
+  max-width: 52ch;
+  color: var(--content-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.nudgeBody a {
+  color: var(--accent-invest);
+  text-decoration: none;
+}
+
+.nudgeBody a:hover { text-decoration: underline; }

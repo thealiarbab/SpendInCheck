@@ -9,7 +9,8 @@ import {
 import {
   ChartFrame, Legend, LineChart, PairedBars, RankedBars,
 } from "../../ui/charts";
-import { alignRunning, alignTo } from "./align";
+import { alignRunning, alignTo, monthName } from "./align";
+import { SurplusCard } from "./SurplusCard";
 import styles from "./Reports.module.css";
 
 /** How much history the charts show. A year, so seasons are visible. */
@@ -19,12 +20,6 @@ function thisMonth(): string {
   const now = new Date();
   const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
   return local.toISOString().slice(0, 7);
-}
-
-function monthName(month: string): string {
-  const [year, index] = month.split("-");
-  return new Date(Number(year), Number(index) - 1, 1)
-    .toLocaleDateString("en-IN", { month: "long", year: "numeric" });
 }
 
 /**
@@ -181,6 +176,11 @@ export function Reports() {
           <Empty>No expenses recorded for {monthName(month)}.</Empty>
         )}
       </Card>
+
+      {/* One of three placements in the app, and on Reports rather than the
+          dashboard on purpose: anything market-flavoured is confined to
+          here and Holdings. See surplus.ts for the rules that keep it rare. */}
+      <SurplusCard month={month} budgeted={budgeted} difference={difference} />
 
       <div className={styles.gap} />
 

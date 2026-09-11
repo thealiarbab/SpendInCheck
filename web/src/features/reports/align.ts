@@ -35,3 +35,18 @@ export function alignRunning<Row extends { month: string }>(
     return carried;
   });
 }
+
+
+/**
+ * "2026-08" as "August 2026".
+ *
+ * Here rather than in either screen because both the reports page and the
+ * surplus card name the same month, and two copies of a date format is how
+ * one screen says "August 2026" while the other says "Aug 2026".
+ */
+export function monthName(month: string): string {
+  const [year, index] = month.split("-").map(Number);
+  if (!year || !index) return month;
+  return new Date(year, index - 1, 1)
+    .toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+}
