@@ -213,6 +213,30 @@ def test_skipped_rows_are_not_written(make_api_account):
     assert commit(client, body["rows"]).get_json()["written"] == 1
 
 
+def test_a_file_bigger_than_one_insert_page_reports_every_row(make_api_account):
+    """execute_values sends the rows in pages, and cursor.rowcount describes
+    only the last statement it ran, not the whole run.
+
+    So a 205-row file committed all 205 rows and answered "written: 5". The
+    ledger was right and the number on the screen was wrong, which is the
+    worse way round: it tells somebody two hundred of their transactions
+    failed to import while they are sitting in the ledger, and the obvious
+    response -- importing the file again -- duplicates all of them.
+
+    psycopg2 pages at 100, so the count has to pass that boundary more than
+    once before the difference shows at all.
+    """
+    client = make_api_account()
+    category = a_category(client)
+    rows = [{"date": "2026-06-01", "amount": "10.00", "type": "Expense",
+             "description": f"row {n}", "category_id": category}
+            for n in range(205)]
+
+    assert commit(client, rows).get_json()["written"] == 205
+    paging = client.get("/api/v1/transactions?per_page=1").get_json()["page"]
+    assert paging["total"] == 205
+
+
 def test_rows_can_be_filed_on_an_account(make_api_account):
     client = make_api_account()
     account = client.get("/api/v1/accounts").get_json()["items"][0]["id"]

@@ -281,8 +281,13 @@ def commit(user_id, rows, account_id=None):
                 "INSERT INTO transactions (user_id, txn_date, category_id, amount, "
                 "        txn_type, description, account_id) VALUES %s",
                 values)
-            written = cursor.rowcount
-        return written
+
+        # len(values), not cursor.rowcount. Paging is exactly why rowcount is
+        # wrong here: it reports the last statement, not the whole run, so a
+        # 205-row file committed all 205 and reported "written: 5". The
+        # transaction above is all or nothing, so arriving here means every
+        # row in values landed, and that count is the honest one.
+        return len(values)
     except Error as e:
         print(f"Error importing transactions: {e}")
         return 0
