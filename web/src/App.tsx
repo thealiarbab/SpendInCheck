@@ -1,20 +1,42 @@
+import { Suspense, lazy } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Shell } from "./app/Shell";
 import { useSession } from "./app/SessionProvider";
 import { Landing } from "./features/landing/Landing";
-import { SignIn } from "./features/auth/SignIn";
-import { Register } from "./features/auth/Register";
-import { Dashboard } from "./features/dashboard/Dashboard";
-import { Transactions } from "./features/transactions/Transactions";
-import { Accounts } from "./features/accounts/Accounts";
-import { Categories } from "./features/categories/Categories";
-import { Import } from "./features/importing/Import";
-import { Budgets } from "./features/budgets/Budgets";
-import { Holdings } from "./features/holdings/Holdings";
-import { Reports } from "./features/reports/Reports";
-import { Settings } from "./features/settings/Settings";
 import { Loading, PageHead } from "./ui";
 import { ThemeLab } from "./features/themelab/ThemeLab";
+
+/* Landing is imported directly above, and everything else is fetched when
+   somebody actually goes there.
+
+   A stranger arriving at "/" is the common first visit, and they need the
+   front page and nothing else -- yet every screen behind the sign-in was
+   being downloaded, parsed and executed before that page could paint. None
+   of it is reachable without an account.
+
+   .then(...) because these are named exports and React.lazy wants a default. */
+const Dashboard = lazy(() => import("./features/dashboard/Dashboard")
+  .then((m) => ({ default: m.Dashboard })));
+const SignIn = lazy(() => import("./features/auth/SignIn")
+  .then((m) => ({ default: m.SignIn })));
+const Register = lazy(() => import("./features/auth/Register")
+  .then((m) => ({ default: m.Register })));
+const Transactions = lazy(() => import("./features/transactions/Transactions")
+  .then((m) => ({ default: m.Transactions })));
+const Accounts = lazy(() => import("./features/accounts/Accounts")
+  .then((m) => ({ default: m.Accounts })));
+const Categories = lazy(() => import("./features/categories/Categories")
+  .then((m) => ({ default: m.Categories })));
+const Import = lazy(() => import("./features/importing/Import")
+  .then((m) => ({ default: m.Import })));
+const Budgets = lazy(() => import("./features/budgets/Budgets")
+  .then((m) => ({ default: m.Budgets })));
+const Holdings = lazy(() => import("./features/holdings/Holdings")
+  .then((m) => ({ default: m.Holdings })));
+const Reports = lazy(() => import("./features/reports/Reports")
+  .then((m) => ({ default: m.Reports })));
+const Settings = lazy(() => import("./features/settings/Settings")
+  .then((m) => ({ default: m.Settings })));
 
 function NotFound() {
   return (
@@ -36,7 +58,7 @@ function Private({ children }: { children: React.ReactNode }) {
   const { status } = useSession();
   if (status === "checking") return <Loading what="your ledger" />;
   if (status === "signed-out") return <Navigate to="/" replace />;
-  return <>{children}</>;
+  return <Screen>{children}</Screen>;
 }
 
 /** Sign in and register, which are pointless once you are signed in. */
@@ -44,7 +66,19 @@ function Public({ children }: { children: React.ReactNode }) {
   const { status } = useSession();
   if (status === "checking") return <Loading what="your ledger" />;
   if (status === "signed-in") return <Navigate to="/" replace />;
-  return <>{children}</>;
+  return <Screen>{children}</Screen>;
+}
+
+/**
+ * Waits for a screen's code to arrive.
+ *
+ * The boundary sits here rather than around the whole router so that the
+ * nav and the frame stay on screen while a chunk loads. Put it above Shell
+ * and every navigation would blank the entire page instead of the part that
+ * is actually changing.
+ */
+function Screen({ children }: { children: React.ReactNode }) {
+  return <Suspense fallback={<Loading what="this screen" />}>{children}</Suspense>;
 }
 
 /**
@@ -58,8 +92,11 @@ function Public({ children }: { children: React.ReactNode }) {
 function Home() {
   const { status } = useSession();
   if (status === "checking") return <Loading what="your ledger" />;
+  // Landing is the one screen not split out: it is what a stranger sees
+  // first, so fetching it separately would only add a round trip to the
+  // paint that matters most.
   if (status === "signed-out") return <Landing />;
-  return <Dashboard />;
+  return <Screen><Dashboard /></Screen>;
 }
 
 /**
