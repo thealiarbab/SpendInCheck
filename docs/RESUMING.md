@@ -86,13 +86,29 @@ figures from it rather than reasoning about them.
   changing currency relabels and re-rounds, and the settings screen says so
   before the control.
 
-## 7. Where Phase 7 starts
+## 7. Where Phase 8 starts
 
-Phase 6 is closed: the reporting backend, the chart primitives and the
-reports screen that draws them, verified in both themes at desktop and
-mobile widths.
+Phase 7 is closed. Accounts, tags, goals, recurring, rollover and CSV
+import, on migrations 003-007 -- one number later than the plan's table,
+because 002 went on widening the money columns.
 
-Phase 7 is accounts through CSV import. The plan says migrations 002-006 go
-in order and import lands last, because it is the one feature that can
-create hundreds of wrong rows at once. 002 is already applied -- it is the
-one that widened the money columns.
+The four decisions worth knowing before touching any of it:
+
+- **Balances and goal totals are summed on read, never stored.** A stored
+  total is a second copy of a fact that already exists, and the two
+  disagree the first time something is edited.
+- **`budgets.rollover_in` is the one exception**, because deriving it means
+  walking back through every month a category was ever budgeted for. Every
+  write path recomputes it, and one test rebuilds it from scratch and
+  compares.
+- **A transfer is two ordinary rows sharing a `transfer_group_id`.** Every
+  report carries `transfer_group_id IS NULL`; without it, moving money
+  between your own accounts reads as income and expenditure.
+- **The recurring sweep is idempotent by construction**, via a unique index
+  on `(rule_id, txn_date)`. Vercel cron is at-least-once, so a repeat run
+  has to be a no-op rather than a duplicate rent.
+
+Phase 8 is killing Jinja: flip the rewrite so React owns `/*`, in one
+revertable commit. Three Jinja templates have already broken this phase by
+unpacking a tuple that grew a column -- `tests/test_pages_render.py` now
+guards the row shapes, and all of that goes away with the templates.

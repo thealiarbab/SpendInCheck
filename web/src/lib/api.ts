@@ -211,6 +211,28 @@ export interface Contribution {
   note: string | null;
 }
 
+/** One line of a CSV, as the server read it. A row carrying `skip` cannot
+ *  be imported and says why. */
+export interface ImportRow {
+  line: number;
+  skip?: string;
+  date?: string;
+  amount?: string;
+  type?: "Income" | "Expense";
+  description?: string;
+  category_id?: number;
+  category?: string | null;
+}
+
+export interface ImportReading {
+  /** Which of the known columns were recognised in the header. */
+  columns: string[];
+  rows: ImportRow[];
+  /** Reasons the whole file is unusable, as opposed to one row. */
+  problems: string[];
+  summary: { readable: number; skipped: number };
+}
+
 export type Cadence = "weekly" | "monthly" | "yearly";
 
 /** A transaction template with a schedule. It writes ordinary rows marked
@@ -400,6 +422,19 @@ export const api = {
     request<void>("/categories/" + id +
       (reassignTo === undefined ? "" : query({ reassign_to: String(reassignTo) })),
       { method: "DELETE" }),
+
+  /** Parse a CSV and report what it would do. Writes nothing. */
+  examineImport: (text: string, defaultCategoryId?: number) =>
+    request<ImportReading>("/import/examine", {
+      method: "POST",
+      body: { text, default_category_id: defaultCategoryId },
+    }),
+  /** Write the rows an examine returned. */
+  commitImport: (rows: ImportRow[], accountId?: number) =>
+    request<{ written: number }>("/import/commit", {
+      method: "POST",
+      body: { rows, account_id: accountId },
+    }),
 
   recurring: () => request<{ items: RecurringRule[] }>("/recurring"),
   addRule: (body: Record<string, unknown>) =>

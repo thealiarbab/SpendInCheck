@@ -34,6 +34,9 @@ from .goals import (add_contribution, add_goal, delete_contribution,
 from .recurring import (CADENCES, MAX_CATCHUP, add_rule, delete_rule,
                         list_rules, materialise_due, next_date_after,
                         rule_exists, set_rule_paused, update_rule)
+from .importing import MAX_ROWS as MAX_IMPORT_ROWS
+from .importing import commit as commit_import
+from .importing import examine, map_columns
 from .budgets import (categories_with_rollover, get_all_budgets,
                       refresh_rollover, set_budget)
 from .reports import (SERIES_MONTHS, budget_vs_actual, cashflow_series,
@@ -69,6 +72,7 @@ __all__ = [
     "CADENCES", "MAX_CATCHUP", "add_rule", "delete_rule", "list_rules",
     "materialise_due", "next_date_after", "rule_exists", "set_rule_paused",
     "update_rule",
+    "MAX_IMPORT_ROWS", "commit_import", "examine", "map_columns",
     "categories_with_rollover", "get_all_budgets", "refresh_rollover",
     "set_budget",
     "SERIES_MONTHS", "budget_vs_actual", "cashflow_series",

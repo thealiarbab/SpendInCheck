@@ -329,3 +329,36 @@ def test_ordinary_rows_still_reach_the_reports(make_api_account):
 def test_every_account_endpoint_needs_a_session(client):
     assert client.get("/api/v1/accounts").status_code == 401
     assert client.post("/api/v1/accounts").status_code in (401, 403)
+
+
+# --- the system category transfers are filed under ---------------------------
+
+def test_the_transfer_category_is_not_offered_as_a_kind_of_spending(make_api_account):
+    """It exists so both legs of a transfer have somewhere to sit. Offering
+    it in the pickers invites filing an ordinary expense as a transfer."""
+    client = make_api_account()
+    open_account(client, "Savings", "Bank", "5000.00")
+    ids = accounts(client)
+    transfer(client, ids["Savings"]["id"], ids["Main"]["id"])
+
+    names = [one["name"] for one in
+             client.get("/api/v1/categories").get_json()["items"]]
+    assert "Transfer" not in names
+
+
+def test_the_transfer_category_cannot_be_renamed_or_deleted(make_api_account):
+    """Renaming it would make it appear as a kind of spending under another
+    name; deleting it would strand the legs that point at it."""
+    client = make_api_account()
+    open_account(client, "Savings", "Bank", "5000.00")
+    ids = accounts(client)
+    transfer(client, ids["Savings"]["id"], ids["Main"]["id"])
+
+    rows = client.get("/api/v1/transactions").get_json()["items"]
+    leg = next(row for row in rows if row["transfer_group"])
+    system_id = client.get(f"/api/v1/transactions/{leg['id']}").get_json()["category_id"]
+
+    assert client.patch(f"/api/v1/categories/{system_id}", headers=client.headers,
+                        json={"name": "Shopping", "type": "Expense"}).status_code == 404
+    assert client.delete(f"/api/v1/categories/{system_id}",
+                         headers=client.headers).status_code == 404

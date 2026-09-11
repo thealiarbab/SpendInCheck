@@ -32,13 +32,22 @@ def add_category(user_id, category_name, category_type):
 
 
 def get_all_categories(user_id):
-    """Return every category as a list of (category_id, category_name, category_type) tuples."""
+    """Every category a person may file something under.
+
+    System categories are left out. The only one today is the per-user
+    Transfer category, which exists so both legs of a transfer have
+    somewhere to sit -- it is not a kind of spending, and offering it in
+    the pickers invites somebody to file an ordinary expense as a transfer.
+
+    Returns (category_id, category_name, category_type) tuples.
+    """
     connection = None
     try:
         connection = db.get_connection()
         cursor = connection.cursor()
         cursor.execute("SELECT category_id, category_name, category_type FROM categories "
-                       "WHERE user_id = %s ORDER BY category_name", (user_id,))
+                       "WHERE user_id = %s AND NOT is_system "
+                       "ORDER BY category_name", (user_id,))
         return cursor.fetchall()
     except Error as e:
         print(f"Error fetching categories: {e}")
@@ -48,13 +57,19 @@ def get_all_categories(user_id):
 
 
 def category_exists(user_id, category_id):
-    """Return True if a category with this category_id exists, else False."""
+    """Return True if this category is this user's and is not a system one.
+
+    System categories are excluded here too, so the rename and delete
+    endpoints answer 404 for them rather than letting the Transfer category
+    be renamed into something that then appears as a kind of spending.
+    """
     connection = None
     try:
         connection = db.get_connection()
         cursor = connection.cursor()
         cursor.execute("SELECT category_id FROM categories "
-                       "WHERE category_id = %s AND user_id = %s", (category_id, user_id))
+                       "WHERE category_id = %s AND user_id = %s AND NOT is_system",
+                       (category_id, user_id))
         return cursor.fetchone() is not None
     except Error as e:
         print(f"Error checking category: {e}")

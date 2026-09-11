@@ -32,7 +32,7 @@ BASELINE = "b2c9a7c"
 # mapping rather than a range. Any commit not listed is treated as part of
 # CURRENT_PHASE, which is what keeps this accurate as new work lands without
 # anyone editing the file.
-CURRENT_PHASE = 7
+CURRENT_PHASE = 8
 
 COMMIT_PHASE = {
     0: ["5e3ab5e", "6308244", "931dabe", "490f434", "c030a97", "e166bb4", "efb70ab"],
@@ -57,7 +57,11 @@ COMMIT_PHASE = {
     5: ["8f7b3bf", "9334d49", "ffbf9aa", "f238733", "58a5f52", "2d9bd7b",
         "1b0d9db", "2e9f861"],
     6: ["902adef", "6b24584", "a97b8d6", "0d0d297", "1dc9e02", "97c4872",
-        "d8a490e", "9ea6003", "1c52356"],
+        "d8a490e", "9ea6003", "1c52356", "6501316", "c4c1838"],
+    # 6501316 and c4c1838 closed phase 6 and are counted there, even though
+    # they landed after the marker had moved -- the same rule as 1d97254 in
+    # phase 3.
+    7: ["24f8a64", "146ea3d", "5a4534c", "53b3104"],
 }
 
 PHASES = [
@@ -99,11 +103,20 @@ PHASES = [
               "are lined up against the net-worth calendar rather than dropped, and a "
               "running total carries an empty month forward instead of falling to zero.",
      "open": []},
-    {"n": 7, "name": "Accounts through CSV import", "state": "now",
-     "blurb": "Migrations 002-006 in order. Import lands last, because it is the "
-              "feature that can create hundreds of wrong rows at once.",
+    {"n": 7, "name": "Accounts through CSV import", "state": "done",
+     "blurb": "Migrations 003-007 -- one later than the plan's numbering, since "
+              "002 went on widening the money columns. Accounts derive their "
+              "balances rather than storing them, and a transfer is two ordinary "
+              "rows sharing a group id, which is why no report counts it. Tags "
+              "and goals both reach user scope through the row that owns them. "
+              "Rollover is the one derived value that is stored, because "
+              "deriving it means walking back through every month a category "
+              "was ever budgeted for. Import lands last, because it is the "
+              "feature that can create hundreds of wrong rows at once -- so it "
+              "shows every row, and the reason for each one it will skip, "
+              "before writing anything.",
      "open": []},
-    {"n": 8, "name": "Kill Jinja", "state": "next",
+    {"n": 8, "name": "Kill Jinja", "state": "now",
      "blurb": "Flip the rewrite so React owns /*. One revertable commit.",
      "open": []},
     {"n": 9, "name": "StockSaathi prices", "state": "next",
