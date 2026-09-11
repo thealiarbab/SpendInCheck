@@ -126,12 +126,20 @@ export function Transactions() {
   const defaultAccountName = defaultAccount
     ? `${defaultAccount.name} (default)` : "Default account";
 
-  // Everything a write changes: the list, the reports that count it, and
-  // the opening screen, which shows the most recent rows.
+  // Everything a write changes: the list, the reports that count it, the
+  // opening screen, which shows the most recent rows, and the accounts,
+  // whose balances are derived from exactly these rows.
+  //
+  // The accounts were missing, which is why a row added here left the
+  // Accounts screen showing the old balance until its cache went stale five
+  // minutes later. Import.tsx has always invalidated them after writing
+  // transactions; this screen writes the same rows and owed the same refresh.
   const refresh = () => {
     client.invalidateQueries({ queryKey: ["transactions"] });
     client.invalidateQueries({ queryKey: ["report"] });
     client.invalidateQueries({ queryKey: ["dashboard"] });
+    client.invalidateQueries({ queryKey: ["accounts"] });
+    client.invalidateQueries({ queryKey: ["account-usage"] });
   };
 
   const save = useMutation({
