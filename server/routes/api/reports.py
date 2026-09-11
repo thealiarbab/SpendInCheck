@@ -10,15 +10,12 @@ from server import money, operations
 from server.auth import money_places, require_user
 from server.errors import ApiError
 from server.routes.api import api
-from server.routes.api.dashboard_payload import dashboard_payload
+from server.routes.api.dashboard_payload import PNL_FIELDS, dashboard_payload
 from server.validators import Validator
 
 SPEND_FIELDS = ["category", "total"]
 BUDGET_FIELDS = ["category", "limit", "actual", "difference",
                  "rollover_in", "rollover"]
-PNL_FIELDS = ["id", "asset_name", "asset_type", "buy_date", "buy_price",
-              "current_price", "quantity", "pnl", "current_value"]
-
 
 
 def _requested_month():

@@ -10,8 +10,13 @@ import cycle between the two modules that use it.
 
 from server import money, operations
 
+# The shape of a holdings row, everywhere one is serialised. reports.py
+# imports it from here rather than keeping a second copy: the two drifted
+# apart once already, and a FIELDS list that is short by a column does not
+# fail -- zip() just drops the column on the floor.
 PNL_FIELDS = ["id", "asset_name", "asset_type", "buy_date", "buy_price",
-              "current_price", "quantity", "pnl", "current_value"]
+              "current_price", "quantity", "pnl", "current_value",
+              "ticker", "exchange", "auto_price", "price_updated_at"]
 TRANSACTION_FIELDS = ["id", "date", "category", "amount", "type", "description"]
 
 VALUE_AT = PNL_FIELDS.index("current_value")

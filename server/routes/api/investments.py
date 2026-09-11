@@ -1,16 +1,23 @@
-"""Holdings and their current prices."""
+"""Holdings, their current prices, and where those prices come from."""
 
 from flask import jsonify, request
 
 from server import money, operations
 from server.auth import money_places, require_user
-from server.errors import ApiError, NotFound
+from server.errors import ApiError, NotFound, ValidationError
 from server.routes.api import api
+from server.services import stocksaathi
 from server.validators import Validator
 
 FIELDS = ["id", "asset_name", "asset_type", "buy_date", "buy_price", "quantity",
-          "current_price"]
+          "current_price",
+          # What the price can be fetched with, and whether it is being
+          # fetched. ticker is null for anything nobody can quote -- a
+          # deposit, an unlisted holding -- and that is the opt-in.
+          "ticker", "exchange", "isin", "auto_price", "price_source",
+          "priced_at"]
 ASSET_TYPES = ["Stock", "Mutual Fund", "FD"]
+EXCHANGES = ["NSE", "BSE"]
 
 
 @api.get("/investments")
@@ -35,12 +42,44 @@ def create_investment():
     # A holding entered before its first revaluation is worth what it cost.
     current_price = fields.amount("current_price", required=False,
                                   places=places) or buy_price
+    ticker = fields.text("ticker", required=False, max_length=32)
+    exchange = fields.choice("exchange", EXCHANGES, required=False)
+    isin = fields.text("isin", required=False, max_length=12)
+    auto = fields.choice("auto_price", ["1", "0"], required=False) == "1"
     fields.raise_if_invalid()
 
+    symbol = _checked_symbol(ticker, auto) if ticker else None
+    if symbol is None:
+        auto = False
+
     if not operations.add_investment(user_id, name, asset_type, buy_date,
-                                     buy_price, quantity, current_price):
+                                     buy_price, quantity, current_price,
+                                     ticker=symbol, exchange=exchange,
+                                     isin=isin or None, auto_price=auto):
         raise ApiError("Could not add that holding.", code="create_failed")
     return jsonify({"ok": True}), 201
+
+
+def _checked_symbol(ticker, must_quote):
+    """The symbol as the API wants it, having checked that it is real.
+
+    Two different standards on purpose. A symbol stored but not fetched
+    only has to look like one -- somebody recording a ticker for their own
+    reference should not be blocked because a feed is down. A symbol the
+    holding is about to be *priced* from has to actually return a price,
+    because the alternative is a holding that silently never updates and
+    somebody who believes it does.
+    """
+    symbol = stocksaathi.normalise(ticker)
+    if symbol is None:
+        raise ValidationError(
+            {"ticker": "That does not look like a symbol. Use the NSE code, "
+                       "like RELIANCE."})
+    if must_quote and symbol not in stocksaathi.live_quotes([symbol]):
+        raise ValidationError(
+            {"ticker": "No price found for " + symbol + ". Check the symbol, "
+                       "or leave automatic pricing off."})
+    return symbol
 
 
 @api.patch("/investments/<int:investment_id>/price")
@@ -63,3 +102,102 @@ def remove_investment(investment_id):
     if not operations.delete_investment(user_id, investment_id):
         raise NotFound()
     return jsonify({"ok": True})
+
+
+@api.patch("/investments/<int:investment_id>/pricing")
+def set_pricing(investment_id):
+    """Point a holding at a market symbol, or stop pointing it at one.
+
+    Its own endpoint rather than part of editing a holding, because it is a
+    different act: an edit corrects what was bought, this decides whether a
+    number on the screen is allowed to change without anybody touching it.
+
+    Turning it on prices the holding immediately. Waiting until tonight to
+    find out whether it worked is not feedback.
+    """
+    user_id = require_user()
+    fields = Validator(request.get_json(silent=True) or {})
+    ticker = fields.text("ticker", required=False, max_length=32)
+    exchange = fields.choice("exchange", EXCHANGES, required=False)
+    isin = fields.text("isin", required=False, max_length=12)
+    auto = fields.choice("auto_price", ["1", "0"], required=False) == "1"
+    fields.raise_if_invalid()
+
+    if not operations.investment_exists(user_id, investment_id):
+        raise NotFound()
+
+    symbol = _checked_symbol(ticker, auto) if ticker else None
+    if symbol is None:
+        auto = False
+
+    if not operations.set_investment_pricing(user_id, investment_id, symbol,
+                                             exchange, isin or None, auto):
+        raise ApiError("Could not save that.", code="update_failed")
+
+    return jsonify({"ok": True, "ticker": symbol, "auto_price": auto,
+                    "priced": _refresh(user_id) if auto else 0})
+
+
+@api.post("/investments/refresh-prices")
+def refresh_prices():
+    """Fetch today's price for every holding that asked for one.
+
+    A POST because it writes. It reports how many holdings were repriced,
+    which is what lets the client say "4 updated" rather than silently
+    redrawing and leaving somebody to compare figures they never memorised.
+    """
+    user_id = require_user()
+    return jsonify({"priced": _refresh(user_id)})
+
+
+def _refresh(user_id):
+    """Price this account's automatic holdings. Returns how many changed.
+
+    Deliberately forgiving: an unreachable feed returns no quotes, which
+    writes nothing and reports zero. Nobody's portfolio is damaged by
+    somebody else's outage, and each holding keeps the last price it had.
+    """
+    symbols = operations.symbols_to_price(user_id)
+    if not symbols:
+        return 0
+    quotes = stocksaathi.live_quotes(symbols)
+    return operations.apply_prices(
+        {symbol: quote["price"] for symbol, quote in quotes.items()}, user_id)
+
+
+@api.get("/quotes")
+def quotes():
+    """Current prices for the symbols asked for.
+
+    The client fetches StockSaathi directly while a screen is open -- their
+    API is CORS-open, and keeping Flask out of the tick path means a
+    ticking screen does not bill a serverless invocation every few seconds.
+    This is for what the browser cannot cover: a client whose direct call a
+    network in the middle blocks, and anything that has to see the same
+    number the server will write.
+    """
+    require_user()
+    asked = [part for part in (request.args.get("symbols") or "").split(",")
+             if part.strip()]
+    if not asked:
+        raise ValidationError({"symbols": "Name at least one symbol."})
+    if len(asked) > stocksaathi.MAX_SYMBOLS:
+        raise ValidationError(
+            {"symbols": "At most " + str(stocksaathi.MAX_SYMBOLS) +
+                        " at a time."})
+
+    places = money_places()
+    return jsonify({"items": {
+        symbol: {
+            "price": money.serialise(quote["price"], places),
+            # serialise already maps None to None, so an absent previous
+            # close stays absent rather than arriving as "0.00".
+            "prev_close": money.serialise(quote["prev_close"], places),
+            # The fraction, untouched. The client turns it into a
+            # percentage, in one place.
+            "change": quote["change"],
+            "as_of": quote["as_of"],
+            "source": quote["source"],
+        }
+        for symbol, quote in stocksaathi.live_quotes(asked).items()
+    }})
