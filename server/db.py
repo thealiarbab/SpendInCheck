@@ -103,8 +103,27 @@ def _get_pool():
     if _pool is None:
         with _pool_lock:
             if _pool is None:
+                # minconn = maxconn, which is not a typo and not paranoia.
+                #
+                # psycopg2's pool keeps exactly minconn idle connections and
+                # CLOSES every one returned beyond that. At minconn=1 the
+                # second and third connections of every burst were closed on
+                # release and handshaked again on the next one -- measured
+                # at 397ms, 370ms, 399ms to acquire three connections on
+                # three consecutive bursts, never warming up, because there
+                # was nothing to warm.
+                #
+                # The reports screen fires five requests at once against
+                # three connections, so it paid that on every visit.
+                #
+                # The cost is moved rather than removed: the pool now opens
+                # MAX_CONNECTIONS at construction instead of one. That is
+                # paid once per process, and a Vercel function is warm
+                # across invocations, so it is paid once rather than on
+                # every burst for the life of the instance.
                 _pool = psycopg2_pool.ThreadedConnectionPool(
-                    minconn=1, maxconn=MAX_CONNECTIONS, **_connection_settings())
+                    minconn=MAX_CONNECTIONS, maxconn=MAX_CONNECTIONS,
+                    **_connection_settings())
     return _pool
 
 
