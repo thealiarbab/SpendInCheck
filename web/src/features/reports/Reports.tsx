@@ -9,18 +9,12 @@ import {
 import {
   ChartFrame, Comparison, Legend, LineChart, PairedBars, RankedBars,
 } from "../../ui/charts";
-import { alignRunning, alignTo, monthName } from "./align";
+import { alignRunning, alignTo, monthName, thisMonth } from "./align";
 import { SurplusCard } from "./SurplusCard";
 import styles from "./Reports.module.css";
 
 /** How much history the charts show. A year, so seasons are visible. */
 const HISTORY = 12;
-
-function thisMonth(): string {
-  const now = new Date();
-  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 7);
-}
 
 /**
  * The two monthly reports, for whichever month is asked for.

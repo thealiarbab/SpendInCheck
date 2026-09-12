@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { alignTo, alignRunning } from "./align.ts";
+import { alignRunning, alignTo, thisMonth } from "./align.ts";
 
 /** The axis a chart plots against: always complete, however sparse the data. */
 const YEAR = ["2026-01", "2026-02", "2026-03", "2026-04"];
@@ -46,4 +46,15 @@ test("a running total carries a negative balance forward too", () => {
 test("an empty axis draws nothing rather than throwing", () => {
   assert.deepEqual(alignTo([], [{ month: "2026-01", value: "1" }], value), []);
   assert.deepEqual(alignRunning([], [], value), []);
+});
+
+test("thisMonth is the local month, not the UTC one", () => {
+  // Not asserting a fixed value -- the test machine's zone is whatever it
+  // is. Asserting the property that matters: it agrees with the calendar
+  // the person is looking at, which toISOString() alone does not in any
+  // zone ahead of UTC. IST is +5:30, so for five and a half hours on the
+  // first of every month the raw UTC answer is the previous month.
+  const now = new Date();
+  const expected = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  assert.equal(thisMonth(), expected);
 });

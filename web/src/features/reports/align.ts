@@ -50,3 +50,23 @@ export function monthName(month: string): string {
   return new Date(year, index - 1, 1)
     .toLocaleDateString("en-IN", { month: "long", year: "numeric" });
 }
+
+/**
+ * The month it is where the person is, as YYYY-MM.
+ *
+ * toISOString() is UTC, and this is compared against a month somebody
+ * picked from a control showing their own calendar. In IST that is five
+ * and a half hours on the first of every month when the two disagree --
+ * the picker offering October while UTC still says September -- and the
+ * surplus card, which is the one thing that asks "is this month over yet",
+ * got it wrong for exactly that window.
+ *
+ * Two copies of this existed: Reports corrected for the offset and
+ * SurplusCard did not, which is the version of this bug that is hardest to
+ * see, because both look right on their own.
+ */
+export function thisMonth(): string {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 7);
+}

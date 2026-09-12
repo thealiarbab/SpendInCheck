@@ -21,7 +21,8 @@ export function TagChooser(
     tags: Tag[];
     chosen: number[];
     onChange: (next: number[]) => void;
-    onCreate: (name: string) => void;
+    /** May return a promise; the typed name clears only when it settles. */
+    onCreate: (name: string) => void | Promise<unknown>;
     creating?: boolean;
     error?: string;
   },
@@ -42,8 +43,17 @@ export function TagChooser(
 
   function create() {
     if (!typed || alreadyExists || creating) return;
-    onCreate(typed);
-    setFresh("");
+    // Cleared on success, not on submission. It used to clear immediately,
+    // so a refused name -- a duplicate the case check missed, a server
+    // having a bad minute -- took the typed word with it and said nothing.
+    // Retyping something you already typed, with no reason given, is the
+    // worst version of a failure.
+    //
+    // The rejection is caught here rather than left to float: onCreate
+    // returns the mutation's promise, and an uncaught rejection from a
+    // handled failure is noise in the console for something the screen has
+    // already dealt with.
+    Promise.resolve(onCreate(typed)).then(() => setFresh(""), () => {});
   }
 
   return (

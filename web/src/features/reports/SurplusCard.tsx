@@ -3,7 +3,7 @@ import { externalLinkProps, surplusHref } from "../../lib/links";
 import { formatMoney } from "../../lib/money";
 import type { Minor } from "../../lib/money";
 import { Button } from "../../ui";
-import { monthName } from "./align";
+import { monthName, thisMonth } from "./align";
 import { shouldOffer } from "./surplus";
 import styles from "./Reports.module.css";
 
@@ -58,7 +58,7 @@ export function SurplusCard(
 
   // Both are YYYY-MM, which sorts correctly as text -- see surplus.ts,
   // where the judgement lives and is tested.
-  const today = new Date().toISOString().slice(0, 7);
+  const today = thisMonth();
   if (!shouldOffer({ month, today, budgeted, difference,
                      dismissed: dismissed.includes(month) })) return null;
 

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, api } from "../../lib/api";
@@ -179,11 +179,27 @@ export function Transactions() {
     },
   });
 
+  // Which Edit click the form is currently loading. A ref rather than
+  // state: nothing renders from it, and bumping it must take effect
+  // immediately rather than at the next render.
+  const editingTicket = useRef(0);
+
   /** Load a row back into the form, in the shape the form holds. */
   async function edit(id: number) {
+    // Whoever asked last wins, rather than whoever answered last.
+    //
+    // Two Edit clicks in quick succession are two requests in flight, and
+    // the network decides the order they come back in. Without this the
+    // second click could load the first row -- the form quietly showing a
+    // different transaction from the one just clicked, with nothing on
+    // screen to say so, and Save then editing the wrong row.
+    const ticket = ++editingTicket.current;
+
     // The list carries a category name; the form needs its id, so the single
     // record has to be fetched rather than read out of the row on screen.
     const record = await api.transaction(id);
+    if (ticket !== editingTicket.current) return;
+
     setDraft({
       id: record.id,
       date: record.date,
@@ -285,10 +301,13 @@ export function Transactions() {
           <TagChooser
             tags={tags.data?.items ?? []}
             chosen={draft.tag_ids}
-            error={fields.tag_ids}
+            /* The save's validation error, or the one from making a tag.
+               The second had nowhere to go at all: a refused tag was
+               silent. */
+            error={fields.tag_ids ?? (makeTag.error as Error | null)?.message}
             creating={makeTag.isPending}
             onChange={(tag_ids) => setDraft({ ...draft, tag_ids })}
-            onCreate={(name) => makeTag.mutate(name)}
+            onCreate={(name) => makeTag.mutateAsync(name)}
           />
           <FormActions>
             <Button onClick={submit} disabled={!chosen || save.isPending}>
