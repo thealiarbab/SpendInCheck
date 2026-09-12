@@ -39,6 +39,10 @@
     {
       "path": "/api/v1/cron/clear-demos",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/v1/cron/recurring",
+      "schedule": "0 1 * * *"
     }
   ],
   "regions": [
