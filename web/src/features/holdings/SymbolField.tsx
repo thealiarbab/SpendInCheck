@@ -104,6 +104,12 @@ export function SymbolField(
                 type="button"
                 role="option"
                 aria-selected={index === active}
+                /* Named explicitly, because the accessible name computed
+                   from the contents is three spans run together --
+                   "RELIANCEReliance Industries LimitedEnergy" -- and a
+                   list of those read aloud is not a list of choices. */
+                aria-label={[suggestion.symbol, suggestion.name,
+                             suggestion.sector].filter(Boolean).join(" — ")}
                 className={index === active
                   ? `${styles.suggestion} ${styles.suggestionActive}`
                   : styles.suggestion}
