@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, api } from "../../lib/api";
 import type { Holding } from "../../lib/api";
@@ -39,14 +39,18 @@ const blank = () => ({
  * and money out, and a ticker tape in the shell would quietly turn a
  * budgeting app into a half-broker.
  *
- * Two prices per row, deliberately. "Valued at" is the figure stored
- * against the holding, which is what the profit and loss and every total on
- * this page are worked out from. "Live" is what the market says this
- * minute, fetched by the browser and never written anywhere. They differ
- * until somebody presses Update prices, which is the one action that makes
- * the stored figure the live one. Showing a live number and a P&L computed
- * from a different one, in the same row, is how a screen stops being
- * believed.
+ * One price per row, and it keeps itself current. This used to show two --
+ * "Valued at", the stored figure every total and P&L is worked out from,
+ * beside "Live", what the market said this minute -- because showing a live
+ * number next to a P&L computed from a different one is how a screen stops
+ * being believed. That reasoning was right and the conclusion was not: the
+ * answer is not to show the stale figure too, it is to stop it being stale.
+ *
+ * So while the exchange is open and the browser is polling anyway, a price
+ * that has moved is written back through refresh-prices, and the whole
+ * screen -- price, P&L, totals -- is worked out from one number again.
+ * Nothing is written when the market is shut, when nothing has moved, or
+ * for a holding priced by hand, which is what auto_price means.
  */
 export function Holdings() {
   const client = useQueryClient();
@@ -135,6 +139,34 @@ export function Holdings() {
     mutationFn: api.refreshPrices,
     onSuccess: refresh,
   });
+
+  // Written back rather than merely displayed, so that "Update prices" is
+  // no longer the only thing standing between a price and the truth.
+  //
+  // Guarded three ways, because this fires from a poll and a write loop
+  // would be invisible: nothing happens unless the exchange is open, unless
+  // some automatic holding's stored price actually differs from the quote,
+  // and unless this exact set of quotes has not already been applied. That
+  // last one is what stops the refetch this triggers from triggering it
+  // again.
+  const applied = useRef("");
+  useEffect(() => {
+    if (!market.ready || !market.marketOpen || updatePrices.isPending) return;
+
+    const signature = Object.entries(market.quotes)
+      .map(([symbol, quote]) => symbol + ":" + quote.price).sort().join(",");
+    if (!signature || signature === applied.current) return;
+
+    const moved = (portfolio.data?.items ?? []).some((holding) => {
+      if (!holding.auto_price || !holding.ticker) return false;
+      const quote = market.quotes[holding.ticker];
+      return quote && toMinor(quote.price) !== toMinor(holding.current_price);
+    });
+    if (!moved) return;
+
+    applied.current = signature;
+    updatePrices.mutate();
+  }, [market, portfolio.data, updatePrices]);
 
   const remove = useMutation({
     mutationFn: (id: number) => api.deleteInvestment(id),
@@ -279,7 +311,7 @@ export function Holdings() {
               {automatic > 0 && (
                 <Button kind="quiet" small disabled={updatePrices.isPending}
                         onClick={() => updatePrices.mutate()}>
-                  {updatePrices.isPending ? "Updating…" : "Update prices"}
+                  {updatePrices.isPending ? "Updating…" : "Update prices now"}
                 </Button>
               )}
               <span className={styles.attribution}>
@@ -332,8 +364,7 @@ export function Holdings() {
                 <th>Bought</th>
                 <th className={cell.numeric}>Buy price</th>
                 <th className={cell.numeric}>Qty</th>
-                <th className={cell.numeric}>Valued at</th>
-                <th className={cell.numeric}>Live</th>
+                <th className={cell.numeric}>Price</th>
                 <th>Month · 52 weeks</th>
                 <th className={cell.numeric}>P&amp;L</th>
                 <th />
@@ -396,23 +427,30 @@ export function Holdings() {
                         aria-label={`New price for ${holding.asset_name}`}
                         onChange={(e) => setPrice(e.target.value)}
                       />
-                    ) : formatMoney(toMinor(holding.current_price))}
-                  </td>
-                  <td className={cell.numeric}>
-                    {quote ? (
+                    ) : (
                       <>
-                        {formatMoney(toMinor(quote.price))}
-                        <span className={`${styles.live} ${
-                          (quote.change ?? 0) > 0 ? styles.up
-                          : (quote.change ?? 0) < 0 ? styles.down : ""}`}>
-                          {formatChange(quote.change)}
-                        </span>
+                        {/* The quote when there is one, the stored figure
+                            when there is not -- a shut exchange, a holding
+                            priced by hand, a feed that did not answer. The
+                            two agree while the market is open, because the
+                            effect above writes the quote back; this is not
+                            two numbers competing, it is one with a
+                            fallback. */}
+                        {formatMoney(toMinor(quote ? quote.price
+                                                   : holding.current_price))}
+                        {quote && (
+                          <span className={`${styles.live} ${
+                            (quote.change ?? 0) > 0 ? styles.up
+                            : (quote.change ?? 0) < 0 ? styles.down : ""}`}>
+                            {formatChange(quote.change)}
+                          </span>
+                        )}
                       </>
-                    ) : "—"}
+                    )}
                   </td>
                   <td>
                     {/* An em-dash when there is nothing to draw, matching
-                        the Live column beside it. A holding with no symbol
+                        the Price column beside it. A holding with no symbol
                         has no price history and never will -- a deposit has
                         no market -- so the cell is empty by nature rather
                         than by failure. Left blank the two columns
