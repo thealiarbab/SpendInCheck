@@ -38,7 +38,13 @@ import urllib.parse
 import urllib.request
 from decimal import Decimal, InvalidOperation
 
-BASE = "https://stocksaathi.co.in/api"
+from .. import config
+
+# From config, which had this setting all along and nothing reading it --
+# the host was written out here instead, so the documented knob adjusted
+# nothing. Useful for pointing this at one of their preview deployments
+# without editing code.
+BASE = config.STOCKSAATHI_BASE_URL.rstrip("/") + "/api"
 
 # Their documented ceiling per request. Asking for more is not an error --
 # it is a slower request that may be truncated, which is worse.
@@ -376,7 +382,7 @@ def fund(code, days=30, timeout=TIMEOUT_SECONDS):
 # are static files on the same host, built by their own pipeline and served
 # from the edge, which is why they cost no function invocation and need no
 # key. The site itself loads the universe this way.
-UNIVERSE_BASE = "https://stocksaathi.co.in/js/data"
+UNIVERSE_BASE = config.STOCKSAATHI_BASE_URL.rstrip("/") + "/js/data"
 
 # The universe is a megabyte of JSON and the fund list nearly six. Only the
 # seeding script reads either, once a day at most, and nobody is waiting.

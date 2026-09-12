@@ -199,3 +199,28 @@ def test_usage_of_someone_elses_category(make_api_account):
     target = make_category(theirs, "Books")
 
     assert mine.get(f"/api/v1/categories/{target}/usage").status_code == 404
+
+
+def test_merging_a_category_keeps_its_rollover_setting(make_api_account):
+    """A budget that carries its surplus forward should still do so after
+    the category it belonged to is merged into another.
+
+    The merge copied the limit and not the flag, so the new row took the
+    column default -- off -- and somebody's carry-forward silently stopped.
+    """
+    client = make_api_account()
+    going = make_category(client, "Going")
+    staying = make_category(client, "Staying")
+
+    # Only the doomed category has a budget that month, and it rolls over.
+    client.put("/api/v1/budgets", headers=client.headers,
+               json={"category_id": going, "month": "2026-04",
+                     "limit": "2000.00", "rollover": "1"})
+
+    assert client.delete(f"/api/v1/categories/{going}?reassign_to={staying}",
+                         headers=client.headers).status_code == 200
+
+    moved = [row for row in client.get("/api/v1/budgets").get_json()["items"]
+             if row["category_id"] == staying and row["month"] == "2026-04"]
+    assert moved, "the budget did not move"
+    assert moved[0]["rollover"] is True, moved[0]

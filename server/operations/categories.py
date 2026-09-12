@@ -144,9 +144,20 @@ def delete_category(user_id, category_id, reassign_to=None):
 
         with db.transaction(connection):
             if reassign_to is not None:
+                # rollover travels with the limit. It did not, so merging a
+                # category whose budgets carry their surplus forward into a
+                # month the surviving category had no budget for produced a
+                # row with the column default -- off -- and somebody's
+                # carry-forward quietly stopped happening.
+                #
+                # On conflict it is deliberately left alone: where the
+                # surviving category already has a budget that month, that
+                # budget's own setting is its owner's decision, and merging
+                # limits into it is not a reason to change how it behaves.
                 cursor.execute(
-                    "INSERT INTO budgets (user_id, category_id, month_year, budget_limit) "
-                    "SELECT user_id, %s, month_year, budget_limit FROM budgets "
+                    "INSERT INTO budgets "
+                    "       (user_id, category_id, month_year, budget_limit, rollover) "
+                    "SELECT user_id, %s, month_year, budget_limit, rollover FROM budgets "
                     " WHERE user_id = %s AND category_id = %s "
                     "ON CONFLICT (user_id, category_id, month_year) "
                     "DO UPDATE SET budget_limit = budgets.budget_limit + EXCLUDED.budget_limit",

@@ -4,6 +4,8 @@ Each takes the month as a query parameter rather than a path segment, since
 the month is a filter on a report rather than an identifier for one.
 """
 
+from decimal import Decimal
+
 from flask import jsonify, request
 
 from server import money, operations
@@ -71,8 +73,19 @@ def portfolio():
     # exists to avoid.
     value_at = PNL_FIELDS.index("current_value")
     pnl_at = PNL_FIELDS.index("pnl")
-    total_value = sum((row[value_at] for row in rows), start=0)
-    total_pnl = sum((row[pnl_at] for row in rows), start=0)
+
+    # Each row is rounded before it is added, because each row is rounded
+    # before it is shown. Summing the raw figures and rounding once at the
+    # end is more accurate and visibly wrong: three holdings displayed as
+    # 10.01 apiece under a total of 30.02 is a screen that cannot be added
+    # up, and somebody checking it with a calculator is right and the app is
+    # wrong. The same rule the net worth chart had to be taught.
+    def total(index):
+        return sum((money.quantise(row[index], places)
+                    for row in rows if row[index] is not None), start=Decimal(0))
+
+    total_value = total(value_at)
+    total_pnl = total(pnl_at)
     return jsonify({
         "items": items,
         "totals": {
