@@ -21,9 +21,13 @@ function today(): string {
   return local.toISOString().slice(0, 10);
 }
 
+// No auto_price, and its absence is the point. The server reads a missing
+// auto_price as "decide from whether there is a symbol" and an explicit
+// "0" as somebody saying no -- so sending "0" here, which this did, opted
+// every new holding out of the pricing it had just been given a symbol for.
 const blank = () => ({
   asset_name: "", asset_type: "Stock", buy_date: today(),
-  buy_price: "", quantity: "", current_price: "", ticker: "", auto_price: "0",
+  buy_price: "", quantity: "", ticker: "",
 });
 
 /**
@@ -207,20 +211,23 @@ export function Holdings() {
             value={draft.quantity} error={fields.quantity} placeholder="0"
             onChange={(e) => setDraft({ ...draft, quantity: e.target.value })}
           />
-          <Field
-            label="Current price" name="current_price" type="number" step="0.01" min="0.01"
-            numeric value={draft.current_price} error={fields.current_price}
-            placeholder="same as buy"
-            onChange={(e) => setDraft({ ...draft, current_price: e.target.value })}
-          />
+          {/* No current price is asked for. Something bought is worth what
+              it cost until the market says otherwise, so the field had one
+              sensible answer and it was already on the screen two rows up.
+              Worse, a holding with a symbol and automatic pricing has
+              whatever was typed here overwritten at the next refresh, so
+              the field invited a number and then quietly threw it away.
+              Correcting a price later is what Price by hand is for, and
+              the server defaults current_price to buy_price when the
+              field is absent, so nothing needs to be sent. */}
           <div className={styles.symbolSlot}>
             <label className={styles.symbolLabel} htmlFor="add-ticker">
-              NSE symbol
+              Symbol or fund code
             </label>
             <SymbolField
               id="add-ticker"
-              label="NSE symbol"
-              placeholder="optional — RELIANCE"
+              label="Symbol or fund code"
+              placeholder="optional — RELIANCE, or 118989"
               value={draft.ticker}
               onChange={(ticker) => setDraft({ ...draft, ticker })}
               /* Taking a suggestion fills the asset name too, but only
@@ -246,9 +253,9 @@ export function Holdings() {
           </FormActions>
         </Form>
         <p className={styles.hint}>
-          Leave the current price empty and the holding is worth what it cost until
-          you reprice it. Give it a symbol and you can have the price fetched for
-          you instead — that is off until you turn it on, per holding.
+          Give it a symbol and it is priced from the market from the moment you
+          save — you do not have to have bought it today. Without one it is worth
+          what it cost until you price it by hand.
         </p>
         {failure && !failure.isValidation && <Notice>{failure.message}</Notice>}
         {add.isSuccess && <Notice ok>Saved.</Notice>}
@@ -487,11 +494,21 @@ export function Holdings() {
                       </RowActions>
                     ) : (
                       <RowActions>
+                        {/* The two of these are one question asked twice:
+                            where does this holding's price come from, you
+                            or the market. Naming them after their answers
+                            rather than after their mechanics ("Reprice",
+                            "Add symbol") is the difference between two
+                            unrelated-looking buttons and a choice. The
+                            market one still changes wording once a symbol
+                            is set, because by then the button no longer
+                            starts anything -- it opens what is already
+                            arranged. */}
                         <Button kind="quiet" small onClick={() => startTracking(holding)}>
-                          {holding.ticker ? "Symbol" : "Add symbol"}
+                          {holding.ticker ? "Market pricing" : "Price from market"}
                         </Button>
                         <Button kind="quiet" small onClick={() => startReprice(holding)}>
-                          Reprice
+                          Price by hand
                         </Button>
                         <Button kind="danger" small
                                 onClick={() => { setRepricing(null); setTracking(null);

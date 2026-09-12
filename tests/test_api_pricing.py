@@ -11,7 +11,7 @@ to the real API.
 import pytest
 
 from server.routes.api import investments as investments_route
-from server.services import stocksaathi
+from server.services import quote_snapshot, stocksaathi
 
 
 HOLDING = {"asset_name": "Reliance Industries", "asset_type": "Stock",
@@ -69,6 +69,14 @@ def feed(monkeypatch):
     for module in (stocksaathi, investments_route.stocksaathi):
         monkeypatch.setattr(module, "live_quotes", stub.quotes)
         monkeypatch.setattr(module, "instrument", stub.instrument)
+    # Adding a holding with a symbol backfills a year of closes. Stubbed
+    # empty rather than left live: a test that reaches the real feed is
+    # slow, is a test of somebody else's uptime, and writes real rows into
+    # quote_history, which is shared by every account in the database.
+    monkeypatch.setattr(quote_snapshot.stocksaathi, "closing_prices",
+                        lambda symbol, days=30, timeout=None: [])
+    monkeypatch.setattr(quote_snapshot.amfi, "closing_prices",
+                        lambda code, days=30, timeout=None: [])
     return stub
 
 
@@ -425,3 +433,77 @@ def test_a_quotable_symbol_is_accepted_when_the_lookup_is_down(
     described = body.get_json()["instrument"]
     assert described and described["name"], "described from our own row"
     assert only_holding(client)["auto_price"] is True
+
+
+# --- a symbol given when the holding is created -----------------------------
+
+def test_a_symbol_given_at_creation_prices_the_holding_now(make_api_account, feed):
+    """The bug this section exists for.
+
+    Adding a holding and naming its symbol used to store what it cost and
+    stop there: the add form sent auto_price="0" always, so the symbol sat
+    in the row doing nothing until somebody found the button on the holdings
+    screen and turned pricing on by hand. Somebody typing RELIANCE has said
+    what they want the price to be; there is no other thing a ticker is for.
+    """
+    client = make_api_account()
+    assert add_holding(client, ticker="RELIANCE").status_code == 201
+
+    holding = only_holding(client)
+    assert holding["ticker"] == "RELIANCE"
+    assert holding["auto_price"] is True
+    assert holding["current_price"] == "1274.00", "priced from the feed"
+    assert holding["current_price"] != HOLDING["current_price"]
+
+
+def test_the_price_beats_what_was_typed_into_the_form(make_api_account, feed):
+    """current_price is still accepted, and a live price still wins.
+
+    Not a contradiction: the field is what a holding is worth when nothing
+    can tell us otherwise. Once a symbol can, it does, and leaving the typed
+    figure in place would show somebody a number the app knew was stale at
+    the moment it saved it.
+    """
+    client = make_api_account()
+    add_holding(client, ticker="RELIANCE", current_price="1.00")
+    assert only_holding(client)["current_price"] == "1274.00"
+
+
+def test_saying_no_explicitly_still_means_no(make_api_account, feed):
+    """A symbol is the opt-in, not a conscription.
+
+    Absent and "0" are different on purpose: the first is a form that never
+    asked, the second is somebody who answered. Somebody recording a ticker
+    for their own reference, priced from a statement, keeps their figure.
+    """
+    client = make_api_account()
+    add_holding(client, ticker="RELIANCE", auto_price="0")
+
+    holding = only_holding(client)
+    assert holding["ticker"] == "RELIANCE"
+    assert holding["auto_price"] is False
+    assert holding["current_price"] == "1200.00"
+    assert feed.asked == [], "nothing was asked of the feed"
+
+
+def test_creating_says_which_company_that_symbol_was(make_api_account, feed):
+    """Same confirmation the pricing endpoint gives, from the same helper.
+
+    The two paths were doing different amounts of work for the same act,
+    which is how one of them ended up not describing the instrument at all.
+    """
+    body = add_holding(client := make_api_account(), ticker="RELIANCE").get_json()
+    assert body["ticker"] == "RELIANCE"
+    assert body["auto_price"] is True
+    assert body["priced"] == 1
+    assert (body["instrument"] or {}).get("name"), body
+    assert only_holding(client)["ticker"] == "RELIANCE"
+
+
+def test_a_holding_with_no_symbol_still_costs_nothing(make_api_account, feed):
+    """The guard for the change above: making a symbol mean something must
+    not make the absence of one mean anything at all."""
+    client = make_api_account()
+    add_holding(client)
+    assert feed.asked == []
+    assert only_holding(client)["current_price"] == "1200.00"

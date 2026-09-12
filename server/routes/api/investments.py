@@ -39,14 +39,30 @@ def create_investment():
     buy_date = fields.past_date("buy_date")
     buy_price = fields.amount("buy_price", places=places)
     quantity = fields.quantity()
-    # A holding entered before its first revaluation is worth what it cost.
+    # The last resort, not the intent. A holding with a symbol is priced
+    # from StockSaathi a few lines below and this is overwritten before the
+    # response; a holding without one has nothing else to be worth. What
+    # this must not become again is an assumption: the app has no idea when
+    # anybody bought, so "you bought it today" is wrong for every holding
+    # entered from a statement, and it was wrong silently.
     current_price = fields.amount("current_price", required=False,
                                   places=places) or buy_price
     ticker = fields.text("ticker", required=False, max_length=32)
     exchange = fields.choice("exchange", EXCHANGES, required=False)
     isin = fields.text("isin", required=False, max_length=12)
-    auto = fields.choice("auto_price", ["1", "0"], required=False) == "1"
+    requested_auto = fields.choice("auto_price", ["1", "0"], required=False)
     fields.raise_if_invalid()
+
+    # **A symbol is the opt-in.** There is no other reason to attach one:
+    # nothing else in this app reads a ticker, so a holding that carries one
+    # and is not priced by it is a stale number sitting next to the means of
+    # correcting itself. The form used to send auto_price="0" always, which
+    # is exactly the holding that produced -- somebody typed RELIANCE, saved,
+    # and was still shown what they paid for it.
+    #
+    # Absent is distinguished from "0" on purpose. An explicit "0" is
+    # somebody saying no, and still means no.
+    auto = requested_auto != "0" if ticker else requested_auto == "1"
 
     symbol, found, kind = (_resolve_symbol(ticker, auto) if ticker
                            else (None, None, "equity"))
@@ -63,7 +79,20 @@ def create_investment():
                                      isin=isin or None, auto_price=auto,
                                      kind=kind):
         raise ApiError("Could not add that holding.", code="create_failed")
-    return jsonify({"ok": True}), 201
+
+    # Everything set_pricing does when a symbol is attached to a holding
+    # that already exists. These were two ways to do one thing and only one
+    # of them worked: attaching a symbol here left the holding undescribed,
+    # with no history to draw and priced at what it cost, until somebody
+    # noticed and clicked the button that does it properly.
+    if symbol:
+        quote_snapshot.ensure_history(symbol, kind=kind)
+        quote_snapshot.describe(symbol, found)
+
+    return jsonify({"ok": True, "ticker": symbol, "kind": kind,
+                    "auto_price": auto,
+                    "priced": _refresh(user_id) if auto else 0,
+                    "instrument": _described(found)}), 201
 
 
 def _resolve_symbol(ticker, must_quote):
