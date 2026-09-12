@@ -216,11 +216,13 @@ PHASES = [
          "number. This also answers the question of whether a save should "
          "wait for a price: it need not, because the screen corrects it "
          "within a poll either way.",
-         "The third nudge -- the goal-reached card -- is left for a "
-         "decision. Goals renders inside Budgets, so it would put a link "
-         "to a broker on a budgeting screen, which the plan's own rule "
-         "about containing markets content to Investments and Reports "
-         "says not to do.",
+         "The third nudge is built: a reached savings goal offers to put "
+         "the money to work. Ali asked for it. Worth knowing that the plan "
+         "says both that three nudges are allowed including \"a "
+         "savings-goal-reached card\" AND that nothing market-flavoured "
+         "appears on Budgets or Goals -- and Goals renders inside Budgets. "
+         "The plan contradicts itself there; his instruction settles it. Do "
+         "not quietly remove it as a containment violation.",
      ]},
     {"n": 10, "name": "Opt-in account linking", "state": "next",
      "blurb": "Planned last because it is the only feature that can damage a "
