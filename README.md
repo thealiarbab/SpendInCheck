@@ -49,13 +49,26 @@ the reason for each one it will skip — before writing anything.
 
 ## Screens
 
-| Dashboard | Reports |
-|---|---|
-| ![Dashboard](docs/dashboard.png) | ![Reports](docs/reports.png) |
+**Dashboard** — what you hold and what you have been spending.
 
-| Transactions |
-|---|
-| ![Transactions](docs/transactions.png) |
+![Dashboard](docs/dashboard.jpg)
+
+**Reports** — income against expense, the running total, net worth at each
+month's close, and where the money actually goes.
+
+![Reports](docs/reports.jpg)
+
+**Holdings** — a symbol on a holding means its price is fetched rather than
+typed, with the day's move, a month of shape and the 52-week range beside it.
+Leave the symbol off and the holding keeps whatever price you last gave it.
+
+![Holdings](docs/holdings.jpg)
+
+**Transactions** — search, filter, sort, and CSV in both directions. A transfer
+between accounts is two rows sharing a group, which is why no report counts it
+as income or spending.
+
+![Transactions](docs/transactions.jpg)
 
 ## Reports
 
