@@ -34,7 +34,13 @@ def create_investment():
     user_id = require_user()
     fields = Validator(request.get_json(silent=True) or {})
     places = money_places()
-    name = fields.text("asset_name", max_length=100)
+    # Optional, because a resolved symbol already knows what the thing is
+    # called. Required, it made the name a second and competing source of
+    # truth: nothing stopped a holding called "Tata" pointing at RELIANCE,
+    # and the client filled the name in only when it happened to be empty.
+    # Whatever is sent still wins -- somebody who calls it "Dad's Reliance"
+    # means it -- but not sending one is now answered rather than refused.
+    name = fields.text("asset_name", required=False, max_length=100)
     asset_type = fields.choice("asset_type", ASSET_TYPES)
     buy_date = fields.past_date("buy_date")
     buy_price = fields.amount("buy_price", places=places)
@@ -68,6 +74,16 @@ def create_investment():
                            else (None, None, "equity"))
     if symbol is None:
         auto = False
+
+    # The instrument's own name, when nobody gave one. A holding still has
+    # to be called something -- it is the only thing on the screen for a
+    # deposit -- so this is refused rather than left blank when there is no
+    # symbol to take it from.
+    name = name or (found or {}).get("name") or symbol
+    if not name:
+        raise ValidationError(
+            {"asset_name": "Give it a name, or a symbol to take one from."})
+
     # The exchange the upstream names beats the one a form guessed at, and a
     # fund has none at all.
     exchange = None if kind == "fund" else ((found or {}).get("exchange") or exchange)

@@ -530,3 +530,42 @@ def test_a_holding_with_no_symbol_still_costs_nothing(make_api_account, feed):
     add_holding(client)
     assert feed.asked == []
     assert only_holding(client)["current_price"] == "1200.00"
+
+
+# --- the name and the symbol cannot disagree --------------------------------
+
+def test_a_symbol_can_supply_the_name(make_api_account, feed):
+    """Nobody should have to type what StockSaathi already knows.
+
+    asset_name used to be required and independent, which made it a second
+    and competing source of truth -- and the client filled it from a picked
+    instrument only when it happened to still be empty. Type the name
+    first, pick the symbol second, and you had a holding called "Tata"
+    pointing at RELIANCE with nothing anywhere objecting.
+    """
+    client = make_api_account()
+    body = dict(HOLDING)
+    body.pop("asset_name")
+    response = client.post("/api/v1/investments", headers=client.headers,
+                           json={**body, "ticker": "ZZPRICECO"})
+    assert response.status_code == 201, response.get_data(as_text=True)[:200]
+    assert only_holding(client)["asset_name"] == "Zzprice Industries Limited"
+
+
+def test_a_name_that_was_given_still_wins(make_api_account, feed):
+    """Somebody who calls it "Dad's Reliance" means it. Taking the name from
+    the instrument is a default, not a correction."""
+    client = make_api_account()
+    add_holding(client, asset_name="Dad's shares", ticker="ZZPRICECO")
+    assert only_holding(client)["asset_name"] == "Dad's shares"
+
+
+def test_neither_a_name_nor_a_symbol_is_refused(make_api_account, feed):
+    """A holding has to be called something: for a deposit the name is the
+    only thing on the screen, and there is no symbol to fall back on."""
+    client = make_api_account()
+    body = dict(HOLDING)
+    body.pop("asset_name")
+    response = client.post("/api/v1/investments", headers=client.headers, json=body)
+    assert response.status_code == 422
+    assert "asset_name" in response.get_json()["error"]["fields"]

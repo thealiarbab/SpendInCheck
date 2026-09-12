@@ -217,9 +217,36 @@ export function Holdings() {
 
       <Card title="Add a holding">
         <Form>
+          <div className={styles.symbolSlot}>
+            <label className={styles.symbolLabel} htmlFor="add-ticker">
+              What did you buy?
+            </label>
+            <SymbolField
+              id="add-ticker"
+              label="What did you buy?"
+              placeholder="Reliance, RELIANCE, or an AMFI code — or leave empty"
+              value={draft.ticker}
+              onChange={(ticker) => setDraft({ ...draft, ticker })}
+              /* Picking an instrument settles the name as well, every
+                 time rather than only when the name was still empty.
+                 That exception is how somebody ended up with a holding
+                 called "Tata" pointed at RELIANCE: type the name first,
+                 pick the symbol second, and the two never had to agree.
+                 The name is still editable underneath, so calling it
+                 "Dad's Reliance" costs one deliberate edit -- which is
+                 the difference between a rename and a contradiction. */
+              onPick={(found) => setDraft((current) => ({
+                ...current,
+                ticker: found.symbol,
+                asset_name: found.name || found.symbol,
+              }))}
+            />
+            {fields.ticker && <p className={styles.symbolError}>{fields.ticker}</p>}
+          </div>
           <Field
-            label="Asset name" name="asset_name" maxLength={100}
-            value={draft.asset_name} error={fields.asset_name} placeholder="Tata Motors"
+            label="Name" name="asset_name" maxLength={100}
+            value={draft.asset_name} error={fields.asset_name}
+            placeholder={draft.ticker ? "from the symbol" : "Tata Motors"}
             onChange={(e) => setDraft({ ...draft, asset_name: e.target.value })}
           />
           <Picker
@@ -252,28 +279,6 @@ export function Holdings() {
               Correcting a price later is what Price by hand is for, and
               the server defaults current_price to buy_price when the
               field is absent, so nothing needs to be sent. */}
-          <div className={styles.symbolSlot}>
-            <label className={styles.symbolLabel} htmlFor="add-ticker">
-              Symbol or fund code
-            </label>
-            <SymbolField
-              id="add-ticker"
-              label="Symbol or fund code"
-              placeholder="optional — RELIANCE, or 118989"
-              value={draft.ticker}
-              onChange={(ticker) => setDraft({ ...draft, ticker })}
-              /* Taking a suggestion fills the asset name too, but only
-                 when it is still empty. Somebody who typed "my Infosys
-                 shares" first meant it, and overwriting that with the
-                 legal name is the app correcting their own records. */
-              onPick={(found) => setDraft((current) => ({
-                ...current,
-                ticker: found.symbol,
-                asset_name: current.asset_name.trim() || found.name || found.symbol,
-              }))}
-            />
-            {fields.ticker && <p className={styles.symbolError}>{fields.ticker}</p>}
-          </div>
           <FormActions>
             <Button
               onClick={() => add.mutate()}
@@ -285,9 +290,11 @@ export function Holdings() {
           </FormActions>
         </Form>
         <p className={styles.hint}>
-          Give it a symbol and it is priced from the market from the moment you
-          save — you do not have to have bought it today. Without one it is worth
-          what it cost until you price it by hand.
+          Search for what you bought and the name and symbol are both taken from
+          StockSaathi's list, so they cannot disagree. It is then priced from the
+          market from the moment you save — you do not have to have bought it
+          today. Leave it empty for something with no market, like a deposit, and
+          it is worth what it cost until you price it by hand.
         </p>
         {failure && !failure.isValidation && <Notice>{failure.message}</Notice>}
         {add.isSuccess && <Notice ok>Saved.</Notice>}
