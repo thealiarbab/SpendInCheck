@@ -209,11 +209,26 @@ entire switch.** Nothing here changes, and the credit under the suggestion
 list starts reading "instruments by StockSaathi" by itself, because the
 response carries `source` and the line follows it.
 
-That repository is **not ours to touch** -- Ali has said so twice, and it
-is on a `kotlin` branch with `app/` untracked. Do not commit into it. To
-ship it he checks out the branch that owns `app/`, commits that file and
-deploys; their `vercel.json` already routes `api/*.py` and
-`SUPABASE_SERVICE_ROLE_KEY` is already set there.
+That repository is **not ours to touch** -- Ali has said so twice. Do not
+commit into it. But the thing that made it look hard is a red herring, and
+it is worth writing down so nobody re-derives it:
+
+`G:\StockSaathi` is not the site. `G:\StockSaathi\app` is, and it is a
+**separate git repository** -- on `main`, in sync with
+`github.com/thealiarbab/StockSaathi`, with its own `.vercel` link and a
+clean tree. The "kotlin branch with `app/` untracked" that earlier notes
+warned about is the *outer* directory, which has no remote at all and is
+not what deploys. Nothing needs checking out.
+
+So from Ali's side it is two commands in `G:\StockSaathi\app`:
+
+    git add api/search.py && git commit -m "..." && git push
+
+Vercel deploys on push to `main` (see 0682e3d, "Trigger redeploy after
+Vercel reconnect"). The file needs no install step -- it imports stdlib
+only, which is what their `vercel.json` promises of `api/*.py` -- and
+`SUPABASE_SERVICE_ROLE_KEY` is already set there, since
+`admin-sync-instruments.py` runs nightly on it.
 
 Two things about the fallback that are easy to get wrong. **None and []
 are different**: `[]` is their answer and only `None` means they did not
