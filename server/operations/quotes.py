@@ -54,6 +54,29 @@ def record_closes(ticker, closes):
         db.close_connection(connection)
 
 
+def has_history(ticker):
+    """Whether this one symbol has any close recorded.
+
+    symbols_with_history() answers the same question by reading every
+    distinct ticker in the table, which is right for the nightly job --
+    it wants the whole set -- and wrong for the save path, where the
+    question is about exactly one symbol and the answer is a single index
+    probe. Small today because the table is small; it is the shape that is
+    wrong, and the table only grows.
+    """
+    if not ticker:
+        return False
+    connection = None
+    try:
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        cursor.execute(
+            "SELECT 1 FROM quote_history WHERE ticker = %s LIMIT 1", (ticker,))
+        return cursor.fetchone() is not None
+    finally:
+        db.close_connection(connection)
+
+
 def symbols_with_history():
     """Every symbol that already has at least one close recorded.
 

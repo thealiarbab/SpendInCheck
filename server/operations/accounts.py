@@ -26,6 +26,24 @@ BALANCE = ("a.opening_balance"
            " - COALESCE(SUM(t.amount) FILTER (WHERE t.txn_type = 'Expense'), 0)")
 
 
+def count_accounts(user_id):
+    """How many accounts this user has, archived ones included.
+
+    Its own query because the only caller wanted a number and was calling
+    list_accounts for it -- which LEFT JOINs the whole transactions table
+    to compute a balance per account, all of it thrown away to take a len().
+    """
+    connection = None
+    try:
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        cursor.execute("SELECT COUNT(*) FROM accounts WHERE user_id = %s",
+                       (user_id,))
+        return cursor.fetchone()[0]
+    finally:
+        db.close_connection(connection)
+
+
 def list_accounts(user_id, include_archived=False):
     """Every account with its derived balance and how many rows it holds.
 

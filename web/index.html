@@ -7,10 +7,25 @@
     <title>SpendInCheck</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Loaded without blocking the first paint.
+         A stylesheet in the head is render-blocking, so every visitor
+         waited on a round trip to fonts.googleapis.com before seeing
+         anything at all -- on a connection that has nothing to do with
+         this app's own hosting, and for faces the page has fallbacks for.
+         media="print" makes the browser fetch it at low priority and not
+         block on it; onload swaps it to "all" and it applies normally.
+         The noscript copy keeps it working with scripting off, where it
+         blocks as before and that is the right trade. -->
     <link
       href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
-      rel="stylesheet"
+      rel="stylesheet" media="print" onload="this.media='all'"
     />
+    <noscript>
+      <link
+        href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet"
+      />
+    </noscript>
     <script>
       // Resolve the theme before first paint, otherwise the page flashes the
       // wrong ground colour while React boots. Order: explicit choice, then

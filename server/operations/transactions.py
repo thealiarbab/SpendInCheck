@@ -199,7 +199,8 @@ def _matching(user_id, filters):
             f"{base} AND c.category_name ILIKE %s"), values + [pattern] + values + [pattern]
 
 
-def search_transactions(user_id, filters=None, page=1, per_page=DEFAULT_PER_PAGE):
+def search_transactions(user_id, filters=None, page=1, per_page=DEFAULT_PER_PAGE,
+                        with_tags=True):
     """Search, filter, sort and page the ledger.
 
     Replaces get_all_transactions, which is now this with no filters.
@@ -213,6 +214,10 @@ def search_transactions(user_id, filters=None, page=1, per_page=DEFAULT_PER_PAGE
     is about 29ms and these queries take single figures, so the second
     statement cost more than the work it saved. COUNT(*) OVER () is computed
     before LIMIT, so it counts every match rather than the page.
+    
+    with_tags=False skips the per-row tag aggregation. The CSV export reads
+    every page of this and writes eight columns, none of them tags, so it
+    was paying a json_agg subquery per row for a value it discarded.
     """
     filters = filters or {}
     connection = None
@@ -232,7 +237,7 @@ def search_transactions(user_id, filters=None, page=1, per_page=DEFAULT_PER_PAGE
         # along on every row of it. Then the tags, which are looked up only
         # for the rows that survived the LIMIT.
         cursor.execute(
-            f"SELECT page.*, {TAGS} FROM ("
+            f"SELECT page.*, {TAGS if with_tags else "NULL AS tags"} FROM ("
             f"    SELECT *, COUNT(*) OVER () AS matching FROM ({inner}) AS matched "
             f"    ORDER BY {column} {direction}, {TIEBREAK} "
             f"    LIMIT %s OFFSET %s"

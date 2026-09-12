@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, api } from "../../lib/api";
 import type { Holding } from "../../lib/api";
@@ -25,6 +25,9 @@ function today(): string {
 // auto_price as "decide from whether there is a symbol" and an explicit
 // "0" as somebody saying no -- so sending "0" here, which this did, opted
 // every new holding out of the pricing it had just been given a symbol for.
+/** Shared empty array, so a holding with no history keeps one identity. */
+const EMPTY_CLOSES: number[] = [];
+
 const blank = () => ({
   asset_name: "", asset_type: "Stock", buy_date: today(),
   buy_price: "", quantity: "", ticker: "",
@@ -94,6 +97,19 @@ export function Holdings() {
     queryFn: api.holdingsHistory,
     enabled: symbols.length > 0,
   });
+
+  // Parsed once per fetch, not once per render. Each holding's sparkline
+  // is thirty closes, and this used to run toMinor over all of them inside
+  // the row map -- so every re-render re-parsed every point of every
+  // holding. That now includes every poll tick, since a moved quote is
+  // written back while the screen is open.
+  const closesByTicker = useMemo(() => {
+    const out: Record<string, number[]> = {};
+    for (const [ticker, points] of Object.entries(history.data?.items ?? {})) {
+      out[ticker] = points.map((point) => toMinor(point.close));
+    }
+    return out;
+  }, [history.data]);
 
   const refresh = () => {
     client.invalidateQueries({ queryKey: ["portfolio"] });
@@ -392,9 +408,9 @@ export function Holdings() {
               // Minor units, because that is what every other figure on
               // this screen is measured in and the chart only needs the
               // shape to be to scale.
-              const closes = (holding.ticker
-                ? history.data?.items[holding.ticker] ?? []
-                : []).map((point) => toMinor(point.close));
+              const closes = holding.ticker
+                ? closesByTicker[holding.ticker] ?? EMPTY_CLOSES
+                : EMPTY_CLOSES;
               // What the symbol is, written down by the nightly job. The
               // lookup behind it takes three seconds cold, which is why
               // this is read from our own table and not asked for here.

@@ -110,11 +110,18 @@ def username_taken(username, email):
     try:
         connection = db.get_connection()
         cursor = connection.cursor()
-        cursor.execute("SELECT 1 FROM users WHERE username = %s", (username,))
-        if cursor.fetchone():
+        # Both questions in one round trip. Asked one after the other they
+        # cost two, and the second was paid by every successful
+        # registration -- the path where neither answer is yes is exactly
+        # the path that ran both queries.
+        cursor.execute(
+            "SELECT EXISTS(SELECT 1 FROM users WHERE username = %s),"
+            "       EXISTS(SELECT 1 FROM users WHERE email = %s)",
+            (username, email))
+        name_taken, email_taken = cursor.fetchone()
+        if name_taken:
             return "That username is already taken."
-        cursor.execute("SELECT 1 FROM users WHERE email = %s", (email,))
-        if cursor.fetchone():
+        if email_taken:
             return "That email address is already registered."
         return None
     except Error as e:

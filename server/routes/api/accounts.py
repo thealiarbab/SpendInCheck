@@ -138,7 +138,7 @@ def remove_account(account_id):
     # The last account cannot go: every transaction needs somewhere to live,
     # and an account list with nothing in it is a ledger that cannot be
     # written to.
-    if len(operations.list_accounts(user_id, include_archived=True)) <= 1:
+    if operations.count_accounts(user_id) <= 1:
         raise ValidationError({"account": "This is your only account."},
                               message="Keep at least one account.")
 

@@ -299,8 +299,11 @@ def export_transactions():
     # time, which is what that cap was really protecting.
     page = 1
     while True:
+        # with_tags=False: the eight columns written below do not include
+        # them, and aggregating them per row for every page of an export is
+        # work thrown away on the largest read this app makes.
         rows, total = operations.search_transactions(
-            user_id, filters, page, operations.MAX_PER_PAGE)
+            user_id, filters, page, operations.MAX_PER_PAGE, with_tags=False)
         if not rows:
             break
 

@@ -17,6 +17,7 @@ from .demo import (DEMO_BUDGETS, DEMO_CATEGORIES, DEMO_INVESTMENTS,
                    DEMO_TRANSACTIONS, create_demo_user, delete_demo_user,
                    delete_stale_demo_users, reset_demo_data)
 from .accounts import (ACCOUNT_KINDS, TRANSFER_CATEGORY, account_exists,
+                       count_accounts,
                        add_account, count_account_use, default_account_id,
                        delete_account, delete_transfer, list_accounts,
                        set_archived, transfer, update_account)
@@ -44,7 +45,7 @@ from .reports import (SERIES_MONTHS, budget_vs_actual, cashflow_series,
                       category_wise_spend, dashboard_summary, monthly_trend,
                       net_worth_series, top_merchants)
 from .quotes import (BENCHMARK, basket_against_benchmark, close_on,
-                     instruments_for, recent_closes, record_closes,
+                     has_history, instruments_for, recent_closes, record_closes,
                      record_instrument, search_instruments,
                      symbols_with_history)
 from .investments import (add_investment, apply_prices, delete_investment,
@@ -62,7 +63,7 @@ __all__ = [
     "DEMO_BUDGETS", "DEMO_CATEGORIES", "DEMO_INVESTMENTS", "DEMO_TRANSACTIONS",
     "create_demo_user", "delete_demo_user", "delete_stale_demo_users",
     "reset_demo_data",
-    "ACCOUNT_KINDS", "TRANSFER_CATEGORY", "account_exists", "add_account",
+    "ACCOUNT_KINDS", "TRANSFER_CATEGORY", "account_exists", "count_accounts", "add_account",
     "count_account_use", "default_account_id", "delete_account",
     "delete_transfer", "list_accounts", "set_archived", "transfer",
     "update_account",
@@ -91,6 +92,6 @@ __all__ = [
     "apply_prices", "set_investment_pricing", "symbols_held",
     "symbols_to_price",
     "BENCHMARK", "basket_against_benchmark", "close_on",
-    "instruments_for", "recent_closes", "record_closes",
+    "has_history", "instruments_for", "recent_closes", "record_closes",
     "record_instrument", "search_instruments", "symbols_with_history",
 ]

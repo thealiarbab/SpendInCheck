@@ -194,10 +194,32 @@ export function formatCompact(minor: Minor): string {
   }
 
   if (size < 1e3) return formatMoney(minor, { whole: true });
-  return new Intl.NumberFormat(LOCALE, {
-    style: "currency", currency: active.code,
+  return compactFormatter(active.code).format(major);
+}
+
+/**
+ * One formatter per currency, kept.
+ *
+ * Constructing an Intl.NumberFormat is the expensive part of using one --
+ * it resolves locale data -- and this is called once per gridline label on
+ * every chart, on every render. A chart redraw was building a dozen
+ * identical formatters and throwing them away.
+ *
+ * Keyed by currency code because that is the only part that varies; the
+ * map has one entry in practice and cannot grow past the list of
+ * currencies this app offers.
+ */
+const compactFormatters = new Map<string, Intl.NumberFormat>();
+
+function compactFormatter(code: string): Intl.NumberFormat {
+  const held = compactFormatters.get(code);
+  if (held) return held;
+  const made = new Intl.NumberFormat(LOCALE, {
+    style: "currency", currency: code,
     notation: "compact", maximumFractionDigits: 1,
-  }).format(major);
+  });
+  compactFormatters.set(code, made);
+  return made;
 }
 
 /** Percentage with a fixed one decimal place, guarding division by zero. */

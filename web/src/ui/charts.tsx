@@ -1,4 +1,4 @@
-import { useSyncExternalStore, type ReactNode } from "react";
+import { memo, useSyncExternalStore, type ReactNode } from "react";
 import { formatCompact, formatMoney } from "../lib/money";
 import styles from "./charts.module.css";
 
@@ -362,7 +362,12 @@ export function Legend(
  * Colour comes from first against last, not from the day's move, because a
  * line drawn over thirty days should be coloured by those thirty days.
  */
-export function Sparkline(
+/**
+ * Memoised, because it is drawn once per holding and its input is now a
+ * stable array: the path string is rebuilt only when the closes change,
+ * not on every render of the table around it.
+ */
+export const Sparkline = memo(function Sparkline(
   { values, label }: { values: number[]; label: string },
 ) {
   // Two points is the fewest that can be a line. One is a dot nobody can
@@ -398,7 +403,7 @@ export function Sparkline(
       <path className={`${styles.sparkLine} ${tone}`} d={path} />
     </svg>
   );
-}
+});
 
 
 /**

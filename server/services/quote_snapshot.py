@@ -124,7 +124,9 @@ def ensure_history(symbol, kind="equity"):
     those up to date, and re-fetching a year on every save would be four
     hundred milliseconds to write nothing.
     """
-    if not symbol or symbol in operations.symbols_with_history():
+    # One symbol, one index probe -- not every distinct ticker in the
+    # table pulled back to test membership of a set of one.
+    if not symbol or operations.has_history(symbol):
         return 0
 
     # stocksaathi's own timeout, not the nightly one: this runs inside the
