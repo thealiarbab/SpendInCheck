@@ -21,10 +21,26 @@ four places, which is more precision than a price column holds. Everything
 below hands back Decimal rupees, as the rest of this codebase means by an
 amount, quantised where it is stored rather than here.
 
-Free, no key, no account, CORS-open. StockSaathi proxies this same upstream
-at /api/mf-history for its own front end; this goes direct, so a fund's
-price does not wait on another product's deployment -- the same reasoning
-that took the instrument list from NSE rather than from their database.
+**StockSaathi is asked first, and this is the fallback.** Their
+/api/mf-history proxies this same upstream, and going through them is the
+point rather than an inconvenience: SpendInCheck and StockSaathi are meant
+to be one integration, and a fund priced by them is that integration doing
+its job. It is also the faster path -- their proxy slices by timeframe
+where mfapi does not, so a month of NAVs is 2KB against 132KB, and it holds
+an hour of edge cache in front of a number that changes once a day.
+
+The direct path below stays for the two things they cannot serve: the
+37,882-scheme universe, which they have no endpoint for, and any moment
+their deployment is down. A fund's price should not depend on another
+product being up, even when it should prefer it being up.
+
+The one cost of preferring them is precision. mfapi publishes a NAV to
+five decimal places in rupees, their proxy converts to integer paise, and
+the price column holds three -- so 235.49400 arrives as 235.49 and the
+third decimal is lost. Half a paisa per unit, against the whole of the
+integration; taken knowingly.
+
+Free, no key, no account, CORS-open on both sides.
 
 Nothing here raises on failure, for the reason stocksaathi.py gives: a feed
 is somebody else's server, and a holdings screen that cannot reach one
@@ -35,6 +51,8 @@ import json
 import urllib.error
 import urllib.request
 from decimal import Decimal, InvalidOperation
+
+from . import stocksaathi
 
 BASE = "https://api.mfapi.in/mf"
 
@@ -126,6 +144,12 @@ def scheme(code, timeout=REQUEST_TIMEOUT_SECONDS):
     if not code:
         return None
 
+    # Theirs first. It answers this whole dict from one 2KB response, and
+    # the extra "closes" key it carries is simply unused here.
+    theirs = stocksaathi.fund(code, days=1, timeout=timeout)
+    if theirs and theirs.get("nav") is not None:
+        return {key: value for key, value in theirs.items() if key != "closes"}
+
     body = _get("/" + code, timeout)
     if not isinstance(body, dict):
         return None
@@ -174,6 +198,13 @@ def closing_prices(code, days=30, timeout=TIMEOUT_SECONDS):
     code = normalise(code)
     if not code:
         return []
+
+    # Theirs first, for the reason the module docstring gives: they slice
+    # to the window asked for, where this upstream ships every NAV since
+    # the scheme launched and leaves the trimming to us.
+    theirs = stocksaathi.fund(code, days=days, timeout=timeout)
+    if theirs and theirs.get("closes"):
+        return theirs["closes"]
 
     body = _get("/" + code, timeout)
     if not isinstance(body, dict):

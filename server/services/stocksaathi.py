@@ -12,6 +12,13 @@ of this codebase means by an amount. /api/fundamentals is rupees again.
 percent down, not four. Multiplying it by 100 at the point of display is
 the kind of mistake that shows somebody a -0.39% day as -39%.
 
+**A mutual fund is not a symbol.** /api/mf-history takes an AMFI scheme
+code -- five or six digits, unrelated to any NSE ticker -- and answers in
+paise like /api/history does. fund() below is the whole of it, and it
+returns what a scheme is *and* its recent NAVs from one call, because
+their proxy slices by timeframe server-side where the upstream it proxies
+does not.
+
 Nothing here raises on failure. A price feed is somebody else's server on
 the far side of the internet, and a holdings screen that cannot reach it
 should show the price it already had -- not an error page. Callers get an
@@ -23,6 +30,7 @@ for the paths a browser cannot serve -- the nightly snapshot, and anything
 that has to be true server-side.
 """
 
+import datetime
 import json
 import urllib.error
 import urllib.parse
@@ -234,3 +242,92 @@ def _range_for(days):
         if days <= limit:
             return name
     return "5y"
+
+
+# Their mutual fund proxy takes a timeframe from a fixed vocabulary, the
+# way /api/history takes a range. Different spellings for the same idea,
+# on the same server; _fund_range_for below picks from this one.
+FUND_RANGES = ((30, "1M"), (91, "3M"), (182, "6M"),
+               (365, "1Y"), (1095, "3Y"), (1825, "5Y"))
+
+
+def _fund_range_for(days):
+    """The nearest timeframe their proxy accepts that covers this many days."""
+    for limit, name in FUND_RANGES:
+        if days <= limit:
+            return name
+    return "ALL"
+
+
+def fund(code, days=30, timeout=TIMEOUT_SECONDS):
+    """One mutual fund scheme: what it is, what it is worth, and its NAVs.
+
+    Returns a dict shaped like instrument()'s, so a caller writing an
+    instrument row does not have to know whether it is holding a share or
+    a scheme, with two additions:
+
+        {"symbol", "name", "sector", "exchange", "fund_house",
+         "nav", "closes"}
+
+    `closes` is [(date, Decimal)] oldest first, which is the shape
+    operations.record_closes wants. It comes back from the same call as
+    the rest because their proxy answers both questions at once -- and
+    that is the reason to prefer it over the upstream it proxies, which
+    has no timeframe parameter and so ships every NAV since inception
+    whatever you wanted. 132KB against 2KB, for one month of a fund.
+
+    `sector` carries the scheme category, because that is what it is:
+    "Equity Scheme - Mid Cap Fund" answers for a scheme what "Refineries"
+    answers for a share. `exchange` is None -- a fund does not trade on
+    one, and writing "AMFI" there would put a word in a column that means
+    something else everywhere else it is read.
+
+    None if the scheme is unknown or the proxy is unreachable. Their
+    handler answers 502 for a code the upstream will not serve, so an
+    unknown scheme arrives here the same way an outage does; the caller
+    that needs to tell them apart asks the upstream itself.
+    """
+    if code is None:
+        return None
+    clean = str(code).strip()
+    if not (clean.isdigit() and 1 <= len(clean) <= 6):
+        return None
+
+    body = _get("/mf-history",
+                {"code": clean, "tf": _fund_range_for(days)}, timeout)
+    if not body or not body.get("scheme_name"):
+        return None
+
+    closes = []
+    for candle in body.get("ohlc") or []:
+        at, close = candle.get("t"), candle.get("c")
+        if at is None or close is None:
+            continue
+        try:
+            # Their timestamps are midnight on the NAV's date, and the date
+            # is the entire content of a NAV -- there is no intraday. Read
+            # back in UTC, because reading in local time is how a NAV
+            # lands on the previous day for anyone west of Greenwich.
+            on = datetime.datetime.fromtimestamp(
+                int(at) / 1000, datetime.timezone.utc).date()
+            closes.append((on, Decimal(int(close)) / 100))
+        except (TypeError, ValueError, OSError, OverflowError):
+            continue
+
+    latest = body.get("latest_nav_paise")
+    return {
+        "symbol": clean,
+        "name": body.get("scheme_name"),
+        "sector": body.get("scheme_category") or None,
+        "exchange": None,
+        "fund_house": body.get("fund_house") or None,
+        # Their proxy does not carry it, and instrument()'s dict has the
+        # key, so it is present and empty rather than missing. The seeded
+        # instruments table has the ISIN anyway -- it comes from the
+        # scheme list, which is the upstream's to give.
+        "isin": None,
+        # Their own field rather than the last candle, so a timeframe that
+        # sliced away everything still reports today's NAV.
+        "nav": (Decimal(int(latest)) / 100) if latest is not None else None,
+        "closes": closes,
+    }
