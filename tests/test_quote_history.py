@@ -27,6 +27,10 @@ TICKER = "TESTCO"
 # which is what these tests did before this constant existed.
 TEST_BENCHMARK = "TESTBM"
 
+# A second synthetic symbol, for the case where one holding has a
+# shorter price history than another.
+LATECO = "TESTLATE"
+
 
 @pytest.fixture
 def clean_history():
@@ -49,6 +53,10 @@ def clean_history():
             # can be using either.
             cursor.execute("DELETE FROM quote_history WHERE ticker = %s",
                            (TEST_BENCHMARK,))
+            cursor.execute("DELETE FROM quote_history WHERE ticker = %s",
+                           (LATECO,))
+            cursor.execute("DELETE FROM instruments WHERE ticker = %s",
+                           (LATECO,))
             connection.commit()
         finally:
             db.close_connection(connection)
@@ -345,6 +353,57 @@ def test_the_basket_holds_quantities_constant(make_api_account, clean_history, s
         Decimal("1000.000"), Decimal("1500.000"), Decimal("2000.000")]
     assert [close for _, _, close in rows] == [
         Decimal("50.000"), Decimal("55.000"), Decimal("60.000")]
+
+
+def test_a_holding_that_listed_late_does_not_read_as_a_market_gain(
+        make_api_account, clean_history, stand_in_benchmark):
+    """The basket has to be the same basket in every month it is charted.
+
+    JOIN LATERAL ... ON TRUE is an inner join, so a holding with no close
+    before a given month is dropped from that month -- while the month
+    itself survives on the strength of the other holdings. The basket
+    silently changes membership partway along, and when the late arrival's
+    history begins, its whole value appears at once.
+
+    Both symbols are flat here on purpose. Nothing about the market moves,
+    so any movement in the basket line is this bug and nothing else.
+    """
+    client = make_api_account()
+    today = date.today()
+    months = []
+    for back in (2, 1, 0):
+        year, month = today.year, today.month - back
+        while month < 1:
+            month += 12
+            year -= 1
+        months.append(date(year, month, 1))
+
+    steady = add_holding(client, asset_name="Steady", quantity="10",
+                         current_price="100.00")
+    client.patch(f"/api/v1/investments/{steady['id']}/pricing",
+                 headers=client.headers, json={"ticker": TICKER, "auto_price": "0"})
+
+    client.post("/api/v1/investments", headers=client.headers,
+                json={"asset_name": "Latecomer", "asset_type": "Stock",
+                      "buy_date": "2026-01-02", "buy_price": "100.00",
+                      "quantity": "10", "current_price": "100.00"})
+    late = next(one for one in
+                client.get("/api/v1/investments").get_json()["items"]
+                if one["asset_name"] == "Latecomer")
+    client.patch(f"/api/v1/investments/{late['id']}/pricing",
+                 headers=client.headers, json={"ticker": LATECO, "auto_price": "0"})
+
+    # Flat throughout. The latecomer simply has no history until the last month.
+    operations.record_closes(TICKER, [(m, Decimal("100.00")) for m in months])
+    operations.record_closes(LATECO, [(months[2], Decimal("100.00"))])
+    seed_benchmark([(m, Decimal("50.00")) for m in months])
+
+    user_id = client.get("/api/v1/auth/session").get_json()["user"]["id"]
+    values = [value for _, value, _ in
+              operations.basket_against_benchmark(user_id, months=3)]
+
+    assert len(set(values)) == 1, (
+        f"nothing moved, so the basket must not have: {values}")
 
 
 def test_a_deposit_takes_no_part(make_api_account, clean_history, stand_in_benchmark):

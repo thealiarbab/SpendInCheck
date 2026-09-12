@@ -278,7 +278,10 @@ def basket_against_benchmark(user_id, months=12, benchmark=None):
     """What this account's holdings did, beside what the market did.
 
     Returns (month, basket_value, benchmark_close) oldest first, with
-    months that have no closes on either side left out.
+    months left out unless BOTH sides can be valued in full: the benchmark
+    needs a close, and so does every one of the holdings. A month in which
+    only part of the basket had a price is not a cheaper answer, it is a
+    different basket -- see the HAVING below.
 
     The basket is valued at **today's quantities** throughout, which is the
     whole point and the thing that is easy to get wrong. Charting the
@@ -327,6 +330,25 @@ def basket_against_benchmark(user_id, months=12, benchmark=None):
                        ORDER BY q.on_date DESC LIMIT 1
                   ) past ON TRUE
                  GROUP BY c.month_start
+                -- Every holding, or the month does not count.
+                --
+                -- The lateral above is an inner join, so a holding with no
+                -- close before this month drops out of it -- while the
+                -- month itself survives on the strength of the others. The
+                -- basket then changes membership partway along the chart,
+                -- and the month a late-listed holding gains a history, its
+                -- whole value arrives at once and reads as a market gain.
+                -- Measured on a flat pair: 1000, 1000, 2000, with neither
+                -- price having moved at all.
+                --
+                -- So a month is charted only when the entire basket can be
+                -- valued in it. The series starts later for an account
+                -- holding something recently listed, which is the honest
+                -- answer: there is no comparison to draw for a month in
+                -- which half the basket did not yet exist.
+                HAVING COUNT(*) = (
+                    SELECT COUNT(*) FROM investments
+                     WHERE user_id = %s AND ticker IS NOT NULL)
             ),
             market AS (
                 SELECT c.month_start, past.close
@@ -342,7 +364,7 @@ def basket_against_benchmark(user_id, months=12, benchmark=None):
                    basket.value, market.close
               FROM basket JOIN market ON market.month_start = basket.month_start
              ORDER BY basket.month_start
-        """, (months - 1, user_id, benchmark))
+        """, (months - 1, user_id, user_id, benchmark))
         return cursor.fetchall()
     finally:
         db.close_connection(connection)
