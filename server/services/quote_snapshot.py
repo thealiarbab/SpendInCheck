@@ -21,7 +21,7 @@ hoped for.
 from datetime import datetime, timedelta, timezone
 
 from server import operations
-from server.services import stocksaathi
+from server.services import amfi, stocksaathi
 
 # The exchange's day, not the server's. A close stamped 15:30 in Mumbai is
 # 10:00 UTC, so both agree today -- but a feed that ever stamps a candle
@@ -63,27 +63,35 @@ def take_snapshot():
     # The benchmark is always in the list, even when nobody holds it.
     # Nothing else would ever fetch it -- it is not anybody's holding --
     # and a comparison chart with one side missing is not a chart.
-    symbols = operations.symbols_to_price()
-    if operations.BENCHMARK not in symbols:
-        symbols = symbols + [operations.BENCHMARK]
+    tracked = operations.symbols_to_price()
+    if not any(ticker == operations.BENCHMARK for ticker, _ in tracked):
+        tracked = list(tracked) + [(operations.BENCHMARK, "equity")]
 
     known = operations.symbols_with_history()
     written = 0
     backfilled = 0
     described = 0
 
-    for symbol in symbols:
+    for symbol, kind in tracked:
         first_time = symbol not in known
         days = BACKFILL_DAYS if first_time else TOPUP_DAYS
-        closes = stocksaathi.closing_prices(symbol, days=days,
-                                            timeout=TIMEOUT_SECONDS)
+        # Each kind to its own feed. A NAV history is already dated, where
+        # an equity's closes arrive as millisecond timestamps, so the two
+        # are normalised to (date, price) here rather than downstream.
+        if kind == "fund":
+            closes = [(on, price) for on, price
+                      in amfi.closing_prices(symbol, days=days,
+                                             timeout=TIMEOUT_SECONDS)]
+        else:
+            closes = [(_as_date(at), price) for at, price
+                      in stocksaathi.closing_prices(symbol, days=days,
+                                                    timeout=TIMEOUT_SECONDS)]
         if not closes:
             # One symbol the feed cannot answer for must not abandon the
             # rest. The next run picks it up.
             continue
 
-        landed = operations.record_closes(
-            symbol, [(_as_date(at), price) for at, price in closes])
+        landed = operations.record_closes(symbol, closes)
         written += landed
         if first_time and landed:
             backfilled += 1
@@ -93,15 +101,17 @@ def take_snapshot():
         # waiting on this job, and the 52-week range it carries moves every
         # day. Writing it here is what lets a screen show the range without
         # asking anybody.
-        if operations.record_instrument(
-                stocksaathi.instrument(symbol, timeout=TIMEOUT_SECONDS)):
+        described_by = (amfi.scheme(symbol, timeout=TIMEOUT_SECONDS)
+                        if kind == "fund"
+                        else stocksaathi.instrument(symbol, timeout=TIMEOUT_SECONDS))
+        if operations.record_instrument(described_by):
             described += 1
 
-    return {"symbols": len(symbols), "closes": written,
+    return {"symbols": len(tracked), "closes": written,
             "backfilled": backfilled, "described": described}
 
 
-def ensure_history(symbol):
+def ensure_history(symbol, kind="equity"):
     """Fetch a year for a symbol this database has never seen. Returns rows.
 
     Called when somebody first points a holding at a symbol, so the chart
@@ -120,11 +130,18 @@ def ensure_history(symbol):
     # stocksaathi's own timeout, not the nightly one: this runs inside the
     # save somebody is waiting on, and Vercel will end the request long
     # before a twenty-second wait here does.
-    closes = stocksaathi.closing_prices(symbol, days=BACKFILL_DAYS)
+    # Each kind to its own feed, and each to the request-path timeout: this
+    # runs inside the save somebody is waiting on, and Vercel ends the
+    # request long before a twenty-second wait here would.
+    if kind == "fund":
+        closes = amfi.closing_prices(symbol, days=BACKFILL_DAYS,
+                                     timeout=amfi.REQUEST_TIMEOUT_SECONDS)
+    else:
+        closes = [(_as_date(at), price) for at, price
+                  in stocksaathi.closing_prices(symbol, days=BACKFILL_DAYS)]
     if not closes:
         return 0
-    return operations.record_closes(
-        symbol, [(_as_date(at), price) for at, price in closes])
+    return operations.record_closes(symbol, closes)
 
 
 def describe(symbol, found=None):

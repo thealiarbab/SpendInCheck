@@ -177,10 +177,78 @@ def test_a_price_still_beats_a_longer_listing(api_account, seeded_instruments):
 
 def test_searching_directly_returns_the_columns_the_client_needs(
         seeded_instruments):
-    """The hook's Suggestion type reads all five."""
+    """The hook's Suggestion type reads all six, kind included."""
     rows = operations.search_instruments("zztestco", limit=1)
     assert len(rows) == 1
-    ticker, name, exchange, sector, isin = rows[0]
+    ticker, name, exchange, sector, isin, kind = rows[0]
     assert ticker == "ZZTESTCO"
     assert name == "Zztest Industries Limited"
     assert exchange == "NSE"
+    assert kind == "equity"
+
+
+# --- funds alongside shares --------------------------------------------------
+
+FUND = ("100ZZZ", "Zztest Flexi Cap Fund - Direct Plan - Growth", "fund")
+FUND_IDCW = ("101ZZZ", "Zztest Flexi Cap Fund - Regular Plan - IDCW", "fund")
+
+
+@pytest.fixture
+def seeded_funds():
+    """Two synthetic schemes, in the same table as the shares."""
+    rows = [FUND, FUND_IDCW]
+    codes = [code for code, _, _ in rows]
+
+    def wipe():
+        connection = db.get_connection()
+        try:
+            cursor = connection.cursor()
+            cursor.execute(
+                "DELETE FROM instruments WHERE ticker = ANY(%s::varchar[])",
+                (codes,))
+            connection.commit()
+        finally:
+            db.close_connection(connection)
+
+    connection = db.get_connection()
+    try:
+        cursor = connection.cursor()
+        for code, name, kind in rows:
+            cursor.execute(
+                "INSERT INTO instruments (ticker, name, kind) VALUES (%s, %s, %s) "
+                "ON CONFLICT (ticker) DO UPDATE "
+                "   SET name = EXCLUDED.name, kind = EXCLUDED.kind",
+                (code, name, kind))
+        connection.commit()
+    finally:
+        db.close_connection(connection)
+
+    yield codes
+    wipe()
+
+
+def test_a_fund_is_searchable_beside_the_shares(api_account, seeded_funds):
+    """One box, both namespaces. A fund is found by its name, because nobody
+    knows an AMFI scheme code by heart the way they know a ticker."""
+    found = search(api_account["client"], "zztest flexi")
+    assert "100ZZZ" in found
+
+
+def test_the_search_says_which_kind_each_result_is(api_account, seeded_funds,
+                                                   seeded_instruments):
+    """The client cannot tell from the identifier: "118989" is a fund and
+    "RELIANCE" is a share, and inferring that from whether it is all digits
+    is exactly what migration 016 added the column to avoid."""
+    body = api_account["client"].get(
+        "/api/v1/symbols/search?q=zztest").get_json()["items"]
+    kinds = {row["symbol"]: row["kind"] for row in body}
+    assert kinds.get("ZZTESTCO") == "equity"
+    assert kinds.get("100ZZZ") == "fund"
+
+
+def test_growth_outranks_the_payout_variant(api_account, seeded_funds):
+    """Every scheme exists as four near-identical rows -- Direct and
+    Regular, Growth and IDCW. A list that leads with the payout variant is
+    answering a question nobody asked."""
+    found = search(api_account["client"], "zztest flexi")
+    assert found.index("100ZZZ") < found.index("101ZZZ")

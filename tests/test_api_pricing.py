@@ -400,8 +400,19 @@ def test_the_exchange_comes_from_the_upstream_not_the_form(
 
 def test_a_quotable_symbol_is_accepted_when_the_lookup_is_down(
         make_api_account, feed):
-    """The fallback. The lookup is the slower, richer endpoint, and their
-    outage must not stop somebody switching on a symbol that works."""
+    """Their outage must not stop somebody switching on a symbol that works.
+
+    It no longer reaches the quote fallback at all for a symbol this
+    database already knows. The instrument master now holds every NSE equity
+    and every AMFI scheme, seeded from the exchange and from AMFI, so a
+    symbol is resolved against our own table and described from our own row
+    -- which is why `instrument` comes back populated here with the upstream
+    lookup deliberately broken.
+
+    This test asserted that it came back null, which was correct when a
+    symbol could only be described by asking somebody else. Answering
+    without them is the improvement, not a regression.
+    """
     client = make_api_account()
     add_holding(client)
     holding = only_holding(client)
@@ -411,6 +422,6 @@ def test_a_quotable_symbol_is_accepted_when_the_lookup_is_down(
                         headers=client.headers,
                         json={"ticker": "RELIANCE", "auto_price": "1"})
     assert body.status_code == 200
-    assert body.get_json()["instrument"] is None, "nothing to describe it with"
+    described = body.get_json()["instrument"]
+    assert described and described["name"], "described from our own row"
     assert only_holding(client)["auto_price"] is True
-    assert feed.asked == [["RELIANCE"]] + feed.asked[1:], "asked for a quote instead"

@@ -9,7 +9,7 @@ from .. import db
 
 def add_investment(user_id, asset_name, asset_type, buy_date, buy_price,
                    quantity, current_price, ticker=None, exchange=None,
-                   isin=None, auto_price=False):
+                   isin=None, auto_price=False, kind="equity"):
     """Insert a new investment. Returns True on success, False on failure.
 
     The pricing arguments default to a holding nobody prices automatically,
@@ -23,12 +23,12 @@ def add_investment(user_id, asset_name, asset_type, buy_date, buy_price,
         query = """
             INSERT INTO investments (user_id, asset_name, asset_type, buy_date,
                                      buy_price, quantity, current_price,
-                                     ticker, exchange, isin, auto_price)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                     ticker, exchange, isin, auto_price, kind)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
         cursor.execute(query, (user_id, asset_name, asset_type, buy_date, buy_price,
                                quantity, current_price, ticker, exchange, isin,
-                               auto_price))
+                               auto_price, kind))
         connection.commit()
         return True
     finally:
@@ -171,7 +171,7 @@ def delete_investment(user_id, investment_id):
 
 
 def set_investment_pricing(user_id, investment_id, ticker, exchange, isin,
-                           auto_price):
+                           auto_price, kind="equity"):
     """Point a holding at a market symbol, or stop pointing it at one.
 
     Clearing the ticker also clears auto_price, because the two are not
@@ -189,6 +189,10 @@ def set_investment_pricing(user_id, investment_id, ticker, exchange, isin,
     """
     if not ticker:
         ticker, exchange, isin, auto_price = None, None, None, False
+        # Back to the default rather than left as it was: a holding with no
+        # identifier is not a fund any more than it is a share, and leaving
+        # 'fund' behind would send the next price run to the wrong feed.
+        kind = "equity"
 
     connection = None
     try:
@@ -197,12 +201,13 @@ def set_investment_pricing(user_id, investment_id, ticker, exchange, isin,
         cursor.execute("""
             UPDATE investments
                SET ticker = %s, exchange = %s, isin = %s, auto_price = %s,
+                   kind = %s,
                    -- A holding that is no longer fetched is manual again,
                    -- so the label never claims a price came from a feed
                    -- that is switched off.
                    price_source = CASE WHEN %s THEN price_source ELSE 'manual' END
              WHERE investment_id = %s AND user_id = %s
-        """, (ticker, exchange, isin, auto_price, auto_price,
+        """, (ticker, exchange, isin, auto_price, kind, auto_price,
               investment_id, user_id))
         connection.commit()
         # As in update_investment_price: no existence check behind a rowcount
@@ -216,6 +221,10 @@ def set_investment_pricing(user_id, investment_id, ticker, exchange, isin,
 def symbols_to_price(user_id=None):
     """Every symbol somebody holds with automatic pricing on.
 
+    Returns (ticker, kind) pairs, because the two kinds go to different
+    feeds -- a share to StockSaathi, a fund to AMFI -- and the caller has
+    to split them before it asks either.
+
     Scoped to one user when given one -- a signed-in visitor refreshing
     their own holdings -- and to everybody when not, which is what the
     nightly snapshot wants. Distinct, because twenty accounts holding
@@ -226,13 +235,13 @@ def symbols_to_price(user_id=None):
         connection = db.get_connection()
         cursor = connection.cursor()
         cursor.execute("""
-            SELECT DISTINCT ticker
+            SELECT DISTINCT ticker, kind
               FROM investments
              WHERE auto_price AND ticker IS NOT NULL
                AND (%s::int IS NULL OR user_id = %s)
              ORDER BY ticker
         """, (user_id, user_id))
-        return [row[0] for row in cursor.fetchall()]
+        return cursor.fetchall()
     finally:
         db.close_connection(connection)
 

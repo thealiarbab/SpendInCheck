@@ -404,6 +404,15 @@ export function Holdings() {
                     ) : "—"}
                   </td>
                   <td>
+                    {/* An em-dash when there is nothing to draw, matching
+                        the Live column beside it. A holding with no symbol
+                        has no price history and never will -- a deposit has
+                        no market -- so the cell is empty by nature rather
+                        than by failure. Left blank the two columns
+                        disagreed about how to say that, and a blank cell in
+                        a row of figures reads as something not having
+                        loaded. */}
+                    {closes.length <= 1 && !(what?.low_52w && what?.high_52w) && "—"}
                     {closes.length > 1 && (
                       <Sparkline values={closes}
                                  label={`${holding.ticker} over the last month`} />

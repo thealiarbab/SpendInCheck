@@ -6,7 +6,7 @@ from server import money, operations
 from server.auth import money_places, require_user
 from server.errors import ApiError, NotFound, ValidationError
 from server.routes.api import api
-from server.services import quote_snapshot, stocksaathi
+from server.services import amfi, quote_snapshot, stocksaathi
 from server.validators import Validator
 
 FIELDS = ["id", "asset_name", "asset_type", "buy_date", "buy_price", "quantity",
@@ -48,16 +48,20 @@ def create_investment():
     auto = fields.choice("auto_price", ["1", "0"], required=False) == "1"
     fields.raise_if_invalid()
 
-    symbol, found = _resolve_symbol(ticker, auto) if ticker else (None, None)
+    symbol, found, kind = (_resolve_symbol(ticker, auto) if ticker
+                           else (None, None, "equity"))
     if symbol is None:
         auto = False
-    # The exchange the upstream names beats the one a form guessed at.
-    exchange = (found or {}).get("exchange") or exchange
+    # The exchange the upstream names beats the one a form guessed at, and a
+    # fund has none at all.
+    exchange = None if kind == "fund" else ((found or {}).get("exchange") or exchange)
+    isin = (found or {}).get("isin") or isin
 
     if not operations.add_investment(user_id, name, asset_type, buy_date,
                                      buy_price, quantity, current_price,
                                      ticker=symbol, exchange=exchange,
-                                     isin=isin or None, auto_price=auto):
+                                     isin=isin or None, auto_price=auto,
+                                     kind=kind):
         raise ApiError("Could not add that holding.", code="create_failed")
     return jsonify({"ok": True}), 201
 
@@ -65,7 +69,7 @@ def create_investment():
 def _resolve_symbol(ticker, must_quote):
     """The symbol as the API wants it, and what it turns out to be.
 
-    Returns (symbol, instrument-or-None).
+    Returns (symbol, instrument-or-None, kind).
 
     The lookup is the closest this integration gets to the symbol search
     the plan wanted: their API has no endpoint that takes "reli" and
@@ -82,15 +86,48 @@ def _resolve_symbol(ticker, must_quote):
     because the alternative is a holding that silently never updates and an
     owner who believes it does.
     """
+    # Our own table first, and this is what makes saving a symbol fast.
+    #
+    # It used to ask StockSaathi's fundamentals endpoint whether the symbol
+    # existed, which their own docstring calls "up to three seconds cold",
+    # on the path somebody is watching a spinner on. That was the right
+    # design when this database knew nothing about symbols. It now holds
+    # every NSE equity and every AMFI scheme -- 40,174 rows, seeded from the
+    # exchange and from AMFI -- so the question "is this a real symbol, and
+    # whose is it" is a primary key lookup against a table in the same
+    # region, not a round trip to somebody else's server.
+    #
+    # The upstream is still asked for anything the seed does not cover, so a
+    # symbol listed this morning still works; it is just no longer the
+    # common path.
+    known = operations.instruments_for([str(ticker).strip().upper()])
+    local = known.get(str(ticker).strip().upper())
+    if local and local.get("name"):
+        return local["symbol"], local, local.get("kind") or "equity"
+
+    # A fund next, because the two namespaces cannot overlap: no NSE
+    # equity ticker is purely numeric and no AMFI code is anything else.
+    # Checked against both lists rather than assumed -- see migration 016.
+    code = amfi.normalise(ticker)
+    if code is not None:
+        scheme = amfi.scheme(code)
+        if scheme:
+            return code, scheme, "fund"
+        if not must_quote:
+            return code, None, "fund"
+        raise ValidationError(
+            {"ticker": "No fund found with code " + code + ". Pick one from "
+                       "the suggestions, or leave automatic pricing off."})
+
     symbol = stocksaathi.normalise(ticker)
     if symbol is None:
         raise ValidationError(
             {"ticker": "That does not look like a symbol. Use the NSE code, "
-                       "like RELIANCE."})
+                       "like RELIANCE, or an AMFI scheme code for a fund."})
 
     found = stocksaathi.instrument(symbol)
     if found or not must_quote:
-        return symbol, found
+        return symbol, found, "equity"
 
     # The lookup is the slower, richer endpoint, so a symbol it cannot
     # answer for might still be quotable -- their own outage should not
@@ -100,7 +137,7 @@ def _resolve_symbol(ticker, must_quote):
         raise ValidationError(
             {"ticker": "No price found for " + symbol + ". Check the symbol, "
                        "or leave automatic pricing off."})
-    return symbol, None
+    return symbol, None, "equity"
 
 
 def _described(found):
@@ -113,12 +150,17 @@ def _described(found):
     if not found:
         return None
     places = money_places()
+    # .get throughout, not indexing: a fund and a share are described by
+    # overlapping but different facts. A scheme has a fund house and a NAV
+    # and no 52-week range; a share has the range and no house. Indexing
+    # would make every fund a KeyError on the screen that confirms it.
     return {
-        "name": found["name"],
-        "sector": found["sector"],
-        "exchange": found["exchange"],
-        "low_52w": money.serialise(found["low_52w"], places),
-        "high_52w": money.serialise(found["high_52w"], places),
+        "name": found.get("name"),
+        "sector": found.get("sector"),
+        "exchange": found.get("exchange"),
+        "fund_house": found.get("fund_house"),
+        "low_52w": money.serialise(found.get("low_52w"), places),
+        "high_52w": money.serialise(found.get("high_52w"), places),
     }
 
 
@@ -166,26 +208,34 @@ def set_pricing(investment_id):
     if not operations.investment_exists(user_id, investment_id):
         raise NotFound()
 
-    symbol, found = _resolve_symbol(ticker, auto) if ticker else (None, None)
+    symbol, found, kind = (_resolve_symbol(ticker, auto) if ticker
+                           else (None, None, "equity"))
     if symbol is None:
         auto = False
     exchange = (found or {}).get("exchange") or exchange
+    # A fund has no exchange and never will. Left as whatever was submitted
+    # it would put "NSE" beside a scheme that does not trade on one.
+    if kind == "fund":
+        exchange = None
+    isin = (found or {}).get("isin") or isin
 
     if not operations.set_investment_pricing(user_id, investment_id, symbol,
-                                             exchange, isin or None, auto):
+                                             exchange, isin or None, auto,
+                                             kind):
         raise ApiError("Could not save that.", code="update_failed")
 
     if symbol:
         # So the holding has a line to draw from the moment it is tracked,
         # rather than being flat until tonight's run. A no-op for a symbol
         # somebody else already tracks, which is most of them.
-        quote_snapshot.ensure_history(symbol)
+        quote_snapshot.ensure_history(symbol, kind=kind)
         # The lookup has already happened -- it is how the symbol was
         # accepted -- so keeping its answer costs nothing and saves every
         # later screen from asking.
         quote_snapshot.describe(symbol, found)
 
-    return jsonify({"ok": True, "ticker": symbol, "auto_price": auto,
+    return jsonify({"ok": True, "ticker": symbol, "kind": kind,
+                    "auto_price": auto,
                     "priced": _refresh(user_id) if auto else 0,
                     # So the screen can say which company that symbol turned
                     # out to be, rather than echoing back what was typed.
@@ -211,12 +261,24 @@ def _refresh(user_id):
     writes nothing and reports zero. Nobody's portfolio is damaged by
     somebody else's outage, and each holding keeps the last price it had.
     """
-    symbols = operations.symbols_to_price(user_id)
-    if not symbols:
+    tracked = operations.symbols_to_price(user_id)
+    if not tracked:
         return 0
-    quotes = stocksaathi.live_quotes(symbols)
-    return operations.apply_prices(
-        {symbol: quote["price"] for symbol, quote in quotes.items()}, user_id)
+
+    # Split by feed before asking either. A share is quoted intraday by
+    # StockSaathi; a fund has a NAV published once each evening by AMFI, and
+    # sending one to the other's endpoint gets a confident nothing back.
+    shares = [ticker for ticker, kind in tracked if kind != "fund"]
+    funds = [ticker for ticker, kind in tracked if kind == "fund"]
+
+    prices = {}
+    if shares:
+        prices.update({symbol: quote["price"]
+                       for symbol, quote in stocksaathi.live_quotes(shares).items()})
+    if funds:
+        prices.update(amfi.latest_navs(funds))
+
+    return operations.apply_prices(prices, user_id) if prices else 0
 
 
 @api.get("/quotes")
@@ -343,7 +405,11 @@ def search_symbols():
 
     rows = operations.search_instruments(term, limit=MAX_SUGGESTIONS)
     return jsonify({"items": [
+        # kind rides along because the client cannot tell from the
+        # identifier alone: "118989" is a fund and "RELIANCE" is a share,
+        # and guessing that from whether it is all digits is exactly the
+        # inference migration 016 added the column to avoid.
         {"symbol": ticker, "name": name, "exchange": exchange,
-         "sector": sector, "isin": isin}
-        for ticker, name, exchange, sector, isin in rows
+         "sector": sector, "isin": isin, "kind": kind}
+        for ticker, name, exchange, sector, isin, kind in rows
     ]})

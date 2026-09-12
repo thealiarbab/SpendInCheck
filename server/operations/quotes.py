@@ -146,8 +146,8 @@ def record_instrument(found):
         cursor = connection.cursor()
         cursor.execute("""
             INSERT INTO instruments (ticker, name, sector, exchange,
-                                     low_52w, high_52w, priced)
-            VALUES (%s, %s, %s, %s, %s, %s, true)
+                                     low_52w, high_52w, fund_house, priced)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, true)
             ON CONFLICT (ticker) DO UPDATE
                SET name = COALESCE(EXCLUDED.name, instruments.name),
                    sector = COALESCE(EXCLUDED.sector, instruments.sector),
@@ -157,6 +157,8 @@ def record_instrument(found):
                    -- momentarily lost the sector should not erase it.
                    low_52w = COALESCE(EXCLUDED.low_52w, instruments.low_52w),
                    high_52w = COALESCE(EXCLUDED.high_52w, instruments.high_52w),
+                   -- A fund has a house where a share has an exchange.
+                   fund_house = COALESCE(EXCLUDED.fund_house, instruments.fund_house),
                    -- Never back to false. Reaching here means the feed
                    -- answered for this symbol, and a seeded row arriving
                    -- later must not un-confirm it. The search ranks on this.
@@ -164,7 +166,7 @@ def record_instrument(found):
                    updated_at = now()
         """, (found["symbol"], found.get("name"), found.get("sector"),
               found.get("exchange"), found.get("low_52w"),
-              found.get("high_52w")))
+              found.get("high_52w"), found.get("fund_house")))
         connection.commit()
         return True
     finally:
@@ -221,13 +223,30 @@ def search_instruments(term, limit=8):
         connection = db.get_connection()
         cursor = connection.cursor()
         cursor.execute("""
-            SELECT ticker, name, exchange, sector, isin
+            SELECT ticker, name, exchange, sector, isin, kind
               FROM instruments
              WHERE ticker LIKE %s ESCAPE '\\'
                 OR name ILIKE %s ESCAPE '\\'
              ORDER BY (ticker = %s) DESC,
                       (ticker LIKE %s ESCAPE '\\') DESC,
+                      -- A name that STARTS with what was typed, before one
+                      -- that merely contains it. "sbi large" means the SBI
+                      -- Large Cap Fund, not some other house's fund with
+                      -- those words in the middle of its name. This matters
+                      -- far more for funds than for shares: there are 37,882
+                      -- schemes and their names share most of their words.
+                      (name ILIKE %s ESCAPE '\\') DESC,
                       priced DESC,
+                      -- Growth before IDCW. Every scheme exists as four
+                      -- near-identical rows -- Direct and Regular, Growth
+                      -- and IDCW -- and a list that leads with the payout
+                      -- variant is answering a question nobody asked. All
+                      -- four still appear; this only decides which is first.
+                      (name ILIKE '%%IDCW%%' OR name ILIKE '%%DIVIDEND%%'),
+                      -- Direct before Regular, for the same reason: it is
+                      -- the plan most holdings opened in the last decade
+                      -- are in, and the cheaper of the two.
+                      (name NOT ILIKE '%%DIRECT%%'),
                       -- NULLS LAST: a row with no listing date is one the
                       -- seed never covered, and it should not outrank every
                       -- company on the exchange for having no date at all.
@@ -235,7 +254,8 @@ def search_instruments(term, limit=8):
                       length(ticker),
                       ticker
              LIMIT %s
-        """, (safe + "%", "%" + safe + "%", fragment, safe + "%", limit))
+        """, (safe + "%", "%" + safe + "%", fragment, safe + "%",
+              safe + "%", limit))
         return cursor.fetchall()
     finally:
         db.close_connection(connection)
@@ -252,12 +272,15 @@ def instruments_for(tickers):
         connection = db.get_connection()
         cursor = connection.cursor()
         cursor.execute("""
-            SELECT ticker, name, sector, exchange, low_52w, high_52w
+            SELECT ticker, name, sector, exchange, low_52w, high_52w,
+                   kind, fund_house
               FROM instruments
              WHERE ticker = ANY(%s::varchar[])
         """, (wanted,))
-        return {row[0]: {"name": row[1], "sector": row[2], "exchange": row[3],
-                         "low_52w": row[4], "high_52w": row[5]}
+        return {row[0]: {"symbol": row[0], "name": row[1], "sector": row[2],
+                         "exchange": row[3], "low_52w": row[4],
+                         "high_52w": row[5], "kind": row[6],
+                         "fund_house": row[7]}
                 for row in cursor.fetchall()}
     finally:
         db.close_connection(connection)

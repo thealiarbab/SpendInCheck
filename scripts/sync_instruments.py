@@ -45,6 +45,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from psycopg2.extras import execute_values  # noqa: E402
 
 from server import db  # noqa: E402
+from server.services import amfi  # noqa: E402
 
 NSE_EQUITY_LIST = "https://archives.nseindia.com/content/equities/EQUITY_L.csv"
 
@@ -107,6 +108,39 @@ def parse(text):
     return rows
 
 
+def upsert_funds(schemes):
+    """Write every AMFI scheme in, as instruments of kind 'fund'.
+
+    Same COALESCE rule as the equities: a seed is the floor, never the
+    truth. It cannot blank a fund house or a category the nightly NAV job
+    has already written, and it cannot un-price a fund somebody holds.
+    """
+    if not schemes:
+        return 0
+
+    connection = None
+    try:
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        with db.transaction(connection):
+            execute_values(
+                cursor,
+                """
+                INSERT INTO instruments (ticker, name, isin, kind)
+                VALUES %s
+                ON CONFLICT (ticker) DO UPDATE
+                   SET name = COALESCE(instruments.name, EXCLUDED.name),
+                       isin = COALESCE(instruments.isin, EXCLUDED.isin),
+                       kind = EXCLUDED.kind
+                """,
+                [(code, name, isin, "fund") for code, name, isin in schemes],
+                page_size=1000,
+            )
+        return len(schemes)
+    finally:
+        db.close_connection(connection)
+
+
 def upsert(rows):
     """Write the list in, without overwriting anything the feed knows.
 
@@ -125,7 +159,7 @@ def upsert(rows):
             execute_values(
                 cursor,
                 """
-                INSERT INTO instruments (ticker, name, isin, exchange, listed_on)
+                INSERT INTO instruments (ticker, name, isin, exchange, listed_on, kind)
                 VALUES %s
                 ON CONFLICT (ticker) DO UPDATE
                    SET name = COALESCE(instruments.name, EXCLUDED.name),
@@ -134,9 +168,11 @@ def upsert(rows):
                        -- Not COALESCEd to the existing value: the listing
                        -- date is a fact NSE owns and nothing else here
                        -- writes it, so the newest answer is the right one.
-                       listed_on = COALESCE(EXCLUDED.listed_on, instruments.listed_on)
+                       listed_on = COALESCE(EXCLUDED.listed_on, instruments.listed_on),
+                       kind = EXCLUDED.kind
                 """,
-                [(ticker, name, isin, "NSE", listed) for ticker, name, isin, listed in rows],
+                [(ticker, name, isin, "NSE", listed, "equity")
+                 for ticker, name, isin, listed in rows],
                 page_size=500,
             )
         return len(rows)
@@ -149,21 +185,36 @@ def main():
     parser.add_argument("--dry", action="store_true",
                         help="fetch and report, write nothing")
     parser.add_argument("--file", help="parse a local CSV instead of fetching")
+    parser.add_argument("--equities-only", action="store_true",
+                        help="skip the mutual fund schemes")
+    parser.add_argument("--funds-only", action="store_true",
+                        help="skip the NSE equities")
     args = parser.parse_args()
 
-    text = (open(args.file, encoding="utf-8").read() if args.file else fetch())
-    rows = parse(text)
-    print(f"{len(rows)} ordinary equities in the list")
-    if rows:
-        print("  first three:", ", ".join(t for t, _, _, _ in rows[:3]))
+    rows = []
+    if not args.funds_only:
+        text = (open(args.file, encoding="utf-8").read() if args.file else fetch())
+        rows = parse(text)
+        print(f"{len(rows)} ordinary equities in NSE's list")
+        if rows:
+            print("  first three:", ", ".join(t for t, _, _, _ in rows[:3]))
+
+    schemes = []
+    if not args.equities_only:
+        schemes = amfi.every_scheme()
+        print(f"{len(schemes)} mutual fund schemes in AMFI's list")
+        if schemes:
+            print("  first three:", ", ".join(c for c, _, _ in schemes[:3]))
 
     if args.dry:
         print("--dry: nothing written.")
         return
 
-    written = upsert(rows)
-    print(f"{written} offered to instruments "
-          "(existing names, ISINs and prices left as they were)")
+    if rows:
+        print(f"{upsert(rows)} equities offered to instruments")
+    if schemes:
+        print(f"{upsert_funds(schemes)} funds offered to instruments")
+    print("(existing names, ISINs and prices left as they were)")
 
 
 if __name__ == "__main__":
