@@ -532,22 +532,37 @@ export function Holdings() {
                       </RowActions>
                     ) : (
                       <RowActions>
-                        {/* The two of these are one question asked twice:
-                            where does this holding's price come from, you
-                            or the market. Naming them after their answers
-                            rather than after their mechanics ("Reprice",
-                            "Add symbol") is the difference between two
-                            unrelated-looking buttons and a choice. The
-                            market one still changes wording once a symbol
-                            is set, because by then the button no longer
-                            starts anything -- it opens what is already
-                            arranged. */}
-                        <Button kind="quiet" small onClick={() => startTracking(holding)}>
-                          {holding.ticker ? "Market pricing" : "Price from market"}
-                        </Button>
-                        <Button kind="quiet" small onClick={() => startReprice(holding)}>
-                          Price by hand
-                        </Button>
+                        {/* One control, and only the one that can do
+                            something.
+
+                            There used to be two on every row -- "Price by
+                            hand" and "Market pricing" -- which was one
+                            question asked twice and, on an automatically
+                            priced holding, a straight lie: you could type
+                            a price and the next poll would overwrite it.
+
+                            So a holding the market prices offers only the
+                            symbol, and a holding priced by hand offers
+                            only the price. The other control is not
+                            disabled, it is absent, because a disabled
+                            button still asks somebody to work out why. */}
+                        {holding.auto_price ? (
+                          <Button kind="quiet" small
+                                  onClick={() => startTracking(holding)}>
+                            Symbol
+                          </Button>
+                        ) : (
+                          <>
+                            <Button kind="quiet" small
+                                    onClick={() => startReprice(holding)}>
+                              Set price
+                            </Button>
+                            <Button kind="quiet" small
+                                    onClick={() => startTracking(holding)}>
+                              Use the market
+                            </Button>
+                          </>
+                        )}
                         <Button kind="danger" small
                                 onClick={() => { setRepricing(null); setTracking(null);
                                                  setConfirming(holding.id); }}>
