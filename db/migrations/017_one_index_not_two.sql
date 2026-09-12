@@ -1,0 +1,17 @@
+-- Drop an index that duplicates a constraint's own index exactly.
+--
+-- Migration 007 added idx_budgets_category_month on
+-- (user_id, category_id, month_year) to serve "every budget for this
+-- category in this month or later", which is the walk refresh_rollover
+-- does. That was the right access pattern and the wrong conclusion: the
+-- uniq_user_cat_month constraint already creates an index on exactly those
+-- three columns in exactly that order, and Postgres will use it for the
+-- same query.
+--
+-- Two identical indexes cost two index writes on every insert and update to
+-- budgets, and the second buys nothing at all -- a unique constraint is not
+-- a lesser index, it is a b-tree with a uniqueness check attached.
+--
+-- IF EXISTS because the index is created IF NOT EXISTS upstream, so a
+-- database that never had it is as valid as one that did.
+DROP INDEX IF EXISTS idx_budgets_category_month;
