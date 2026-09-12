@@ -188,6 +188,17 @@ def search_instruments(term, limit=8):
                        of a company name
       priced           a symbol this app has actually fetched a price for
                        is a better suggestion than one merely listed
+      listed longest   RELIANCE (listed 1995) above RELIABLE (2024). Both
+                       are eight characters, so length separates them not
+                       at all, and the alphabet alone put a micro-cap above
+                       India's largest company -- which is what typing
+                       "reli" actually returned before this line existed.
+                       There is no market capitalisation here and a search
+                       box should not acquire one; how long a company has
+                       been listed is a proxy for size, and an honest one.
+                       Below `priced` on purpose, so a recent listing this
+                       app already tracks still wins -- that being the case
+                       the proxy would otherwise get wrong
       the shortest     RELIANCE above RELIANCEPOWER, on the grounds that
                        the parent is what was meant far more often
 
@@ -217,6 +228,10 @@ def search_instruments(term, limit=8):
              ORDER BY (ticker = %s) DESC,
                       (ticker LIKE %s ESCAPE '\\') DESC,
                       priced DESC,
+                      -- NULLS LAST: a row with no listing date is one the
+                      -- seed never covered, and it should not outrank every
+                      -- company on the exchange for having no date at all.
+                      listed_on ASC NULLS LAST,
                       length(ticker),
                       ticker
              LIMIT %s

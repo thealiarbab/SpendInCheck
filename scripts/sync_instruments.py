@@ -38,6 +38,7 @@ import io
 import os
 import sys
 import urllib.request
+from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -70,8 +71,21 @@ def fetch(url=NSE_EQUITY_LIST):
         return response.read().decode("utf-8", errors="replace")
 
 
+def _listed_on(raw):
+    """NSE's "29-NOV-1995" as a date, or None if it is not one.
+
+    Worth having rather than skipping: it is what lets the search rank
+    RELIANCE above RELIABLE, which are the same length and would otherwise
+    be separated by nothing but the alphabet.
+    """
+    try:
+        return datetime.strptime(raw.strip(), "%d-%b-%Y").date()
+    except (ValueError, AttributeError):
+        return None
+
+
 def parse(text):
-    """(ticker, name, isin) for every ordinary equity in the list.
+    """(ticker, name, isin, listed_on) for every ordinary equity in the list.
 
     The header row carries leading spaces on most columns -- " SERIES", not
     "SERIES" -- so every key is stripped before it is read. Reading them
@@ -88,7 +102,8 @@ def parse(text):
         if not ticker:
             continue
         rows.append((ticker, row.get("NAME OF COMPANY") or None,
-                     row.get("ISIN NUMBER") or None))
+                     row.get("ISIN NUMBER") or None,
+                     _listed_on(row.get("DATE OF LISTING"))))
     return rows
 
 
@@ -110,14 +125,18 @@ def upsert(rows):
             execute_values(
                 cursor,
                 """
-                INSERT INTO instruments (ticker, name, isin, exchange)
+                INSERT INTO instruments (ticker, name, isin, exchange, listed_on)
                 VALUES %s
                 ON CONFLICT (ticker) DO UPDATE
                    SET name = COALESCE(instruments.name, EXCLUDED.name),
                        isin = COALESCE(instruments.isin, EXCLUDED.isin),
-                       exchange = COALESCE(instruments.exchange, EXCLUDED.exchange)
+                       exchange = COALESCE(instruments.exchange, EXCLUDED.exchange),
+                       -- Not COALESCEd to the existing value: the listing
+                       -- date is a fact NSE owns and nothing else here
+                       -- writes it, so the newest answer is the right one.
+                       listed_on = COALESCE(EXCLUDED.listed_on, instruments.listed_on)
                 """,
-                [(ticker, name, isin, "NSE") for ticker, name, isin in rows],
+                [(ticker, name, isin, "NSE", listed) for ticker, name, isin, listed in rows],
                 page_size=500,
             )
         return len(rows)
@@ -136,7 +155,7 @@ def main():
     rows = parse(text)
     print(f"{len(rows)} ordinary equities in the list")
     if rows:
-        print("  first three:", ", ".join(t for t, _, _ in rows[:3]))
+        print("  first three:", ", ".join(t for t, _, _, _ in rows[:3]))
 
     if args.dry:
         print("--dry: nothing written.")

@@ -13,13 +13,16 @@ from server import db, operations
 
 
 SEEDED = [
-    # ticker, name, priced
-    ("RELIANCE", "Reliance Industries Limited", True),
-    ("RELIANCEPOWER", "Reliance Power Limited", False),
-    ("RELINFRA", "Reliance Infrastructure Limited", False),
-    ("TATAMOTORS", "Tata Motors Limited", False),
-    ("TATASTEEL", "Tata Steel Limited", True),
-    ("HEROMOTOCO", "Hero MotoCorp Limited", False),
+    # ticker, name, priced, listed_on
+    ("RELIANCE", "Reliance Industries Limited", True, "1995-11-29"),
+    ("RELIANCEPOWER", "Reliance Power Limited", False, "2008-02-11"),
+    ("RELINFRA", "Reliance Infrastructure Limited", False, "1995-08-09"),
+    # Same length as RELIANCE, alphabetically before it, and listed thirty
+    # years later. This row is the whole reason listed_on is in the ORDER BY.
+    ("RELIABLE", "Reliable Data Services Limited", False, "2024-07-10"),
+    ("TATAMOTORS", "Tata Motors Limited", False, "1998-07-22"),
+    ("TATASTEEL", "Tata Steel Limited", True, "1998-11-18"),
+    ("HEROMOTOCO", "Hero MotoCorp Limited", False, "2003-01-01"),
 ]
 
 
@@ -34,24 +37,25 @@ def seeded_instruments():
     connection = db.get_connection()
     try:
         cursor = connection.cursor()
-        for ticker, name, priced in SEEDED:
+        for ticker, name, priced, listed in SEEDED:
             cursor.execute(
-                "INSERT INTO instruments (ticker, name, exchange, priced) "
-                "VALUES (%s, %s, 'NSE', %s) "
+                "INSERT INTO instruments (ticker, name, exchange, priced, listed_on) "
+                "VALUES (%s, %s, 'NSE', %s, %s) "
                 "ON CONFLICT (ticker) DO UPDATE "
-                "   SET name = EXCLUDED.name, priced = EXCLUDED.priced",
-                (ticker, name, priced))
+                "   SET name = EXCLUDED.name, priced = EXCLUDED.priced, "
+                "       listed_on = EXCLUDED.listed_on",
+                (ticker, name, priced, listed))
         connection.commit()
     finally:
         db.close_connection(connection)
 
-    yield [ticker for ticker, _, _ in SEEDED]
+    yield [ticker for ticker, _, _, _ in SEEDED]
 
     connection = db.get_connection()
     try:
         cursor = connection.cursor()
         cursor.execute("DELETE FROM instruments WHERE ticker = ANY(%s::varchar[])",
-                       ([ticker for ticker, _, _ in SEEDED],))
+                       ([ticker for ticker, _, _, _ in SEEDED],))
         connection.commit()
     finally:
         db.close_connection(connection)
@@ -129,6 +133,36 @@ def test_a_symbol_with_a_price_outranks_one_merely_listed(api_account,
     """Both match "ta"; TATASTEEL has been priced and TATAMOTORS has not."""
     found = [s for s in search(api_account["client"], "tata")]
     assert found.index("TATASTEEL") < found.index("TATAMOTORS")
+
+
+def test_the_longer_listed_company_wins_a_tie(api_account, seeded_instruments):
+    """The bug the live data found the moment the seed landed.
+
+    RELIANCE and RELIABLE are both eight characters, so "shortest wins"
+    separates them not at all, and the alphabet put Reliable Data Services
+    Limited -- listed 2024 -- above Reliance Industries. Correct by the
+    rules as they were written, and wrong by any reading of what somebody
+    typing "reli" wants.
+
+    How long a company has been listed is the tiebreak: a proxy for size
+    rather than a measure of it, but an honest one, and the only such
+    signal already in the file this app downloads.
+    """
+    found = search(api_account["client"], "reli")
+    assert found[0] == "RELIANCE"
+    assert found.index("RELIANCE") < found.index("RELIABLE")
+
+
+def test_a_price_still_beats_a_longer_listing(api_account, seeded_instruments):
+    """The ordering that keeps the proxy honest.
+
+    RELINFRA listed in August 1995, three months before RELIANCE, so on
+    listing date alone it would lead. RELIANCE is priced and it does not --
+    because a symbol this app actually tracks is a better suggestion than
+    any guess about which company is bigger.
+    """
+    found = search(api_account["client"], "reli")
+    assert found.index("RELIANCE") < found.index("RELINFRA")
 
 
 def test_searching_directly_returns_the_columns_the_client_needs(
