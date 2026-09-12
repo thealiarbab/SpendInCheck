@@ -96,7 +96,8 @@ COMMIT_PHASE = {
     # the blurb below can say what they actually were.
     9: ["43ace20", "8d44a25", "8b6a894", "5f73d62", "b17eff2", "7194485",
         "c661f1e", "9418c85", "b37a840", "c1b7d05", "a1af021", "28fac04",
-        "0634421", "2cf8973", "3303756", "d96d054", "59d89a3"],
+        "0634421", "2cf8973", "3303756", "d96d054", "59d89a3",
+        "4f2df58", "95488b9", "70c301a", "e6592fb", "9b50a71", "a0bab29", "d0b1dbd", "5f41677", "071927d", "2229a4b", "c7f1f72", "c0df2de"],
 }
 
 PHASES = [
@@ -190,12 +191,20 @@ PHASES = [
               "so a screen can show it without making a lookup that takes "
               "three seconds cold. Holdings are charted against NIFTYBEES, the ETF that tracks the NIFTY 50 -- the index itself does not quote -- with the basket held at today's quantities so that buying more does not read as a gain.",
      "open": [
-         "Symbol autocomplete is built and needs its universe. "
-         "`python scripts/sync_instruments.py` seeds the 2,292 NSE "
-         "equities the search reads; instruments holds 3 rows until it "
-         "runs, and 3 rows is not an autocomplete. Also "
-         "`python scripts/migrate.py` to record 014 in the ledger -- it "
-         "was applied through Supabase directly, so the row is missing.",
+         "Symbol autocomplete is live, and so is mutual fund pricing: "
+         "40,174 instruments seeded, 2,292 NSE equities and 37,882 AMFI "
+         "schemes, searched in one box. But the instrument list comes from "
+         "NSE and the NAVs from api.mfapi.in *directly*, and Ali wants "
+         "StockSaathi integrated rather than routed around. Point the NAVs "
+         "at their /api/mf-history (live, tested) and the instrument list "
+         "at their search.py once it is deployed -- which is theirs to "
+         "deploy, not ours to touch.",
+         "Saving a symbol still costs about 2.4s: ~0.5s fetching a year of "
+         "history and ~1.9s fetching today's price, serially. Resolving the "
+         "symbol used to be a third call and is now a local lookup. "
+         "Parallelising the remaining two is unsafe until "
+         "DB_MAX_CONNECTIONS comes off 3 -- two worker threads plus the "
+         "request's own is the whole pool. The database allows 60.",
          "The third nudge -- the goal-reached card -- is left for a "
          "decision. Goals renders inside Budgets, so it would put a link "
          "to a broker on a budgeting screen, which the plan's own rule "
