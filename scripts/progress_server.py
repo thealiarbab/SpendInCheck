@@ -191,24 +191,31 @@ PHASES = [
               "so a screen can show it without making a lookup that takes "
               "three seconds cold. Holdings are charted against NIFTYBEES, the ETF that tracks the NIFTY 50 -- the index itself does not quote -- with the basket held at today's quantities so that buying more does not read as a gain.",
      "open": [
-         "Nothing blocks this phase any more. The instrument list really "
-         "is StockSaathi's: they publish their universe as static JSON "
-         "from their own edge -- 4,367 shares and ETFs with sectors, "
-         "13,969 curated schemes with fund houses -- and the seed reads "
-         "that. No deploy in their repository was ever needed. The "
-         "endpoint three sessions waited on reads a table that is empty "
-         "and selects a column that does not exist.",
-         "Fund NAVs now come from their /api/mf-history rather than from "
-         "api.mfapi.in directly: 186ms against 380ms, 2KB against 132KB, "
-         "and one call where there were two. The schemes are theirs as "
-         "well: 13,969 curated ones with fund houses, against the 37,882 "
-         "mostly dormant rows AMFI publishes raw.",
-         "Saving a symbol is no longer the 5s Ali saw. Resolving is a local "
-         "lookup, and what is left is ~0.5s of history and a live quote "
-         "that is 101ms warm -- the 2s reading was a cold cache on their "
-         "side, not our code. Whether the save should wait for a price at "
-         "all is still a question for Ali: the holdings screen polls live "
-         "quotes by itself, so it need not.",
+         "Nothing blocks this phase. The instrument list really is "
+         "StockSaathi's: they publish their universe as static JSON from "
+         "their own edge -- 4,367 shares and ETFs with sectors, 13,969 "
+         "curated schemes with fund houses -- and the seed reads that. No "
+         "deploy in their repository was ever needed. The endpoint three "
+         "sessions waited on reads a table that is empty and selects a "
+         "column that does not exist.",
+         "Fund NAVs come from their /api/mf-history rather than api.mfapi.in "
+         "directly: 186ms against 380ms, 2KB against 132KB, one call where "
+         "there were two.",
+         "The search reads phrases now, not fragments. \"reliance shares\", "
+         "\"my infosys stock\" and \"nifty bees\" all returned nothing, "
+         "because the whole input was matched as a single substring. Words "
+         "are matched separately and trigram similarity is the backstop; "
+         "40-80ms, down from ~200ms, by letting the GIN index do the work. "
+         "On top of it their /api/ai?op=market-search says in a sentence "
+         "which instrument it takes a phrase to mean -- never blocking, and "
+         "only ever naming a symbol our own search proposed.",
+         "A holding has one price and it keeps itself current. There were "
+         "two -- the stored figure and the live one -- disagreeing until "
+         "somebody pressed a button. A quote that has moved is written back "
+         "while the screen is open, so price, P&L and totals come from one "
+         "number. This also answers the question of whether a save should "
+         "wait for a price: it need not, because the screen corrects it "
+         "within a poll either way.",
          "The third nudge -- the goal-reached card -- is left for a "
          "decision. Goals renders inside Budgets, so it would put a link "
          "to a broker on a budgeting screen, which the plan's own rule "
