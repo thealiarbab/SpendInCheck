@@ -200,9 +200,9 @@ PHASES = [
          "and selects a column that does not exist.",
          "Fund NAVs now come from their /api/mf-history rather than from "
          "api.mfapi.in directly: 186ms against 380ms, 2KB against 132KB, "
-         "and one call where there were two. Their master carries no "
-         "schemes, so the 37,882 AMFI funds stay ours whoever serves the "
-         "shares.",
+         "and one call where there were two. The schemes are theirs as "
+         "well: 13,969 curated ones with fund houses, against the 37,882 "
+         "mostly dormant rows AMFI publishes raw.",
          "Saving a symbol is no longer the 5s Ali saw. Resolving is a local "
          "lookup, and what is left is ~0.5s of history and a live quote "
          "that is 101ms warm -- the 2s reading was a cold cache on their "
