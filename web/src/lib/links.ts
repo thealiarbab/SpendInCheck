@@ -54,6 +54,19 @@ export const discoverHref = tagged("/#/stocks", "investments_empty");
 /** The surplus nudge shown when a month closes under budget. */
 export const surplusHref = tagged("/", "surplus_nudge");
 
+/**
+ * The third and last nudge: a savings goal that has been reached.
+ *
+ * Their markets browser rather than the front page, for the same reason
+ * discoverHref uses it -- somebody who has just been told they hit a
+ * savings target and clicked through has decided to look at instruments,
+ * and a landing page asks them to decide again.
+ *
+ * Three placements is the cap the plan sets, and this is the third. There
+ * is no fourth without taking one of these away.
+ */
+export const goalHref = tagged("/#/stocks", "goal_nudge");
+
 /** Applied to every outbound anchor: a new tab, and no window.opener handle. */
 export const externalLinkProps = {
   target: "_blank",

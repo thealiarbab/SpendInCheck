@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import { formatPercent, formatMoney, formatSigned, toMinor } from "../../lib/money";
 import { externalLinkProps, investHref, surplusHref } from "../../lib/links";
+import { shouldOffer } from "./surplus";
 import {
   Card, Empty, Field, Loading, Notice, PageHead, Stat, StatRow, Table, cell,
 } from "../../ui";
@@ -30,8 +31,28 @@ function thisMonth(): string {
  * and each report keeps showing the previous month's figures until the new
  * ones arrive, rather than blanking out.
  */
+/** Where a dismissed surplus month is remembered, per browser. */
+const DISMISSED_KEY = "spendincheck.surplus.dismissed";
+
 export function Reports() {
   const [month, setMonth] = useState(thisMonth);
+
+  // Per month and per browser. A dismissal is a preference about one
+  // sentence, not a fact about the account -- it should not follow somebody
+  // to another device, and it is not worth a column. Wrapped because
+  // storage throws in a private window rather than returning nothing.
+  const [dismissedMonths, setDismissedMonths] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem(DISMISSED_KEY);
+      return Array.isArray(JSON.parse(raw ?? "[]")) ? JSON.parse(raw ?? "[]") : [];
+    } catch { return []; }
+  });
+  const dismissed = dismissedMonths.includes(month);
+  const dismiss = (which: string) => {
+    const next = [...new Set([...dismissedMonths, which])].slice(-24);
+    setDismissedMonths(next);
+    try { localStorage.setItem(DISMISSED_KEY, JSON.stringify(next)); } catch { /* private window */ }
+  };
 
   // Keyed by month so switching back to one already seen is instant, and
   // "report" as the first segment so a write on any screen invalidates both.
@@ -297,10 +318,22 @@ export function Reports() {
         )}
       </Card>
 
-      {budgeted > 0 && difference > 0 && (
+      {/* shouldOffer, not `difference > 0`. The rules were written and
+          tested in surplus.ts and then never called from here, so the card
+          appeared on the third of the month -- when an unspent budget is
+          not a surplus but arithmetic about a month that has not happened,
+          and suggesting somebody invest it is advice to spend money they
+          are about to need. It also could not be dismissed, which the plan
+          asks of all three nudges. */}
+      {shouldOffer({ month, today: thisMonth(), budgeted, difference,
+                     dismissed }) && (
         <p className={styles.surplus}>
           {formatMoney(difference)} of {monthName(month)}'s budget is unspent.{" "}
-          <a href={surplusHref} {...externalLinkProps}>See what it could be earning ↗</a>
+          <a className={styles.saathiLink} href={surplusHref}
+             {...externalLinkProps}>See what it could be earning ↗</a>
+          <button type="button" className={styles.dismiss}
+                  aria-label={`Dismiss the surplus note for ${monthName(month)}`}
+                  onClick={() => dismiss(month)}>×</button>
         </p>
       )}
     </>

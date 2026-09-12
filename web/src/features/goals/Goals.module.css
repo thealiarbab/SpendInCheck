@@ -87,3 +87,36 @@
 .spacer { flex: 1 1 auto; }
 
 .overdue { color: var(--money-debit); }
+
+/* The goal-reached nudge. Sits under the bar it belongs to, quieter than
+   the figures above it -- it is a remark about a goal that is finished,
+   not part of reading how the goal is going. */
+.nudge {
+  margin: var(--space-3) 0 0;
+  font-size: 0.8125rem;
+  color: var(--content-secondary);
+}
+
+/* StockSaathi's own brand green, #00B386 -- their --brand in css/main.css.
+   Hard-coded rather than mapped to one of our tokens because it marks the
+   way out to their product and should stay theirs if our palette moves. */
+.saathiLink { color: #00B386; font-weight: 500; text-decoration: none; }
+.saathiLink:hover, .saathiLink:focus-visible {
+  color: #00906B;
+  text-decoration: underline;
+}
+
+/* Every nudge is dismissible, which is the plan's condition for having
+   any of them. */
+.dismiss {
+  margin-left: var(--space-2);
+  padding: 0 var(--space-1);
+  border: 0;
+  background: none;
+  color: var(--content-muted);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.dismiss:hover, .dismiss:focus-visible { color: var(--content-primary); }

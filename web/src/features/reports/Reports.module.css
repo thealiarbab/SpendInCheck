@@ -36,8 +36,32 @@
   color: var(--content-secondary);
 }
 
-.surplus a { color: var(--accent-invest); text-decoration: none; }
-.surplus a:hover { text-decoration: underline; }
+/* StockSaathi's own brand green, #00B386, taken from their css/main.css
+   where it is --brand. Hard-coded rather than mapped to a token of ours:
+   this marks the way out to their product, and it should stay their colour
+   even if our palette moves. The same value in both themes, as on their
+   side -- they do not redefine --brand in dark. */
+.saathiLink { color: #00B386; font-weight: 500; text-decoration: none; }
+.saathiLink:hover, .saathiLink:focus-visible {
+  color: #00906B;                       /* their --brand-dark */
+  text-decoration: underline;
+}
+
+/* Every nudge is dismissible, which the plan asks for and this one could
+   not do. Quiet, and never the first thing reached: the sentence is the
+   point and this is the way out of it. */
+.dismiss {
+  margin-left: var(--space-2);
+  padding: 0 var(--space-1);
+  border: 0;
+  background: none;
+  color: var(--content-muted);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.dismiss:hover, .dismiss:focus-visible { color: var(--content-primary); }
 
 /* One chart per row on a phone, two abreast on a desktop, and never three:
    these plot twelve months, and a third column buys narrower months rather

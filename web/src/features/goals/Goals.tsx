@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, api } from "../../lib/api";
 import type { Goal } from "../../lib/api";
 import { formatMoney, formatPercent, toMinor } from "../../lib/money";
+import { externalLinkProps, goalHref } from "../../lib/links";
 import {
   Button, Card, Confirm, Empty, Field, Form, FormActions, Loading, Notice,
   Picker, RowActions,
@@ -52,7 +53,24 @@ function readableDate(date: string): string {
  * stored, so nothing here can show a total the contributions do not add up
  * to. The same rule as account balances.
  */
+/** Where a dismissed goal suggestion is remembered, per browser. */
+const DISMISSED_KEY = "spendincheck.goal.dismissed";
+
 export function Goals() {
+  // Per goal and per browser, like the surplus note. A dismissal is a
+  // preference about one sentence, not a fact about the account.
+  const [dismissedGoals, setDismissedGoals] = useState<number[]>(() => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(DISMISSED_KEY) ?? "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch { return []; }
+  });
+  const dismissGoal = (id: number) => {
+    const next = [...new Set([...dismissedGoals, id])].slice(-50);
+    setDismissedGoals(next);
+    try { localStorage.setItem(DISMISSED_KEY, JSON.stringify(next)); } catch { /* private window */ }
+  };
+
   const client = useQueryClient();
   const [draft, setDraft] = useState<Draft>(blank);
   const [open, setOpen] = useState<number | null>(null);
@@ -209,6 +227,30 @@ export function Goals() {
                       style={{ width: `${progress.width}%` }}
                     />
                   </div>
+
+                  {progress.reached && !dismissedGoals.includes(goal.id!) && (
+                    /* The third of the three nudges the plan allows, and
+                       the one it was most reluctant about: goals render on
+                       the Budgets screen, and market content is supposed to
+                       stay in Investments and Reports.
+                
+                       What makes this the exception rather than the hole in
+                       the rule is that it is not a suggestion about
+                       budgeting. The money has already been saved, the
+                       target is already met, and the only question left is
+                       what it does now -- which is a markets question
+                       wherever it happens to be asked. It appears on a
+                       reached goal and nowhere else, and it goes away for
+                       good when dismissed. */
+                    <p className={styles.nudge}>
+                      Target met — this money has no job any more.{" "}
+                      <a className={styles.saathiLink} href={goalHref}
+                         {...externalLinkProps}>See what it could be earning ↗</a>
+                      <button type="button" className={styles.dismiss}
+                              aria-label={`Dismiss the suggestion for ${goal.name}`}
+                              onClick={() => dismissGoal(goal.id!)}>×</button>
+                    </p>
+                  )}
 
                   <div className={styles.meta}>
                     <span>
