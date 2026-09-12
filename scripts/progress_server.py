@@ -191,20 +191,25 @@ PHASES = [
               "so a screen can show it without making a lookup that takes "
               "three seconds cold. Holdings are charted against NIFTYBEES, the ETF that tracks the NIFTY 50 -- the index itself does not quote -- with the basket held at today's quantities so that buying more does not read as a gain.",
      "open": [
-         "Symbol autocomplete is live, and so is mutual fund pricing: "
-         "40,174 instruments seeded, 2,292 NSE equities and 37,882 AMFI "
-         "schemes, searched in one box. But the instrument list comes from "
-         "NSE and the NAVs from api.mfapi.in *directly*, and Ali wants "
-         "StockSaathi integrated rather than routed around. Point the NAVs "
-         "at their /api/mf-history (live, tested) and the instrument list "
-         "at their search.py once it is deployed -- which is theirs to "
-         "deploy, not ours to touch.",
-         "Saving a symbol still costs about 2.4s: ~0.5s fetching a year of "
-         "history and ~1.9s fetching today's price, serially. Resolving the "
-         "symbol used to be a third call and is now a local lookup. "
-         "Parallelising the remaining two is unsafe until "
-         "DB_MAX_CONNECTIONS comes off 3 -- two worker threads plus the "
-         "request's own is the whole pool. The database allows 60.",
+         "One thing blocks this phase, and it is a deploy in the other "
+         "repository. StockSaathi's /api/search is written at "
+         "app/api/search.py and has never been shipped, so it 404s. "
+         "/api/v1/symbols/search already asks them first and falls back to "
+         "our seeded copy of the same NSE list, and the credit under the "
+         "suggestion box already follows whoever answered -- so deploying "
+         "that one file is the whole switch, and nothing here changes. "
+         "That repository is not ours to commit into.",
+         "Fund NAVs now come from their /api/mf-history rather than from "
+         "api.mfapi.in directly: 186ms against 380ms, 2KB against 132KB, "
+         "and one call where there were two. Their master carries no "
+         "schemes, so the 37,882 AMFI funds stay ours whoever serves the "
+         "shares.",
+         "Saving a symbol is no longer the 5s Ali saw. Resolving is a local "
+         "lookup, and what is left is ~0.5s of history and a live quote "
+         "that is 101ms warm -- the 2s reading was a cold cache on their "
+         "side, not our code. Whether the save should wait for a price at "
+         "all is still a question for Ali: the holdings screen polls live "
+         "quotes by itself, so it need not.",
          "The third nudge -- the goal-reached card -- is left for a "
          "decision. Goals renders inside Budgets, so it would put a link "
          "to a broker on a budgeting screen, which the plan's own rule "

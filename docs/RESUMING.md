@@ -193,32 +193,37 @@ in every month**. Charting the portfolio's real value against an index
 compares two different things -- buying more raises the value without the
 market moving, so a month of heavy saving reads as spectacular returns.
 
-**Symbol autocomplete: built, and waiting on one deploy that is not
-mine.** The search genuinely has to live on StockSaathi's side: the
-instrument master is `dhan_instruments` in their Supabase, behind RLS with
-no anon policy, which is correct and should stay that way.
+**Symbol autocomplete: live, and asking StockSaathi first.** The search
+genuinely belongs on their side -- the instrument master is
+`dhan_instruments` in their Supabase, behind RLS with no anon policy, which
+is correct and should stay that way.
 
-So the endpoint is written, at:
+So `/api/v1/symbols/search` asks their `/api/search` and falls back to our
+own seeded copy of the same NSE universe when they cannot answer. Which is
+currently every time: the endpoint is written, at
 
     G:\StockSaathi\app\api\search.py
 
-It is **uncommitted there on purpose** -- that repository is currently on
-a `kotlin` branch with `app/` untracked, so committing into it would have
-been a mess somebody else has to unpick. To ship it:
+and has never been deployed, so it 404s. **Deploying that one file is the
+entire switch.** Nothing here changes, and the credit under the suggestion
+list starts reading "instruments by StockSaathi" by itself, because the
+response carries `source` and the line follows it.
 
-1. Check out the branch that owns `app/`.
-2. Commit `app/api/search.py` and deploy. No config change is needed;
-   their `vercel.json` already routes `api/*.py`, and it uses
-   `SUPABASE_SERVICE_ROLE_KEY`, which is already set there.
-3. Nothing in FinTrack needs changing. The client side is already live and
-   will start suggesting the moment that endpoint answers.
+That repository is **not ours to touch** -- Ali has said so twice, and it
+is on a `kotlin` branch with `app/` untracked. Do not commit into it. To
+ship it he checks out the branch that owns `app/`, commits that file and
+deploys; their `vercel.json` already routes `api/*.py` and
+`SUPABASE_SERVICE_ROLE_KEY` is already set there.
 
-Until then the symbol box is an ordinary text field, which is what it was
-before -- and the server still verifies every symbol on save, so
-correctness never depended on the list. What could not be tested from here
-is the one live query, because `SUPABASE_SERVICE_ROLE_KEY` is blank in the
-local `.env.imported`. The ranking, the filter escaping and the failure
-paths were all tested offline.
+Two things about the fallback that are easy to get wrong. **None and []
+are different**: `[]` is their answer and only `None` means they did not
+answer, so a fallback triggering on both would second-guess a search that
+worked. And **their master has no mutual funds** -- it is the NSE universe
+-- so a search they answer is still topped up from our table for the
+37,882 AMFI schemes.
+
+A failure stands their endpoint down for five minutes per process rather
+than costing a round trip on every keystroke.
 
 One thing the browser caught that is worth remembering: **a missing
 cross-origin endpoint does not present as a readable 404.** The host
