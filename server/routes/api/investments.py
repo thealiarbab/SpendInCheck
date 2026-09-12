@@ -348,7 +348,16 @@ def quotes():
                         " at a time."})
 
     places = money_places()
-    return jsonify({"items": {
+    found = stocksaathi.live_quotes(asked)
+    # Passed through, because a browser polling this cannot otherwise tell a
+    # shut exchange from a broken feed. Without it the fallback path assumed
+    # the market was always open and polled all night, while the direct path
+    # assumed a closed market would never reopen and stopped for good.
+    state = stocksaathi.market_state()
+    return jsonify({
+        "market_open": state.get("market_open"),
+        "cache_ttl_ms": state.get("cache_ttl_ms"),
+        "items": {
         symbol: {
             "price": money.serialise(quote["price"], places),
             # serialise already maps None to None, so an absent previous
@@ -360,7 +369,7 @@ def quotes():
             "as_of": quote["as_of"],
             "source": quote["source"],
         }
-        for symbol, quote in stocksaathi.live_quotes(asked).items()
+        for symbol, quote in found.items()
     }})
 
 

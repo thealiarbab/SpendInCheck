@@ -114,6 +114,10 @@ def _chunks(items, size):
         yield items[start:start + size]
 
 
+# Filled by live_quotes; read through market_state() below.
+_last_state = {"market_open": None, "cache_ttl_ms": None}
+
+
 def live_quotes(symbols, timeout=TIMEOUT_SECONDS):
     """Current prices for these symbols, as {symbol: quote}.
 
@@ -137,10 +141,18 @@ def live_quotes(symbols, timeout=TIMEOUT_SECONDS):
         return {}
 
     found = {}
+    state = {"market_open": None, "cache_ttl_ms": None}
     for batch in _chunks(wanted, MAX_SYMBOLS):
         body = _get("/live-quote", {"symbols": ",".join(batch)}, timeout)
         if not body:
             continue
+        # Kept rather than dropped. The exchange being shut is the reason a
+        # price is not moving, and a client that cannot tell the difference
+        # between "shut" and "broken" either polls all night or stops
+        # forever -- this app managed both at once, on two code paths.
+        if state["market_open"] is None:
+            state["market_open"] = body.get("market_open")
+            state["cache_ttl_ms"] = body.get("cache_ttl_ms")
         for symbol, quote in (body.get("quotes") or {}).items():
             # A symbol the upstream does not know comes back as an explicit
             # null rather than being absent.
@@ -157,7 +169,28 @@ def live_quotes(symbols, timeout=TIMEOUT_SECONDS):
                 "as_of": quote.get("ts_ms"),
                 "source": quote.get("source"),
             }
+    _last_state.update(state)
     return found
+
+
+def market_state():
+    """What the last live_quotes call was told about the exchange.
+
+    Module state read through a function rather than a value returned by
+    live_quotes, whose shape -- {symbol: quote}, symbols missing rather than
+    None -- is read in a dozen places and is right for all of them. Only the
+    route answering a polling browser needs this.
+
+    Not an attribute hung on live_quotes either: every test that stands in
+    for the feed replaces that function, and the attribute went with it.
+
+    Both keys are None until a call has been made, and stay None when the
+    feed could not be reached -- which is the honest answer. A caller that
+    cannot tell "shut" from "unreachable" should say so rather than guess,
+    since guessing wrong in one direction polls all night and in the other
+    stops for good.
+    """
+    return dict(_last_state)
 
 
 def instrument(symbol, timeout=TIMEOUT_SECONDS):

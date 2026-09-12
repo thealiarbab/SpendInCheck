@@ -569,3 +569,34 @@ def test_neither_a_name_nor_a_symbol_is_refused(make_api_account, feed):
     response = client.post("/api/v1/investments", headers=client.headers, json=body)
     assert response.status_code == 422
     assert "asset_name" in response.get_json()["error"]["fields"]
+
+
+# --- what the exchange was doing ---------------------------------------------
+
+def test_quotes_say_whether_the_market_was_open(make_api_account, feed,
+                                                monkeypatch):
+    """The browser polls this, and it cannot otherwise tell a shut exchange
+    from a broken feed.
+
+    Guessing either way is a bug, and this app had both: the direct path
+    stopped polling for good the first time it heard "closed", and the
+    fallback assumed "open" always and polled all night.
+    """
+    monkeypatch.setattr(stocksaathi, "market_state",
+                        lambda: {"market_open": False, "cache_ttl_ms": 300000})
+    client = make_api_account()
+    body = client.get("/api/v1/quotes?symbols=RELIANCE").get_json()
+    assert body["market_open"] is False
+    assert body["cache_ttl_ms"] == 300000
+
+
+def test_an_unreachable_feed_is_not_a_closed_market(make_api_account, feed,
+                                                    monkeypatch):
+    """None, not False. A caller that cannot tell them apart should be told
+    so rather than shown a guess -- guessing "closed" stops the poll, and
+    the poll is the only thing that would notice the feed coming back."""
+    monkeypatch.setattr(stocksaathi, "market_state",
+                        lambda: {"market_open": None, "cache_ttl_ms": None})
+    client = make_api_account()
+    body = client.get("/api/v1/quotes?symbols=RELIANCE").get_json()
+    assert body["market_open"] is None

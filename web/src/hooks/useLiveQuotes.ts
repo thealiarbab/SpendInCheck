@@ -25,6 +25,14 @@ import type { Quote } from "../lib/api";
 const LIVE_QUOTE_URL = "https://stocksaathi.co.in/api/live-quote";
 
 /** Never poll faster than this, whatever the upstream says its TTL is. */
+/**
+ * How often to check whether a shut exchange has opened.
+ *
+ * Matches their own cache_ttl_ms, so an answer while the market is closed
+ * is served from their edge rather than fetched.
+ */
+const CLOSED_MS = 5 * 60 * 1000;
+
 const FLOOR_MS = 10_000;
 
 /** Their documented ceiling per request. */
@@ -90,10 +98,15 @@ async function fetchDirect(symbols: string[]): Promise<Fetched> {
 
 async function fetchViaServer(symbols: string[]): Promise<Fetched> {
   const body = await api.quotes(symbols);
-  // Our own endpoint does not report the market's state -- it has no reason
-  // to know. Assuming open keeps the fallback path polling; assuming closed
-  // would freeze it silently on the one path that is already degraded.
-  return { quotes: body.items, marketOpen: true, everyMs: FLOOR_MS };
+  // Our endpoint passes the exchange's state through now. It used to
+  // hardcode `true` on the grounds that assuming open keeps a degraded path
+  // polling -- which it does, all night, once a minute, on a market that
+  // has been shut for nine hours.
+  return {
+    quotes: body.items,
+    marketOpen: body.market_open !== false,
+    everyMs: typeof body.cache_ttl_ms === "number" ? body.cache_ttl_ms : FLOOR_MS,
+  };
 }
 
 /**
@@ -118,7 +131,20 @@ export function useLiveQuotes(symbols: string[]): LiveQuotes {
     staleTime: 0,
     refetchInterval: (query) => {
       const data = query.state.data;
-      if (!data?.marketOpen) return false;
+      // A shut exchange slows the poll down; it does not stop it.
+      //
+      // Returning false here was a trap that closed behind itself: nothing
+      // refetches, so `marketOpen` never becomes true again, so it never
+      // refetches. A screen left open overnight -- which is the normal way
+      // to leave a screen -- showed yesterday's prices through the whole of
+      // the next trading day and would not have recovered without a reload.
+      //
+      // CLOSED_MS is the price of noticing the open. It is the browser
+      // asking StockSaathi directly, on their own five-minute cache, so it
+      // costs this app nothing and them almost nothing -- and a backgrounded
+      // tab does not ask at all.
+      if (!data) return false;
+      if (!data.marketOpen) return CLOSED_MS;
       return Math.max(FLOOR_MS, data.everyMs);
     },
     // Background tabs stop asking. This is the default, and it is stated

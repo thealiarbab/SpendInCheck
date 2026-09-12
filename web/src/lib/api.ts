@@ -666,9 +666,14 @@ export const api = {
    * CORS-open and routing the tick through Flask would bill a serverless
    * invocation every few seconds.
    */
+  /** Prices, and what the exchange was doing when they were fetched. */
   quotes: (symbols: string[]) =>
-    request<{ items: Record<string, Quote> }>(
-      "/quotes" + query({ symbols: symbols.join(",") })),
+    request<{
+      items: Record<string, Quote>;
+      /** null when the feed could not be reached, which is not "closed". */
+      market_open: boolean | null;
+      cache_ttl_ms: number | null;
+    }>("/quotes" + query({ symbols: symbols.join(",") })),
 
   currencies: () => request<{ items: string[]; current: string }>(
     "/settings/currencies"),
