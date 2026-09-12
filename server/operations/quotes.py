@@ -158,8 +158,8 @@ def record_instrument(found):
         cursor = connection.cursor()
         cursor.execute("""
             INSERT INTO instruments (ticker, name, sector, exchange,
-                                     low_52w, high_52w)
-            VALUES (%s, %s, %s, %s, %s, %s)
+                                     low_52w, high_52w, priced)
+            VALUES (%s, %s, %s, %s, %s, %s, true)
             ON CONFLICT (ticker) DO UPDATE
                SET name = COALESCE(EXCLUDED.name, instruments.name),
                    sector = COALESCE(EXCLUDED.sector, instruments.sector),
@@ -169,6 +169,10 @@ def record_instrument(found):
                    -- momentarily lost the sector should not erase it.
                    low_52w = COALESCE(EXCLUDED.low_52w, instruments.low_52w),
                    high_52w = COALESCE(EXCLUDED.high_52w, instruments.high_52w),
+                   -- Never back to false. Reaching here means the feed
+                   -- answered for this symbol, and a seeded row arriving
+                   -- later must not un-confirm it. The search ranks on this.
+                   priced = true,
                    updated_at = now()
         """, (found["symbol"], found.get("name"), found.get("sector"),
               found.get("exchange"), found.get("low_52w"),
@@ -180,6 +184,61 @@ def record_instrument(found):
             connection.rollback()
         print(f"Error recording instrument {found.get('symbol')}: {e}")
         return False
+    finally:
+        db.close_connection(connection)
+
+
+def search_instruments(term, limit=8):
+    """Symbols matching a fragment, best guess first.
+
+    Two questions at once, because people type both. A ticker is a prefix
+    question -- "reli" means RELIANCE and nobody types the middle of a
+    ticker -- while a company name is a substring one, since "motors" is a
+    perfectly ordinary way to look for TATAMOTORS.
+
+    The ordering is the whole value of this. In order:
+
+      an exact ticker  somebody who typed RELIANCE meant RELIANCE, and it
+                       must not sit under RELIANCEPOWER for being shorter
+      a ticker prefix  before any name match, because a typed fragment is
+                       far more often the start of a ticker than the middle
+                       of a company name
+      priced           a symbol this app has actually fetched a price for
+                       is a better suggestion than one merely listed
+      the shortest     RELIANCE above RELIANCEPOWER, on the grounds that
+                       the parent is what was meant far more often
+
+    LIKE, not ILIKE, on the ticker: tickers are stored upper case and the
+    term is folded before it gets here, so this stays on the prefix index
+    that migration 014 adds. ILIKE would not use it.
+    """
+    fragment = (term or "").strip().upper()
+    if len(fragment) < 2:
+        return []
+
+    # % and _ are wildcards to LIKE, so a term containing one would quietly
+    # match far more than it looks like it should. Escaped here rather than
+    # stripped, because a name legitimately contains "&" and friends and
+    # this should not start editing what somebody typed.
+    safe = fragment.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+    connection = None
+    try:
+        connection = db.get_connection()
+        cursor = connection.cursor()
+        cursor.execute("""
+            SELECT ticker, name, exchange, sector, isin
+              FROM instruments
+             WHERE ticker LIKE %s ESCAPE '\\'
+                OR name ILIKE %s ESCAPE '\\'
+             ORDER BY (ticker = %s) DESC,
+                      (ticker LIKE %s ESCAPE '\\') DESC,
+                      priced DESC,
+                      length(ticker),
+                      ticker
+             LIMIT %s
+        """, (safe + "%", "%" + safe + "%", fragment, safe + "%", limit))
+        return cursor.fetchall()
     finally:
         db.close_connection(connection)
 

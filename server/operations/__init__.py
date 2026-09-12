@@ -45,7 +45,8 @@ from .reports import (SERIES_MONTHS, budget_vs_actual, cashflow_series,
                       net_worth_series, top_merchants)
 from .quotes import (BENCHMARK, basket_against_benchmark, close_on,
                      instruments_for, recent_closes, record_closes,
-                     record_instrument, symbols_with_history)
+                     record_instrument, search_instruments,
+                     symbols_with_history)
 from .investments import (add_investment, apply_prices, delete_investment,
                           get_all_investments, investment_exists,
                           portfolio_pnl, set_investment_pricing,
@@ -91,5 +92,5 @@ __all__ = [
     "symbols_to_price",
     "BENCHMARK", "basket_against_benchmark", "close_on",
     "instruments_for", "recent_closes", "record_closes",
-    "record_instrument", "symbols_with_history",
+    "record_instrument", "search_instruments", "symbols_with_history",
 ]

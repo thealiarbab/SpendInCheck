@@ -3,26 +3,35 @@ import { useEffect, useState } from "react";
 /**
  * Suggest a symbol from a fragment.
  *
- * Calls StockSaathi's `/api/search` from the browser, for the same reasons
- * useLiveQuotes calls their quote endpoint directly: it is CORS-open, it
- * needs no key, and a keystroke handler must not bill a serverless
- * invocation per letter.
+ * Calls our own `/api/v1/symbols/search`, not StockSaathi.
  *
- * **It degrades to nothing.** That endpoint may not be deployed -- it was
- * written for this and lives in the other repository -- so a 404, a 503 or
- * an unreachable host all resolve to "no suggestions", and the field it
- * decorates stays an ordinary text box that still works. The server checks
- * the symbol on save either way, which is what actually prevents a wrong
- * one being stored; this only saves somebody guessing.
+ * It used to call theirs. Their instrument master is the same NSE list,
+ * but it sits behind row level security with no anon policy -- correct of
+ * them -- so it needed a new endpoint in a different product's repository,
+ * and that endpoint was written but never deployed. This hook has been
+ * disabling itself on every load ever since, which is why the symbol field
+ * has only ever been a plain text box.
+ *
+ * So the universe is seeded from NSE's own published equity list into our
+ * own instruments table instead (scripts/sync_instruments.py), and the
+ * search reads that. Same answers, no cross-product deploy to wait on, and
+ * same-origin -- so it carries the session cookie and cannot be scraped by
+ * anybody who is not signed in.
+ *
+ * **It still degrades to nothing.** The failure handling below is kept
+ * exactly as it was: an endpoint that is missing or unhappy resolves to
+ * "no suggestions" and the field stays an ordinary text box that works.
+ * The server checks the symbol on save either way, which is what actually
+ * prevents a wrong one being stored; this only saves somebody guessing.
  *
  * `available` is what a screen uses to decide whether to promise anything.
  * Offering "start typing to search" against an endpoint that is not there
  * is worse than offering nothing.
  */
 
-const SEARCH_URL = "https://stocksaathi.co.in/api/search";
+const SEARCH_URL = "/api/v1/symbols/search";
 
-/** Their minimum too. Below this every query matches thousands of rows. */
+/** The server's minimum too. Below this every query matches hundreds. */
 const MIN_LENGTH = 2;
 
 /**
@@ -55,13 +64,15 @@ let endpointMissing = false;
 /**
  * Consecutive failures before giving up for the session.
  *
- * A missing cross-origin endpoint does not present as a readable 404. The
- * host answers its own 404 page, that page carries no
- * Access-Control-Allow-Origin, and the browser refuses to let script see
- * the status at all -- so fetch rejects and the code never learns what
- * went wrong. Counting failures is what distinguishes "not deployed" from
- * "one bad moment on the train", without a single blip disabling the
- * feature for the rest of the session.
+ * Same-origin now, so a missing endpoint really does arrive as a readable
+ * 404 and the branch below can act on it directly -- which it could not
+ * when this was cross-origin, because the other host's 404 page carried no
+ * Access-Control-Allow-Origin and the browser would not let script see the
+ * status at all.
+ *
+ * The counter stays for what it was always also doing: distinguishing a
+ * genuinely broken endpoint from one bad moment on the train, without a
+ * single blip disabling the feature for the rest of the session.
  */
 const GIVE_UP_AFTER = 3;
 let failures = 0;
@@ -87,12 +98,14 @@ export function useSymbolSearch(term: string): SymbolSearch {
     const timer = setTimeout(async () => {
       setSearching(true);
       try {
+        // same-origin, not omit: this endpoint is behind require_user now,
+        // so the session cookie has to go with it.
         const response = await fetch(
           `${SEARCH_URL}?q=${encodeURIComponent(trimmed)}`,
-          { credentials: "omit", signal: cancel.signal });
+          { credentials: "same-origin", signal: cancel.signal });
 
         if (response.status === 404) {
-          // Deployed hosts that answer CORS on their 404 do reach here.
+          // Same-origin, so this is reachable and conclusive.
           failures = GIVE_UP_AFTER;
           endpointMissing = true;
           setAvailable(false);

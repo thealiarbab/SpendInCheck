@@ -299,3 +299,51 @@ def holdings_history():
             for ticker, facts in known.items()
         },
     })
+
+
+# How many suggestions a list under a text box can usefully hold. Beyond
+# about this many nobody reads them, and the point is to save a guess, not
+# to offer a directory.
+MAX_SUGGESTIONS = 8
+
+# Below two characters every fragment matches hundreds of rows and none of
+# them is a suggestion.
+MIN_SEARCH = 2
+
+
+@api.get("/symbols/search")
+def search_symbols():
+    """Suggest a symbol from a fragment somebody is typing.
+
+    Served from our own instruments table rather than from StockSaathi.
+    Their instrument master is the same NSE list, but it sits behind row
+    level security with no anon policy -- correct of them, since an
+    anon-readable master is a scrape waiting to happen -- so reading it
+    would have meant a new endpoint in a different product's repository and
+    a second production deploy to keep in step with this one.
+
+    scripts/sync_instruments.py seeds the same universe from NSE's own
+    published list instead, which leaves this app owning its own
+    autocomplete and waiting on nobody.
+
+    Behind require_user for the same reason their version guards the table:
+    2,292 rows of instrument master is worth scraping, and an endpoint that
+    hands it out two letters at a time to anybody is how it leaves. A
+    signed-in account, a two-character minimum and eight rows is the
+    controlled way through.
+
+    A fragment shorter than the minimum is an empty list, not a 422. This
+    runs on a keystroke, and the first letter of every search is not a
+    client error.
+    """
+    require_user()
+    term = (request.args.get("q") or "").strip()
+    if len(term) < MIN_SEARCH:
+        return jsonify({"items": []})
+
+    rows = operations.search_instruments(term, limit=MAX_SUGGESTIONS)
+    return jsonify({"items": [
+        {"symbol": ticker, "name": name, "exchange": exchange,
+         "sector": sector, "isin": isin}
+        for ticker, name, exchange, sector, isin in rows
+    ]})
