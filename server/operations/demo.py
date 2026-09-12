@@ -350,12 +350,20 @@ def create_demo_user(password_hash=UNUSABLE_PASSWORD):
         db.close_connection(connection)
 
 
-def delete_stale_demo_users(older_than_hours=24):
+def delete_stale_demo_users(older_than_hours=24.5):
     """Remove demonstration accounts older than the given age.
 
     Every data table cascades from users, so one DELETE clears the whole
     account. Run on a schedule: per-visitor demos would otherwise accumulate
     one row per person who ever clicked the link.
+
+    Fractional hours are allowed, and the default is one because of when
+    this runs. Vercel's Hobby plan does not promise the minute a daily job
+    fires -- only the hour -- so two consecutive runs can be anywhere from
+    23 to 25 hours apart. At a flat 24 the sweep could reach a demo that had
+    existed for 23 hours and take it while somebody was still reading it.
+    The extra half hour is wider than that jitter, so a demo always gets its
+    full day.
 
     Returns the number of accounts removed.
     """
@@ -363,10 +371,12 @@ def delete_stale_demo_users(older_than_hours=24):
     try:
         connection = db.get_connection()
         cursor = connection.cursor()
+        # Whole minutes rather than hours: make_interval's hours argument is
+        # an integer, and the age is deliberately no longer a whole number.
         cursor.execute(
             "DELETE FROM users WHERE is_demo = TRUE "
-            "AND created_at < NOW() - make_interval(hours => %s)",
-            (older_than_hours,))
+            "AND created_at < NOW() - make_interval(mins => %s)",
+            (round(older_than_hours * 60),))
         connection.commit()
         return cursor.rowcount
     except Error as e:

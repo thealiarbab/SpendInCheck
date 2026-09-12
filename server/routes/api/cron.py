@@ -24,7 +24,14 @@ CRON_HEADER = "X-Cron-Secret"
 # Demonstration accounts are per visitor and short-lived. A day is long enough
 # that nobody loses a session they are still using, and short enough that
 # abandoned ones do not accumulate.
-DEMO_MAX_AGE_HOURS = 24
+#
+# A day and a half hour, in fact. Vercel's Hobby plan promises the hour a
+# daily job runs in, not the minute, so two consecutive sweeps can fall 23 to
+# 25 hours apart. At a flat 24 an early run could take a demo that was only
+# 23 hours old, from somebody still looking at it. The half hour is wider
+# than that jitter, and the cost of it is that an abandoned demo lives an
+# extra half hour before being swept, which nothing minds.
+DEMO_MAX_AGE_HOURS = 24.5
 
 
 def _require_cron_secret():
