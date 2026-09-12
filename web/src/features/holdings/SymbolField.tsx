@@ -6,11 +6,8 @@ import styles from "./Holdings.module.css";
 /**
  * A symbol box that suggests, and still works when it cannot.
  *
- * The suggestions come from StockSaathi's instrument master when their
- * search endpoint answers, and from this app's seeded copy of the same NSE
- * universe, plus AMFI's schemes, when it cannot. The credit under the list
- * says which -- it used to claim StockSaathi unconditionally, for a search
- * that never once called them. When that
+ * The suggestions are StockSaathi's instrument universe, seeded daily into
+ * this app's own table and served from our own region. When that
  * endpoint is not reachable the list simply never appears and this is an
  * ordinary text input -- which is what it was before, and still enough:
  * the server verifies the symbol on save regardless, so the worst case is
@@ -35,7 +32,7 @@ export function SymbolField(
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const box = useRef<HTMLDivElement>(null);
-  const { suggestions, available, source } = useSymbolSearch(open ? value : "");
+  const { suggestions, available } = useSymbolSearch(open ? value : "");
 
   const showing = open && available && suggestions.length > 0;
 
@@ -120,17 +117,12 @@ export function SymbolField(
               </button>
             </li>
           ))}
-          {/* Whoever actually answered. Crediting the wrong source is
-              worse than crediting none -- it sends somebody checking a
-              symbol to look it up in the wrong place -- and this line
-              claimed StockSaathi for years of searches that never called
-              them. It says so again, truthfully, the day their endpoint
-              is deployed, without anybody editing this file. */}
-          <li className={styles.suggestionCredit}>
-            {source === "stocksaathi"
-              ? "instruments by StockSaathi"
-              : "instruments from NSE and AMFI"}
-          </li>
+          {/* True now, and it was not before. This line credited
+              StockSaathi for years of searches that read a list seeded
+              from NSE; the fix was not to shrink the claim but to make
+              the list actually theirs -- see scripts/sync_instruments.py,
+              which seeds this table from the universe they publish. */}
+          <li className={styles.suggestionCredit}>instruments by StockSaathi</li>
         </ul>
       )}
     </div>

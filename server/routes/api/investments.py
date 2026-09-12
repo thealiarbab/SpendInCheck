@@ -406,33 +406,24 @@ MIN_SEARCH = 2
 def search_symbols():
     """Suggest a symbol from a fragment somebody is typing.
 
-    **StockSaathi answers this when it can.** Their /api/search reads
-    dhan_instruments, which is their instrument master, and that is where
-    these suggestions are meant to come from -- the two products are one
-    integration, and a symbol box fed by their universe is the visible part
-    of it.
+    **The list is StockSaathi's**, and that is now literally rather than
+    aspirationally true. scripts/sync_instruments.py seeds this table from
+    the universe they publish -- 4,367 shares and ETFs with sectors, and
+    13,969 curated schemes with fund houses -- so what this serves is their
+    list, ranked and served from our own region.
 
-    Today it cannot: the endpoint is written in their repository and has
-    never been deployed, so it 404s. That is why the fallback exists rather
-    than the other way round. scripts/sync_instruments.py seeds the same
-    NSE universe into our own instruments table, and this serves from there
-    whenever they are unreachable -- which is currently always. The moment
-    that endpoint is deployed, suggestions come from them with no change
-    here, and `source` in the response starts saying so.
+    This briefly asked their /api/search per keystroke instead, and that was
+    the wrong shape three times over: the endpoint is written but never
+    deployed, it selects a column their table does not have, and the table
+    it reads is empty because their own sync has never filled it. Their
+    product does not use it either -- it loads the same published files this
+    seeds from. A daily seed of their canonical list beats a live call to a
+    path nothing maintains.
 
-    A failure stands their endpoint down for five minutes rather than being
-    retried per keystroke; see services.stocksaathi.search.
-
-    **Their master carries no mutual funds.** dhan_instruments is the NSE
-    universe, and the 37,882 AMFI schemes are ours alone, so a search they
-    answer is still topped up from our table for the funds. One box, both
-    namespaces, whoever happens to be serving the shares.
-
-    Behind require_user for the same reason their version guards the table:
-    2,292 rows of instrument master is worth scraping, and an endpoint that
-    hands it out two letters at a time to anybody is how it leaves. A
-    signed-in account, a two-character minimum and eight rows is the
-    controlled way through.
+    Behind require_user for the reason their own search guards the master:
+    an instrument list is worth scraping, and an endpoint that hands it out
+    two letters at a time to anybody is how it leaves. A signed-in account,
+    a two-character minimum and eight rows is the controlled way through.
 
     A fragment shorter than the minimum is an empty list, not a 422. This
     runs on a keystroke, and the first letter of every search is not a
@@ -441,25 +432,15 @@ def search_symbols():
     require_user()
     term = (request.args.get("q") or "").strip()
     if len(term) < MIN_SEARCH:
-        return jsonify({"items": [], "source": "local"})
+        return jsonify({"items": []})
 
-    def ours(limit, kind=None):
+    rows = operations.search_instruments(term, limit=MAX_SUGGESTIONS)
+    return jsonify({"items": [
         # kind rides along because the client cannot tell from the
         # identifier alone: "118989" is a fund and "RELIANCE" is a share,
         # and guessing that from whether it is all digits is exactly the
         # inference migration 016 added the column to avoid.
-        return [{"symbol": ticker, "name": name, "exchange": exchange,
-                 "sector": sector, "isin": isin, "kind": row_kind}
-                for ticker, name, exchange, sector, isin, row_kind
-                in operations.search_instruments(term, limit=limit, kind=kind)]
-
-    theirs = stocksaathi.search(term, limit=MAX_SUGGESTIONS)
-    if theirs is None:
-        # None is no answer, not an empty one. An empty list from them is a
-        # search that worked and found nothing, and falling back on that
-        # would be this app second-guessing a result it asked for.
-        return jsonify({"items": ours(MAX_SUGGESTIONS), "source": "local"})
-
-    return jsonify({"items": theirs + ours(MAX_SUGGESTIONS - len(theirs),
-                                           kind="fund"),
-                    "source": "stocksaathi"})
+        {"symbol": ticker, "name": name, "exchange": exchange,
+         "sector": sector, "isin": isin, "kind": kind}
+        for ticker, name, exchange, sector, isin, kind in rows
+    ]})

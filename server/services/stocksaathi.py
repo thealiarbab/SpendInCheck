@@ -334,69 +334,116 @@ def fund(code, days=30, timeout=TIMEOUT_SECONDS):
     }
 
 
-# Suggestions run on a keystroke, so they get their own, much shorter
-# budget. Somebody typing does not wait six seconds for a list; a list that
-# arrives after the next keystroke is worse than no list at all.
-SEARCH_TIMEOUT_SECONDS = 1.5
+# Where their published instrument universe lives. Not under /api: these
+# are static files on the same host, built by their own pipeline and served
+# from the edge, which is why they cost no function invocation and need no
+# key. The site itself loads the universe this way.
+UNIVERSE_BASE = "https://stocksaathi.co.in/js/data"
 
-# How long to stop asking after they could not answer.
-#
-# Their /api/search is written but not deployed -- it 404s today -- and
-# without this every keystroke in the app would spend a round trip finding
-# that out again. One failure stands down the whole endpoint for five
-# minutes, per process, and the next attempt after that either finds it
-# deployed or costs one more round trip.
-SEARCH_RETRY_SECONDS = 300
-
-# Below two characters every query matches thousands of rows and none of
-# them is a suggestion. Their own endpoint draws the line in the same
-# place; drawing it here too means the request is never made at all.
-SEARCH_MIN = 2
-
-# {"until": monotonic seconds}. A plain dict rather than a lock: the worst
-# a race can do is let one extra request through, and paying for a lock on
-# every keystroke to prevent that is the wrong trade.
-_search_standdown = {"until": 0.0}
+# The universe is a megabyte of JSON and the fund list nearly six. Only the
+# seeding script reads either, once a day at most, and nobody is waiting.
+UNIVERSE_TIMEOUT_SECONDS = 60
 
 
-def search(term, limit=8, timeout=SEARCH_TIMEOUT_SECONDS):
-    """Instruments matching a fragment, from their master. None if they cannot.
+def _universe_url(name, timeout):
+    """The immutable URL for one published dataset.
 
-    The distinction between None and [] is the whole interface. [] is their
-    answer -- they looked and there is nothing called that. None is no
-    answer -- not deployed, unreachable, too slow -- and only None should
-    send a caller to a different source. A fallback that triggers on [] as
-    well would quietly second-guess a search that worked.
-
-    **Equities only.** Their master is dhan_instruments, which is the NSE
-    universe; it has no mutual funds in it, so a caller that offers funds
-    has to get those from somewhere else.
-
-    Nothing here raises, and a failure stands the endpoint down for
-    SEARCH_RETRY_SECONDS rather than being retried on the next keystroke.
+    Their filenames are content-hashed -- universeFull.27a44892.json -- so
+    the edge can cache them forever. The hash is discovered from an
+    unhashed sidecar, `<name>.meta.json`, which is the protocol their own
+    loader uses. Falling back to the unhashed name matters during a rolling
+    deploy, when the sidecar has updated before the hashed file reaches
+    every edge.
     """
-    cleaned = (term or "").strip()
-    if len(cleaned) < SEARCH_MIN:
+    try:
+        request = urllib.request.Request(
+            UNIVERSE_BASE + "/" + name + ".meta.json",
+            headers={"User-Agent": USER_AGENT})
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            meta = json.loads(response.read().decode("utf-8"))
+        sha = meta.get("sha8")
+        if isinstance(sha, str) and len(sha) == 8 and all(
+                c in "0123456789abcdef" for c in sha):
+            return UNIVERSE_BASE + "/" + name + "." + sha + ".json"
+    except (urllib.error.URLError, ValueError, TimeoutError, OSError):
+        pass
+    return UNIVERSE_BASE + "/" + name + ".json"
+
+
+def _published(name, timeout):
+    """One published dataset as a list, or [] if it could not be read."""
+    url = _universe_url(name, timeout)
+    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            body = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, ValueError, TimeoutError, OSError) as e:
+        print("stocksaathi " + name + " failed: " + str(e))
         return []
+    return body if isinstance(body, list) else []
 
-    if time.monotonic() < _search_standdown["until"]:
-        return None
 
-    body = _get("/search", {"q": cleaned}, timeout)
-    if body is None or not isinstance(body.get("items"), list):
-        _search_standdown["until"] = time.monotonic() + SEARCH_RETRY_SECONDS
-        return None
+def universe(timeout=UNIVERSE_TIMEOUT_SECONDS):
+    """Every share and ETF they carry, as rows ready for our instruments table.
 
-    # Cleared explicitly, so the first success after a deployment ends the
-    # stand-down rather than waiting the rest of it out.
-    _search_standdown["until"] = 0.0
+    4,367 of them, against the 2,292 NSE's own published CSV gives, and
+    each one carries a sector -- which the CSV does not have at all. This
+    is their curated list rather than a raw exchange dump: BSE and the SME
+    board are in it, ETFs are marked as such, and the names are the ones
+    their own screens show.
 
-    found = []
-    for row in body["items"][:limit]:
+    `kind` collapses to ours. They distinguish EQUITY from ETF; we do not,
+    because an ETF is quoted and settled exactly like a share and the whole
+    of our distinction is which feed prices a thing.
+    """
+    rows = []
+    for row in _published("universeFull", timeout):
         symbol = normalise(row.get("symbol"))
-        if not symbol or not row.get("name"):
+        name = (row.get("name") or "").strip()
+        if not symbol or not name:
             continue
-        found.append({"symbol": symbol, "name": row.get("name"),
-                      "exchange": row.get("exchange"), "sector": row.get("sector"),
-                      "isin": row.get("isin"), "kind": "equity"})
-    return found
+        sector = (row.get("sector") or "").strip() or None
+        rows.append({
+            "ticker": symbol,
+            "name": name[:200],
+            # "Other" is their placeholder for a sector they could not
+            # determine, and storing it would make an unknown look decided.
+            "sector": None if sector in (None, "Other") else sector[:100],
+            "exchange": (row.get("exchange") or "NSE")[:8],
+            "isin": (row.get("isin") or "").strip()[:12] or None,
+            "kind": "equity",
+        })
+    return rows
+
+
+def fund_universe(timeout=UNIVERSE_TIMEOUT_SECONDS):
+    """Every scheme they carry, keyed by AMFI code.
+
+    13,969, against the 37,882 AMFI itself publishes -- and the difference
+    is the point. Theirs is filtered to schemes that actually have a
+    current NAV and are worth offering; the raw list is mostly dormant and
+    closed-ended plans that no one can hold. A shorter, better list is a
+    better search box.
+
+    **Keyed by amfi_code, not by their symbol.** Their identifier is
+    "MF_151165"; ours has always been the bare scheme code, because that is
+    what /api/mf-history takes and what every holding already stores.
+    """
+    rows = []
+    for row in _published("mfFull", timeout):
+        code = (str(row.get("amfi_code") or "")).strip()
+        name = (row.get("name") or "").strip()
+        if not (code.isdigit() and 1 <= len(code) <= 6) or not name:
+            continue
+        rows.append({
+            "ticker": code,
+            "name": name[:200],
+            # The scheme category, which is what a fund has instead of a
+            # sector -- the same choice services/amfi.py makes.
+            "sector": ((row.get("category") or "").strip() or None),
+            "exchange": None,
+            "isin": ((row.get("isin_growth") or "").strip() or None),
+            "fund_house": ((row.get("amc") or "").strip() or None),
+            "kind": "fund",
+        })
+    return rows

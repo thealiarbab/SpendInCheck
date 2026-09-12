@@ -3,18 +3,16 @@ import { useEffect, useState } from "react";
 /**
  * Suggest a symbol from a fragment.
  *
- * Calls `/api/v1/symbols/search`, which asks StockSaathi first.
+ * Calls `/api/v1/symbols/search`, this app's own endpoint.
  *
- * This used to call their API directly and disable itself on every load,
- * because the endpoint it wanted is written in their repository and has
- * never been deployed. It goes through our own server now, which asks them
- * and falls back to our seeded copy of the same NSE universe when they
- * cannot answer -- which is currently every time. Same-origin, so it
- * carries the session cookie and cannot be scraped by anybody signed out.
+ * It used to call StockSaathi's directly and disable itself on every load,
+ * because the endpoint it wanted has never been deployed. Same-origin now,
+ * so it carries the session cookie and cannot be scraped by anybody who is
+ * signed out.
  *
- * `source` says which of the two actually answered, so the credit under
- * the list names the list it is crediting. The day their endpoint is
- * deployed, that starts saying StockSaathi on its own.
+ * The list itself is StockSaathi's: scripts/sync_instruments.py seeds our
+ * table from the universe they publish, so the credit under the box is
+ * accurate without the client having to ask who answered.
  *
  * **It still degrades to nothing.** The failure handling below is kept
  * exactly as it was: an endpoint that is missing or unhappy resolves to
@@ -47,15 +45,11 @@ export interface Suggestion {
   isin: string | null;
 }
 
-/** Whose instrument master answered: theirs, or our seeded copy. */
-export type SuggestionSource = "stocksaathi" | "local";
-
 export interface SymbolSearch {
   suggestions: Suggestion[];
   searching: boolean;
   /** False once the endpoint has proved it is not there. */
   available: boolean;
-  source: SuggestionSource;
 }
 
 // Remembered for the life of the tab. Once the endpoint has proved it is
@@ -83,9 +77,6 @@ export function useSymbolSearch(term: string): SymbolSearch {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [searching, setSearching] = useState(false);
   const [available, setAvailable] = useState(!endpointMissing);
-  // Ours until a response says otherwise, so the credit never claims
-  // StockSaathi for a list they did not serve.
-  const [source, setSource] = useState<SuggestionSource>("local");
 
   const trimmed = term.trim();
 
@@ -132,7 +123,6 @@ export function useSymbolSearch(term: string): SymbolSearch {
         failures = 0;
         const body = await response.json();
         setSuggestions(Array.isArray(body?.items) ? body.items : []);
-        setSource(body?.source === "stocksaathi" ? "stocksaathi" : "local");
       } catch {
         // An aborted request lands here too, and an abort is not a
         // failure -- it is this hook cancelling its own work.
@@ -153,5 +143,5 @@ export function useSymbolSearch(term: string): SymbolSearch {
     };
   }, [trimmed]);
 
-  return { suggestions, searching, available, source };
+  return { suggestions, searching, available };
 }

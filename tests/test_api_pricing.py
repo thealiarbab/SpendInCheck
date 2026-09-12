@@ -11,6 +11,7 @@ to the real API.
 import pytest
 
 from server.routes.api import investments as investments_route
+from server import db
 from server.services import quote_snapshot, stocksaathi
 
 
@@ -20,7 +21,14 @@ HOLDING = {"asset_name": "Reliance Industries", "asset_type": "Stock",
 
 
 NAMES = {"RELIANCE": ("Reliance Industries Ltd", "Energy"),
-         "TCS": ("Tata Consultancy Services Ltd", "Information Technology")}
+         "TCS": ("Tata Consultancy Services Ltd", "Information Technology"),
+         # Synthetic, and deliberately not a real listing. Resolving a
+         # symbol checks our own instruments table first, so a test that
+         # wants the stubbed feed to answer has to ask about something the
+         # seed does not carry -- otherwise it asserts on whatever
+         # StockSaathi's published universe happens to call the company
+         # this week, which is how the name assertion below broke.
+         "ZZPRICECO": ("Zzprice Industries Limited", "Energy")}
 
 
 @pytest.fixture
@@ -35,7 +43,8 @@ def feed(monkeypatch):
 
     class Feed:
         def __init__(self):
-            self.prices = {"RELIANCE": "1274.00", "TCS": "2204.10"}
+            self.prices = {"RELIANCE": "1274.00", "TCS": "2204.10",
+                           "ZZPRICECO": "1274.00"}
             self.asked = []
             self.looked_up = []
             self.reachable = True
@@ -77,7 +86,21 @@ def feed(monkeypatch):
                         lambda symbol, days=30, timeout=None: [])
     monkeypatch.setattr(quote_snapshot.amfi, "closing_prices",
                         lambda code, days=30, timeout=None: [])
-    return stub
+    yield stub
+
+    # `instruments` is shared -- what a company is called is a fact about
+    # the company, not about an account -- so a test cannot clean up by
+    # deleting its own account. Pointing a holding at a symbol writes a row
+    # there, and leaving ZZPRICECO behind would let one run's row satisfy
+    # the next run's assertions. That is exactly how the 52-week assertion
+    # in this file passed for a while against a figure no test had set.
+    connection = db.get_connection()
+    try:
+        cursor = connection.cursor()
+        cursor.execute("DELETE FROM instruments WHERE ticker = 'ZZPRICECO'")
+        connection.commit()
+    finally:
+        db.close_connection(connection)
 
 
 def add_holding(client, **overrides):
@@ -386,8 +409,8 @@ def test_saving_a_symbol_says_which_company_it_turned_out_to_be(
 
     body = client.patch(f"/api/v1/investments/{holding['id']}/pricing",
                         headers=client.headers,
-                        json={"ticker": "RELIANCE", "auto_price": "1"}).get_json()
-    assert body["instrument"]["name"] == "Reliance Industries Ltd"
+                        json={"ticker": "ZZPRICECO", "auto_price": "1"}).get_json()
+    assert body["instrument"]["name"] == "Zzprice Industries Limited"
     assert body["instrument"]["sector"] == "Energy"
     assert body["instrument"]["low_52w"] == "1000.00", "money as a string"
 
