@@ -174,12 +174,20 @@ def record_instrument(found):
 
 
 def search_instruments(term, limit=8, kind=None):
-    """Symbols matching a fragment, best guess first.
+    """Symbols matching what somebody typed, best guess first.
 
-    Two questions at once, because people type both. A ticker is a prefix
-    question -- "reli" means RELIANCE and nobody types the middle of a
-    ticker -- while a company name is a substring one, since "motors" is a
-    perfectly ordinary way to look for TATAMOTORS.
+    **People type phrases, not fragments.** This matched the whole input as
+    one substring, so "reliance shares" found nothing at all -- no company
+    is called that -- while "reliance" found three. Same for "my infosys
+    stock", "sbi bluechip" and "nifty bees". A search that only works when
+    you already type the name correctly is not much of a search.
+
+    So the input is split into words and each is matched separately, and a
+    row that matches more of them ranks higher. "reliance shares" matches
+    Reliance Industries on one word out of two, which is enough to offer
+    it. Trigram similarity is the backstop for the rest: "bluechip" is not
+    a substring of "Blue Chip", and no amount of word splitting fixes a
+    space somebody did not type.
 
     The ordering is the whole value of this. In order:
 
@@ -188,19 +196,26 @@ def search_instruments(term, limit=8, kind=None):
       a ticker prefix  before any name match, because a typed fragment is
                        far more often the start of a ticker than the middle
                        of a company name
+      words matched    two words of a two-word query beats one of two
+      a name prefix    "sbi large" means the SBI Large Cap Fund, not some
+                       other house's fund with those words in the middle.
+                       This matters far more for funds than for shares:
+                       there are 13,969 schemes and their names share most
+                       of their words
       priced           a symbol this app has actually fetched a price for
                        is a better suggestion than one merely listed
+      similarity       how close the whole phrase is to the whole name,
+                       which is what catches a typo or a missing space
+      growth, direct   every scheme exists as four near-identical rows --
+                       Direct and Regular, Growth and IDCW -- and a list
+                       that leads with the payout variant is answering a
+                       question nobody asked. All four still appear; this
+                       only decides which is first
       listed longest   RELIANCE (listed 1995) above RELIABLE (2024). Both
                        are eight characters, so length separates them not
                        at all, and the alphabet alone put a micro-cap above
-                       India's largest company -- which is what typing
-                       "reli" actually returned before this line existed.
-                       There is no market capitalisation here and a search
-                       box should not acquire one; how long a company has
-                       been listed is a proxy for size, and an honest one.
-                       Below `priced` on purpose, so a recent listing this
-                       app already tracks still wins -- that being the case
-                       the proxy would otherwise get wrong
+                       India's largest company. NULLS LAST, so a row the
+                       seed never dated does not outrank the exchange
       the shortest     RELIANCE above RELIANCEPOWER, on the grounds that
                        the parent is what was meant far more often
 
@@ -208,15 +223,44 @@ def search_instruments(term, limit=8, kind=None):
     term is folded before it gets here, so this stays on the prefix index
     that migration 014 adds. ILIKE would not use it.
     """
-    fragment = (term or "").strip().upper()
-    if len(fragment) < 2:
+    raw = (term or "").strip()
+    if len(raw) < 2:
         return []
 
-    # % and _ are wildcards to LIKE, so a term containing one would quietly
-    # match far more than it looks like it should. Escaped here rather than
-    # stripped, because a name legitimately contains "&" and friends and
-    # this should not start editing what somebody typed.
-    safe = fragment.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    def escape(value):
+        # %% and _ are wildcards to LIKE, so a term containing one would
+        # quietly match far more than it looks like it should. Escaped
+        # rather than stripped, because a name legitimately contains "&"
+        # and friends and this should not start editing what somebody typed.
+        return (value.replace("\\", "\\\\")
+                     .replace("%", r"\%").replace("_", r"\_"))
+
+    fragment = raw.upper()
+    safe = escape(fragment)
+
+    # Words that say what kind of thing it is rather than which one. Left
+    # in, "reliance shares" asks for a company with "shares" in its name.
+    # "fund" is deliberately absent -- for a scheme it is part of the name.
+    NOISE = {"my", "a", "an", "the", "of", "and", "in", "share", "shares",
+             "stock", "stocks", "holding", "holdings", "ltd", "limited",
+             "co", "company", "inc", "plc"}
+
+    words = [w for w in "".join(
+        c if c.isalnum() or c in "&.-" else " " for c in raw.lower()).split() if w]
+    meaningful = [w for w in words if w not in NOISE] or words
+    tokens = [escape(w) for w in meaningful[:6]]
+
+    # Spelled out rather than looped over inside SQL, because an OR of
+    # plain ILIKEs can use the GIN trigram index on name and a lateral
+    # over unnest() cannot. The %% operator on the last line is pg_trgm's
+    # own similarity test, which is index-backed where similarity(..) > 0.2
+    # is a sequential scan over every instrument.
+    matches = " OR ".join(
+        "name ILIKE '%%' || %(tok{})s || '%%' ESCAPE '\\'".format(n)
+        for n in range(len(tokens))) or "false"
+    params = {"kind": kind, "prefix": safe + "%", "upper": fragment,
+              "toks": tokens, "raw": raw, "limit": limit}
+    params.update({"tok" + str(n): t for n, t in enumerate(tokens)})
 
     connection = None
     try:
@@ -225,42 +269,30 @@ def search_instruments(term, limit=8, kind=None):
         cursor.execute("""
             SELECT ticker, name, exchange, sector, isin, kind
               FROM instruments
-             WHERE (ticker LIKE %s ESCAPE '\\'
-                OR name ILIKE %s ESCAPE '\\')
-               -- Narrowed to one kind only when a caller has already
-               -- covered the other. StockSaathi's own master is the NSE
-               -- universe and carries no schemes, so a search they answer
-               -- still comes here for the funds.
-               AND (%s::varchar IS NULL OR kind = %s)
-             ORDER BY (ticker = %s) DESC,
-                      (ticker LIKE %s ESCAPE '\\') DESC,
-                      -- A name that STARTS with what was typed, before one
-                      -- that merely contains it. "sbi large" means the SBI
-                      -- Large Cap Fund, not some other house's fund with
-                      -- those words in the middle of its name. This matters
-                      -- far more for funds than for shares: there are 37,882
-                      -- schemes and their names share most of their words.
-                      (name ILIKE %s ESCAPE '\\') DESC,
+             WHERE (%(kind)s::varchar IS NULL OR kind = %(kind)s)
+               AND (ticker LIKE %(prefix)s ESCAPE ''
+                    OR """ + matches + """
+                    OR name %% %(raw)s)
+             ORDER BY (ticker = %(upper)s) DESC,
+                      (ticker LIKE %(prefix)s ESCAPE '') DESC,
+                      (SELECT count(*) FROM unnest(%(toks)s::varchar[]) w
+                        WHERE name ILIKE '%%' || w || '%%' ESCAPE '') DESC,
+                      (name ILIKE %(prefix)s ESCAPE '') DESC,
                       priced DESC,
-                      -- Growth before IDCW. Every scheme exists as four
-                      -- near-identical rows -- Direct and Regular, Growth
-                      -- and IDCW -- and a list that leads with the payout
-                      -- variant is answering a question nobody asked. All
-                      -- four still appear; this only decides which is first.
+                      -- Rounded, so it bands rather than orders. The four
+                      -- variants of one scheme differ by hundredths --
+                      -- 0.3250 against 0.3333 for the same query -- and at
+                      -- full precision that noise decided the winner,
+                      -- putting the payout variant above the growth one.
+                      -- Banded, they tie and the two rules below decide.
+                      round(similarity(name, %(raw)s)::numeric, 1) DESC,
                       (name ILIKE '%%IDCW%%' OR name ILIKE '%%DIVIDEND%%'),
-                      -- Direct before Regular, for the same reason: it is
-                      -- the plan most holdings opened in the last decade
-                      -- are in, and the cheaper of the two.
                       (name NOT ILIKE '%%DIRECT%%'),
-                      -- NULLS LAST: a row with no listing date is one the
-                      -- seed never covered, and it should not outrank every
-                      -- company on the exchange for having no date at all.
                       listed_on ASC NULLS LAST,
                       length(ticker),
                       ticker
-             LIMIT %s
-        """, (safe + "%", "%" + safe + "%", kind, kind,
-              fragment, safe + "%", safe + "%", limit))
+             LIMIT %(limit)s
+        """, params)
         return cursor.fetchall()
     finally:
         db.close_connection(connection)
