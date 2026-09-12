@@ -89,14 +89,26 @@ optimising means counting statements, not tuning SQL.
 plain SELECT otherwise leaves a transaction open that costs a full round
 trip to roll back.
 
-**The pool holds three connections and the reports screen opens five
-requests.** That is fine because `_checkout` waits for one rather than
-failing -- but it is only fine for that reason. psycopg2's own pool raises
-"connection pool exhausted" the instant it is empty, which is how that
-screen served a 400 to whichever request lost the race. If a screen ever
-grows past a burst that three connections can absorb within
-`POOL_WAIT_SECONDS`, raise `DB_MAX_CONNECTIONS` -- the measured ceiling is
-sixteen usable client connections. Anything needing several statements to succeed or fail
+**The pool holds five connections, which is what the reports screen
+opens.** Below that they queued: `_checkout` waits for a connection rather
+than failing, so the screen worked, but it was as slow as its slowest
+serialised pair. psycopg2's own pool raises "connection pool exhausted" the
+instant it is empty, which is how that screen once served a 400 to
+whichever request lost the race.
+
+Five is a division, not a preference. **The ceiling is sixteen, not the
+sixty that `show max_connections` reports** -- that number describes the
+Postgres instance, and every client here arrives through Supabase's pooler,
+which hands out sixteen. Measured by opening connections until one broke.
+It breaks *lazily*: the seventeenth connects fine and then dies on first
+use with "SSL connection has been closed unexpectedly".
+
+That sixteen is shared across every process, and serverless means many
+containers each holding a whole pool, so the constraint is
+`DB_MAX_CONNECTIONS x concurrent containers <= 16`. Raising it is not free
+either: `minconn = maxconn`, so the pool opens every connection at
+construction, at ~195ms each and linear -- 600ms for three, 955ms for five,
+1,570ms for eight. That is paid once per container, not per request. Anything needing several statements to succeed or fail
 together uses `db.transaction()`. Every read endpoint is one round trip;
 opening the demo is three.
 

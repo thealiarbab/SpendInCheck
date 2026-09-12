@@ -1,7 +1,10 @@
 """More requests at once than the pool holds.
 
 This exists because the reports screen fires five requests when it opens
-and `DB_MAX_CONNECTIONS` defaults to three. psycopg2's pool does not wait
+and `DB_MAX_CONNECTIONS` defaulted to three. It is five now, so that
+particular screen no longer queues -- but the test deliberately asks for
+twice whatever the pool holds, because what is under test is the waiting,
+not the size. psycopg2's pool does not wait
 when it is empty -- it raises "connection pool exhausted" straight away --
 so whichever request lost the race got no connection, its operation
 swallowed the error and returned nothing, and the route turned that into a

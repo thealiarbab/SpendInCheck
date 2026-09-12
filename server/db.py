@@ -24,22 +24,34 @@ _REQUEST_KEY = "_spendincheck_connection"
 
 # How many connections this process may hold open at once.
 #
-# Three, because the shared ceiling is far lower than it looks. Measured
-# against this project's pooler: the seventeenth concurrent client
-# connection fails, so the whole budget across every process that talks to
-# this database is sixteen. A serverless deployment is many containers each
-# holding their own pool, so a generous number here is how five containers
-# exhaust everything.
+# Five, and the number is a division rather than a preference.
 #
-# The failure mode is worth knowing because it is not the obvious one: past
-# the limit, connecting appears to succeed and the connection then dies on
-# first use with "SSL connection has been closed unexpectedly". _checkout
-# below survives that -- it uses each connection before handing it on and
-# discards the ones that fail -- but the ceiling is still real.
+# **The ceiling is sixteen, not sixty.** `show max_connections` reports 60
+# and that figure is a red herring: it describes the Postgres instance,
+# while every client here arrives through Supabase's pooler, and the
+# pooler gives out sixteen. Measured by opening connections until one
+# broke -- the seventeenth. The failure is worth knowing because it is not
+# the obvious one: connecting past the limit appears to succeed and the
+# connection then dies on first use with "SSL connection has been closed
+# unexpectedly". Nothing raises at connect time to tell you.
 #
-# A process that serves one request at a time needs one; three is headroom
-# for a threaded local server. Raise DB_MAX_CONNECTIONS if the database
-# plan changes, since this limit comes with the tier.
+# **That sixteen is shared, and a serverless deployment is many
+# containers.** Each warm Vercel instance holds a whole pool of its own,
+# so the real constraint is `MAX_CONNECTIONS x concurrent containers <=
+# 16`. At five, three containers coexist; at eight, two.
+#
+# **Five, because the worst burst this app makes is five.** The reports
+# screen fires five requests at once. Below five they queue in _checkout
+# and the screen is as slow as its slowest serialised pair; at five it is
+# as slow as its slowest single request.
+#
+# The cost of a bigger pool is paid at construction, not per request,
+# because minconn = maxconn opens every connection up front (see
+# _get_pool). Measured against the Mumbai pooler at about 195ms each, and
+# linear: a pool of three stands up in 600ms, five in 955ms, eight in
+# 1,570ms. So this trades 355ms of cold start, once per container, for an
+# unqueued reports screen and the headroom a request needs to fetch and
+# write at the same time.
 #
 # Requests beyond this wait for a connection to come back, which is still
 # far cheaper than the 180ms of handshake they would otherwise each pay.
@@ -48,7 +60,7 @@ _REQUEST_KEY = "_spendincheck_connection"
 # This comment described the intended behaviour and not the actual one for
 # long enough that the reports screen -- five requests fired at once
 # against three connections -- served a 400 to whichever lost the race.
-MAX_CONNECTIONS = max(1, int(os.environ.get("DB_MAX_CONNECTIONS", "3")))
+MAX_CONNECTIONS = max(1, int(os.environ.get("DB_MAX_CONNECTIONS", "5")))
 
 # How long a request will wait for somebody else's connection before giving
 # up. Generous against a query, because the thing being waited for is
