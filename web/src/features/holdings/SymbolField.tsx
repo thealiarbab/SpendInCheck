@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { useSymbolSearch } from "../../hooks/useSymbolSearch";
+import { useSymbolReading } from "../../hooks/useSymbolReading";
 import type { Suggestion } from "../../hooks/useSymbolSearch";
 import styles from "./Holdings.module.css";
 
@@ -35,6 +36,9 @@ export function SymbolField(
   const { suggestions, available } = useSymbolSearch(open ? value : "");
 
   const showing = open && available && suggestions.length > 0;
+  // Asked only while a list is actually on screen, so a closed field
+  // never spends a model call.
+  const reading = useSymbolReading(value, showing);
 
   function take(suggestion: Suggestion) {
     onChange(suggestion.symbol);
@@ -122,6 +126,16 @@ export function SymbolField(
               from NSE; the fix was not to shrink the claim but to make
               the list actually theirs -- see scripts/sync_instruments.py,
               which seeds this table from the universe they publish. */}
+          {reading.why && (
+            /* Their reading of the phrase, under the list it describes.
+               It arrives seconds after the list and changes nothing about
+               it -- no reordering, no auto-selection. Somebody typing
+               "reliance shares" gets the list at once and, a moment later,
+               a sentence saying which of them it thinks they meant. Moving
+               the list under the cursor once it lands would be worse than
+               saying nothing. */
+            <li className={styles.suggestionReading}>{reading.why}</li>
+          )}
           <li className={styles.suggestionCredit}>instruments by StockSaathi</li>
         </ul>
       )}

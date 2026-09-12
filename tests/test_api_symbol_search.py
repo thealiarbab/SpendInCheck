@@ -27,6 +27,8 @@ RELIABLE-versus-RELIANCE trap: nothing but the listing date separates them.
 import pytest
 
 from server import db, operations
+from server.routes.api import investments as investments_route
+from server.services import stocksaathi
 
 
 # Synthetic throughout. No exchange lists a ZZ ticker, so nothing outside
@@ -271,3 +273,59 @@ def test_the_suggestions_are_stocksaathis_list(api_account):
     reliance = next((row for row in body if row["symbol"] == "RELIANCE"), None)
     assert reliance is not None, body
     assert reliance["sector"], "a sector can only have come from their list"
+
+
+# --- the second, slower opinion ---------------------------------------------
+
+def test_the_reading_only_ever_names_a_candidate(api_account, monkeypatch,
+                                                 seeded_instruments):
+    """The guard that matters most here.
+
+    A language model asked to recall tickers unaided invents plausible ones,
+    and a holding pointed at a plausible wrong ticker prices itself
+    convincingly every day. So the database proposes and the model only
+    chooses: anything it names that was not offered to it is dropped.
+    """
+    monkeypatch.setattr(investments_route.stocksaathi, "recognise",
+                        lambda q, candidates, timeout=None: {
+                            "symbols": ["ZZTESTCO", "TOTALLYMADEUP"],
+                            "why": "because"})
+    body = api_account["client"].get(
+        "/api/v1/symbols/interpret?q=zztest").get_json()
+    assert body["symbols"] == ["ZZTESTCO"] or "TOTALLYMADEUP" not in body["symbols"]
+
+
+def test_no_reading_is_not_an_error(api_account, monkeypatch,
+                                    seeded_instruments):
+    """It sits behind a language model and their deployment. The list has
+    already rendered without it, so silence is a normal outcome."""
+    monkeypatch.setattr(investments_route.stocksaathi, "recognise",
+                        lambda q, candidates, timeout=None: None)
+    response = api_account["client"].get("/api/v1/symbols/interpret?q=zztest")
+    assert response.status_code == 200
+    assert response.get_json() == {"symbols": [], "why": ""}
+
+
+def test_nothing_to_choose_from_is_never_asked(api_account, monkeypatch):
+    """Their endpoint 400s without candidates, and asking a model to name a
+    symbol with nothing to pick from is the failure above."""
+    asked = []
+    monkeypatch.setattr(investments_route.stocksaathi, "recognise",
+                        lambda q, candidates, timeout=None: asked.append(q))
+    body = api_account["client"].get(
+        "/api/v1/symbols/interpret?q=zzzznothingmatchesthis").get_json()
+    assert body == {"symbols": [], "why": ""}
+    assert asked == [], "no candidates, so no call"
+
+
+def test_a_fragment_too_short_is_not_asked_either(api_account, monkeypatch):
+    asked = []
+    monkeypatch.setattr(investments_route.stocksaathi, "recognise",
+                        lambda q, candidates, timeout=None: asked.append(q))
+    assert api_account["client"].get(
+        "/api/v1/symbols/interpret?q=z").get_json() == {"symbols": [], "why": ""}
+    assert asked == []
+
+
+def test_the_reading_needs_an_account(client):
+    assert client.get("/api/v1/symbols/interpret?q=reliance").status_code == 401

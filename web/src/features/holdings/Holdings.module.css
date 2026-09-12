@@ -198,6 +198,18 @@
   color: var(--content-muted);
 }
 
+/* Their reading of the phrase. Quieter than a suggestion and separated
+   from them, because it is a remark about the list rather than a row in
+   it -- nothing here is clickable, and it must never look like it is. */
+.suggestionReading {
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--line-soft);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  color: var(--content-secondary);
+  font-style: italic;
+}
+
 /* Named, because the list is theirs. */
 .suggestionCredit {
   padding: var(--space-2) var(--space-3);

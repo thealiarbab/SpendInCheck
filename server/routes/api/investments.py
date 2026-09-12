@@ -444,3 +444,51 @@ def search_symbols():
          "sector": sector, "isin": isin, "kind": kind}
         for ticker, name, exchange, sector, isin, kind in rows
     ]})
+
+
+@api.get("/symbols/interpret")
+def interpret_symbol():
+    """Which instrument a phrase probably means, in words, from StockSaathi's AI.
+
+    A second, slower opinion on the same query /symbols/search just
+    answered. Separate endpoint on purpose: the list has to be instant
+    because it renders under a cursor, and this takes 1.5 to 4 seconds
+    because there is a language model behind it. One endpoint doing both
+    would make every keystroke wait for the slow half.
+
+    So the client shows the ranked list immediately and asks this
+    afterwards, and the answer arrives as a sentence confirming which one
+    it thinks was meant. Nothing depends on it: if it never answers, the
+    list is exactly what it was.
+
+    **The database proposes and the model only chooses.** Candidates come
+    from our own ranked search and their endpoint can only return symbols
+    it was given -- checked again on this side. An instrument search that
+    asked a model to recall tickers unaided would be a machine for
+    inventing plausible wrong ones, and a holding pointed at a plausible
+    wrong ticker prices itself convincingly every day.
+    """
+    require_user()
+    term = (request.args.get("q") or "").strip()
+    if len(term) < MIN_SEARCH:
+        return jsonify({"symbols": [], "why": ""})
+
+    rows = operations.search_instruments(term, limit=MAX_SUGGESTIONS)
+    if not rows:
+        return jsonify({"symbols": [], "why": ""})
+
+    offered = [row[0] for row in rows]
+    read = stocksaathi.recognise(term, [
+        {"symbol": ticker, "name": name, "sector": sector}
+        for ticker, name, _exchange, sector, _isin, _kind in rows])
+    if not read:
+        return jsonify({"symbols": [], "why": ""})
+
+    # Filtered here as well as in the service. Both sides check the same
+    # thing on purpose: the rule is that only a symbol this database
+    # proposed may be named, and a rule enforced in exactly one place is one
+    # refactor away from being enforced nowhere.
+    known = [symbol for symbol in read["symbols"] if symbol in offered]
+    if not known:
+        return jsonify({"symbols": [], "why": ""})
+    return jsonify({"symbols": known, "why": read["why"]})

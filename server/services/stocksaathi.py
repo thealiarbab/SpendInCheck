@@ -447,3 +447,66 @@ def fund_universe(timeout=UNIVERSE_TIMEOUT_SECONDS):
             "kind": "fund",
         })
     return rows
+
+
+# Their AI router. One Edge function for every AI feature they have,
+# dispatched by ?op=, because Vercel's function cap made twelve endpoints
+# impossible. op=market-search is the one that reads a phrase.
+AI_URL = BASE + "/ai?op=market-search"
+
+# Longer than a quote and far longer than a search, because there is a
+# language model behind it: measured at 3.6s cold. Their side caches per
+# query per day, so the second person to ask anything gets it instantly.
+# Nothing waits on this -- see the route that calls it.
+AI_TIMEOUT_SECONDS = 8
+
+
+def recognise(query, candidates, timeout=AI_TIMEOUT_SECONDS):
+    """Which of these instruments somebody meant, and why. None if unknown.
+
+    Their /api/ai?op=market-search takes the phrase and a candidate list and
+    answers {"matches": [symbol], "rationale": "..."}. It will only ever
+    return symbols that were offered to it -- they filter against the
+    candidate set on their side -- so this cannot invent a ticker, which is
+    the failure that would matter.
+
+    Returns {"symbols": [...], "why": "..."} or None. None means no answer,
+    not no match: the caller already has its own ranked list and should show
+    that rather than nothing.
+
+    **Candidates are required.** Their endpoint 400s without them, which is
+    the right shape -- an instrument search that asks a language model to
+    recall tickers from memory is a machine for inventing plausible wrong
+    ones. The database proposes; the model only chooses.
+    """
+    shortlist = [c for c in (candidates or []) if c.get("symbol")][:60]
+    if not (query or "").strip() or not shortlist:
+        return None
+
+    payload = json.dumps({
+        "query": str(query).strip()[:200],
+        "candidates": [{"symbol": c["symbol"], "name": c.get("name") or "",
+                        "sector": c.get("sector") or ""} for c in shortlist],
+    }).encode("utf-8")
+
+    request = urllib.request.Request(
+        AI_URL, data=payload,
+        headers={"User-Agent": USER_AGENT, "Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            body = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, ValueError, TimeoutError, OSError):
+        return None
+
+    if not isinstance(body, dict):
+        return None
+    offered = {c["symbol"] for c in shortlist}
+    # Filtered again on our side. They already do it; trusting one side of a
+    # boundary to validate for the other is how the check gets dropped.
+    symbols = [s for s in (body.get("matches") or [])
+               if isinstance(s, str) and s in offered]
+    if not symbols:
+        return None
+    why = body.get("rationale")
+    return {"symbols": symbols,
+            "why": why.strip()[:280] if isinstance(why, str) else ""}
