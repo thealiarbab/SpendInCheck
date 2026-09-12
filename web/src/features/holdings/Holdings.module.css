@@ -198,6 +198,22 @@
   color: var(--content-muted);
 }
 
+/* StockSaathi's own brand green, #00B386, taken from their css/main.css
+   where it is --brand. Hard-coded rather than mapped to one of our tokens
+   on purpose: this is not our accent colour used for a link, it is their
+   colour used to mark the way out to their product, and it should stay
+   theirs even if our palette moves. The same value in both themes, as it
+   is on their side -- they do not redefine --brand in dark. */
+.saathiLink {
+  color: #00B386;
+  font-weight: 500;
+}
+
+.saathiLink:hover,
+.saathiLink:focus-visible {
+  color: #00906B;   /* their --brand-dark */
+}
+
 /* Their reading of the phrase. Quieter than a suggestion and separated
    from them, because it is a remark about the list rather than a row in
    it -- nothing here is clickable, and it must never look like it is. */

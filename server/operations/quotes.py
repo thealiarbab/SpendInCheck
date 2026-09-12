@@ -12,7 +12,7 @@ still require one -- but what comes back is public information either way.
 """
 
 
-from .. import db
+from .. import db, vocabulary
 
 
 def record_closes(ticker, closes):
@@ -176,48 +176,45 @@ def record_instrument(found):
 def search_instruments(term, limit=8, kind=None):
     """Symbols matching what somebody typed, best guess first.
 
-    **People type phrases, not fragments.** This matched the whole input as
-    one substring, so "reliance shares" found nothing at all -- no company
-    is called that -- while "reliance" found three. Same for "my infosys
-    stock", "sbi bluechip" and "nifty bees". A search that only works when
-    you already type the name correctly is not much of a search.
+    **People type phrases, not fragments, and they use the old names.** This
+    matched the whole input as one substring, so "reliance shares" found
+    nothing at all -- no company is called that -- while "reliance" found
+    three. And "sbi bluechip" found the wrong SBI funds, because SEBI's 2018
+    recategorisation renamed that scheme to SBI Large Cap and the words
+    somebody types are not in the data any more.
 
-    So the input is split into words and each is matched separately, and a
-    row that matches more of them ranks higher. "reliance shares" matches
-    Reliance Industries on one word out of two, which is enough to offer
-    it. Trigram similarity is the backstop for the rest: "bluechip" is not
-    a substring of "Blue Chip", and no amount of word splitting fixes a
-    space somebody did not type.
+    So the input becomes a list of *concepts* (server/vocabulary.py), each
+    carrying every spelling worth matching -- "bluechip" brings "blue chip"
+    and "large cap" with it -- and a row matching more concepts ranks
+    higher. Matching any spelling counts the concept once, which is what
+    keeps that honest: offering three spellings of one word must not
+    outrank a row that genuinely matched three different words.
 
-    The ordering is the whole value of this. In order:
+    Trigram similarity is the backstop for what neither splitting nor the
+    dictionary catches, which is mostly typos.
+
+    The ordering, in order:
 
       an exact ticker  somebody who typed RELIANCE meant RELIANCE, and it
                        must not sit under RELIANCEPOWER for being shorter
       a ticker prefix  before any name match, because a typed fragment is
                        far more often the start of a ticker than the middle
                        of a company name
-      words matched    two words of a two-word query beats one of two
+      concepts matched two ideas of two beats one of two
       a name prefix    "sbi large" means the SBI Large Cap Fund, not some
                        other house's fund with those words in the middle.
                        This matters far more for funds than for shares:
-                       there are 13,969 schemes and their names share most
-                       of their words
+                       13,969 schemes share most of their words
       priced           a symbol this app has actually fetched a price for
                        is a better suggestion than one merely listed
-      similarity       how close the whole phrase is to the whole name,
-                       which is what catches a typo or a missing space
-      growth, direct   every scheme exists as four near-identical rows --
-                       Direct and Regular, Growth and IDCW -- and a list
-                       that leads with the payout variant is answering a
-                       question nobody asked. All four still appear; this
-                       only decides which is first
-      listed longest   RELIANCE (listed 1995) above RELIABLE (2024). Both
-                       are eight characters, so length separates them not
-                       at all, and the alphabet alone put a micro-cap above
-                       India's largest company. NULLS LAST, so a row the
-                       seed never dated does not outrank the exchange
-      the shortest     RELIANCE above RELIANCEPOWER, on the grounds that
-                       the parent is what was meant far more often
+      similarity       banded, not ordered -- see the comment below
+      growth, direct   every scheme exists as four near-identical rows, and
+                       a list that leads with the payout variant answers a
+                       question nobody asked
+      listed longest   RELIANCE (1995) above RELIABLE (2024), both eight
+                       characters. NULLS LAST, so an undated row does not
+                       outrank the exchange
+      the shortest     RELIANCE above RELIANCEPOWER
 
     LIKE, not ILIKE, on the ticker: tickers are stored upper case and the
     term is folded before it gets here, so this stays on the prefix index
@@ -232,35 +229,33 @@ def search_instruments(term, limit=8, kind=None):
         # quietly match far more than it looks like it should. Escaped
         # rather than stripped, because a name legitimately contains "&"
         # and friends and this should not start editing what somebody typed.
-        return (value.replace("\\", "\\\\")
-                     .replace("%", r"\%").replace("_", r"\_"))
+        return (value.replace(chr(92), chr(92) * 2)
+                     .replace("%", chr(92) + "%").replace("_", chr(92) + "_"))
 
     fragment = raw.upper()
     safe = escape(fragment)
 
-    # Words that say what kind of thing it is rather than which one. Left
-    # in, "reliance shares" asks for a company with "shares" in its name.
-    # "fund" is deliberately absent -- for a scheme it is part of the name.
-    NOISE = {"my", "a", "an", "the", "of", "and", "in", "share", "shares",
-             "stock", "stocks", "holding", "holdings", "ltd", "limited",
-             "co", "company", "inc", "plc"}
-
-    words = [w for w in "".join(
-        c if c.isalnum() or c in "&.-" else " " for c in raw.lower()).split() if w]
-    meaningful = [w for w in words if w not in NOISE] or words
-    tokens = [escape(w) for w in meaningful[:6]]
-
-    # Spelled out rather than looped over inside SQL, because an OR of
-    # plain ILIKEs can use the GIN trigram index on name and a lateral
-    # over unnest() cannot. The %% operator on the last line is pg_trgm's
-    # own similarity test, which is index-backed where similarity(..) > 0.2
-    # is a sequential scan over every instrument.
-    matches = " OR ".join(
-        "name ILIKE '%%' || %(tok{})s || '%%' ESCAPE '\\'".format(n)
-        for n in range(len(tokens))) or "false"
     params = {"kind": kind, "prefix": safe + "%", "upper": fragment,
-              "toks": tokens, "raw": raw, "limit": limit}
-    params.update({"tok" + str(n): t for n, t in enumerate(tokens)})
+              "raw": raw, "limit": limit}
+
+    # One bracketed OR per concept, spelled out rather than looped over
+    # inside SQL: an OR of plain ILIKEs uses the GIN trigram index on name,
+    # where a lateral over unnest() does not. Measured at 172ms against
+    # 24ms on 18,489 rows.
+    groups = []
+    for n, spellings in enumerate(vocabulary.concepts(raw)):
+        parts = []
+        for m, spelling in enumerate(spellings):
+            key = "c%d_%d" % (n, m)
+            params[key] = escape(spelling)
+            parts.append("name ILIKE '%%' || %(" + key + ")s || '%%' ESCAPE '\\'")
+        groups.append("(" + " OR ".join(parts) + ")")
+
+    matches = " OR ".join(groups) or "false"
+    # Counted per concept, not per spelling.
+    # "0::int" rather than "0": a bare integer constant in ORDER BY is read
+    # as a column position, so the empty case asked to sort by column zero.
+    matched = " + ".join("(" + g + ")::int" for g in groups) or "0::int"
 
     connection = None
     try:
@@ -270,14 +265,13 @@ def search_instruments(term, limit=8, kind=None):
             SELECT ticker, name, exchange, sector, isin, kind
               FROM instruments
              WHERE (%(kind)s::varchar IS NULL OR kind = %(kind)s)
-               AND (ticker LIKE %(prefix)s ESCAPE ''
+               AND (ticker LIKE %(prefix)s ESCAPE '\\'
                     OR """ + matches + """
                     OR name %% %(raw)s)
              ORDER BY (ticker = %(upper)s) DESC,
-                      (ticker LIKE %(prefix)s ESCAPE '') DESC,
-                      (SELECT count(*) FROM unnest(%(toks)s::varchar[]) w
-                        WHERE name ILIKE '%%' || w || '%%' ESCAPE '') DESC,
-                      (name ILIKE %(prefix)s ESCAPE '') DESC,
+                      (ticker LIKE %(prefix)s ESCAPE '\\') DESC,
+                      (""" + matched + """) DESC,
+                      (name ILIKE %(prefix)s ESCAPE '\\') DESC,
                       priced DESC,
                       -- Rounded, so it bands rather than orders. The four
                       -- variants of one scheme differ by hundredths --

@@ -329,3 +329,51 @@ def test_a_fragment_too_short_is_not_asked_either(api_account, monkeypatch):
 
 def test_the_reading_needs_an_account(client):
     assert client.get("/api/v1/symbols/interpret?q=reliance").status_code == 401
+
+
+# --- the names people actually use ------------------------------------------
+
+def test_a_fund_is_found_by_the_name_it_used_to_have(api_account):
+    """SEBI's 2018 recategorisation renamed most of the industry, and the
+    people who bought before it did not rename anything.
+
+    SBI Blue Chip Fund is SBI Large Cap Fund now. Somebody typing what is
+    written on their own statement from 2016 should not get nothing, and
+    before server/vocabulary.py they got three unrelated SBI ETFs.
+    """
+    found = search(api_account["client"], "sbi bluechip")
+    names = {row["symbol"]: row["name"] for row in api_account["client"].get(
+        "/api/v1/symbols/search?q=sbi+bluechip").get_json()["items"]}
+    assert found, "no suggestions at all"
+    assert any("large cap" in (name or "").lower() for name in names.values()), names
+
+
+def test_the_old_name_and_the_new_one_agree(api_account):
+    """Both spellings are searched, never one swapped for the other: the
+    fund has to be findable by either."""
+    old = search(api_account["client"], "sbi bluechip")
+    new = search(api_account["client"], "sbi large cap")
+    assert set(old) & set(new), (old, new)
+
+
+def test_matching_more_spellings_of_one_word_is_not_matching_more_words(
+        api_account, seeded_instruments):
+    """The ranking counts concepts, not spellings.
+
+    "bluechip" carries three ways of writing itself into the query. If each
+    counted separately, any row matching that one idea would outrank a row
+    that genuinely matched two different ones.
+    """
+    from server import vocabulary
+    spellings = vocabulary.concepts("sbi bluechip")
+    assert len(spellings) == 2, spellings
+    assert len(spellings[1]) > 1, "the concept should carry alternatives"
+
+
+def test_an_unknown_word_is_left_exactly_as_typed(api_account,
+                                                  seeded_instruments):
+    """The dictionary only knows renames that happened. It must not start
+    guessing at words it has never seen."""
+    from server import vocabulary
+    assert vocabulary.concepts("zztestco") == [["zztestco"]]
+    assert search(api_account["client"], "zztestco")[0] == "ZZTESTCO"

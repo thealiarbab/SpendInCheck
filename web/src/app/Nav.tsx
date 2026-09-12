@@ -10,7 +10,7 @@ const PAGES = [
   { to: "/accounts", label: "Accounts" },
   { to: "/categories", label: "Categories" },
   { to: "/budgets", label: "Budgets" },
-  { to: "/investments", label: "Holdings" },
+  { to: "/investments", label: "Investments" },
   { to: "/reports", label: "Reports" },
   { to: "/settings", label: "Settings" },
 ];

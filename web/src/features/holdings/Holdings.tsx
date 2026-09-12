@@ -200,7 +200,7 @@ export function Holdings() {
 
   return (
     <>
-      <PageHead title="Holdings" subtitle="What you own, against what it cost." />
+      <PageHead title="Investments" subtitle="What you own, against what it cost." />
 
       {portfolio.isPending && !totals ? (
         <Loading what="your position" shape="stats" rows={3} />
@@ -563,7 +563,8 @@ export function Holdings() {
         ) : (
           <Empty>
             Nothing held yet.{" "}
-            <a href={discoverHref} {...externalLinkProps}>Find something worth holding ↗</a>
+            <a className={styles.saathiLink} href={discoverHref}
+               {...externalLinkProps}>Find something worth holding ↗</a>
           </Empty>
         )}
         {reprice.error && <Notice>{(reprice.error as Error).message}</Notice>}
