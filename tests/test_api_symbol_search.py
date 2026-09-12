@@ -252,3 +252,106 @@ def test_growth_outranks_the_payout_variant(api_account, seeded_funds):
     answering a question nobody asked."""
     found = search(api_account["client"], "zztest flexi")
     assert found.index("100ZZZ") < found.index("101ZZZ")
+
+
+# --- whose list this is ------------------------------------------------------
+#
+# The suggestions are meant to come from StockSaathi: their /api/search reads
+# dhan_instruments, their instrument master, and a symbol box fed by their
+# universe is the visible half of the two products being one thing. It is not
+# deployed -- it 404s -- so everything above this line exercises the fallback,
+# which is what actually serves today. These cover the preference itself, so
+# that the day it is deployed is a deploy and not a change.
+
+import pytest as _pytest
+
+from server.services import stocksaathi
+
+
+THEIRS = [{"symbol": "ZZTESTCO", "name": "Zztest Industries Limited",
+           "exchange": "NSE", "sector": "Energy", "isin": "INZZ0TEST001",
+           "kind": "equity"}]
+
+
+@_pytest.fixture
+def their_search(monkeypatch):
+    """Answer for them, and record what they were asked."""
+    calls = []
+
+    def answer(term, limit=8, timeout=None):
+        calls.append(term)
+        return answer.returns
+
+    answer.returns = list(THEIRS)
+    answer.calls = calls
+    monkeypatch.setattr(stocksaathi, "search", answer)
+    return answer
+
+
+def body(client, term):
+    response = client.get("/api/v1/symbols/search?q=" + term)
+    assert response.status_code == 200, response.get_data(as_text=True)[:200]
+    return response.get_json()
+
+
+def test_their_answer_is_the_one_used(api_account, their_search,
+                                      seeded_instruments):
+    """Not merged with ours, not ranked against it. Theirs is the master."""
+    found = body(api_account["client"], "zztest")
+    assert found["source"] == "stocksaathi"
+    assert [row["symbol"] for row in found["items"]] == ["ZZTESTCO"]
+    assert their_search.calls == ["zztest"]
+
+
+def test_funds_are_still_ours_when_they_answer(api_account, their_search,
+                                               seeded_funds):
+    """dhan_instruments is the NSE universe and has no schemes in it, so a
+    search they answer is still topped up from our AMFI seed. One box, both
+    namespaces, whoever is serving the shares."""
+    their_search.returns = []
+    found = body(api_account["client"], "zztest flexi")
+    assert found["source"] == "stocksaathi"
+    assert "100ZZZ" in [row["symbol"] for row in found["items"]]
+
+
+def test_an_empty_answer_is_an_answer(api_account, their_search,
+                                      seeded_instruments):
+    """The distinction the fallback turns on. [] means they looked and there
+    is nothing called that; falling back on it would be this app
+    second-guessing a search it asked for. Only None is no answer."""
+    their_search.returns = []
+    found = body(api_account["client"], "zztestco")
+    assert found["source"] == "stocksaathi"
+    assert [row["symbol"] for row in found["items"]] == []
+
+
+def test_our_table_serves_when_they_cannot(api_account, their_search,
+                                           seeded_instruments):
+    """Which is every request today: the endpoint is not deployed."""
+    their_search.returns = None
+    found = body(api_account["client"], "zztest")
+    assert found["source"] == "local"
+    assert found["items"][0]["symbol"] == "ZZTESTCO"
+
+
+def test_a_failure_stands_them_down_rather_than_asking_again(monkeypatch):
+    """Otherwise every keystroke in the app spends a round trip finding out
+    the endpoint is still not deployed."""
+    asked = []
+    monkeypatch.setattr(stocksaathi, "_get",
+                        lambda path, params, timeout: asked.append(path))
+    monkeypatch.setitem(stocksaathi._search_standdown, "until", 0.0)
+
+    assert stocksaathi.search("zztest") is None
+    assert stocksaathi.search("zztest") is None
+    assert len(asked) == 1, "the second ask never left the process"
+
+
+def test_a_fragment_too_short_never_reaches_them(monkeypatch):
+    """Below two characters there is no suggestion to be had, and their own
+    endpoint draws the line in the same place -- so the request is not made
+    at all rather than made and discarded."""
+    monkeypatch.setattr(stocksaathi, "_get",
+                        lambda *a, **k: pytest.fail("asked anyway"))
+    monkeypatch.setitem(stocksaathi._search_standdown, "until", 0.0)
+    assert stocksaathi.search("z") == []

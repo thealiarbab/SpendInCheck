@@ -32,6 +32,7 @@ that has to be true server-side.
 
 import datetime
 import json
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -331,3 +332,71 @@ def fund(code, days=30, timeout=TIMEOUT_SECONDS):
         "nav": (Decimal(int(latest)) / 100) if latest is not None else None,
         "closes": closes,
     }
+
+
+# Suggestions run on a keystroke, so they get their own, much shorter
+# budget. Somebody typing does not wait six seconds for a list; a list that
+# arrives after the next keystroke is worse than no list at all.
+SEARCH_TIMEOUT_SECONDS = 1.5
+
+# How long to stop asking after they could not answer.
+#
+# Their /api/search is written but not deployed -- it 404s today -- and
+# without this every keystroke in the app would spend a round trip finding
+# that out again. One failure stands down the whole endpoint for five
+# minutes, per process, and the next attempt after that either finds it
+# deployed or costs one more round trip.
+SEARCH_RETRY_SECONDS = 300
+
+# Below two characters every query matches thousands of rows and none of
+# them is a suggestion. Their own endpoint draws the line in the same
+# place; drawing it here too means the request is never made at all.
+SEARCH_MIN = 2
+
+# {"until": monotonic seconds}. A plain dict rather than a lock: the worst
+# a race can do is let one extra request through, and paying for a lock on
+# every keystroke to prevent that is the wrong trade.
+_search_standdown = {"until": 0.0}
+
+
+def search(term, limit=8, timeout=SEARCH_TIMEOUT_SECONDS):
+    """Instruments matching a fragment, from their master. None if they cannot.
+
+    The distinction between None and [] is the whole interface. [] is their
+    answer -- they looked and there is nothing called that. None is no
+    answer -- not deployed, unreachable, too slow -- and only None should
+    send a caller to a different source. A fallback that triggers on [] as
+    well would quietly second-guess a search that worked.
+
+    **Equities only.** Their master is dhan_instruments, which is the NSE
+    universe; it has no mutual funds in it, so a caller that offers funds
+    has to get those from somewhere else.
+
+    Nothing here raises, and a failure stands the endpoint down for
+    SEARCH_RETRY_SECONDS rather than being retried on the next keystroke.
+    """
+    cleaned = (term or "").strip()
+    if len(cleaned) < SEARCH_MIN:
+        return []
+
+    if time.monotonic() < _search_standdown["until"]:
+        return None
+
+    body = _get("/search", {"q": cleaned}, timeout)
+    if body is None or not isinstance(body.get("items"), list):
+        _search_standdown["until"] = time.monotonic() + SEARCH_RETRY_SECONDS
+        return None
+
+    # Cleared explicitly, so the first success after a deployment ends the
+    # stand-down rather than waiting the rest of it out.
+    _search_standdown["until"] = 0.0
+
+    found = []
+    for row in body["items"][:limit]:
+        symbol = normalise(row.get("symbol"))
+        if not symbol or not row.get("name"):
+            continue
+        found.append({"symbol": symbol, "name": row.get("name"),
+                      "exchange": row.get("exchange"), "sector": row.get("sector"),
+                      "isin": row.get("isin"), "kind": "equity"})
+    return found

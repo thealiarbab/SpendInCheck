@@ -173,7 +173,7 @@ def record_instrument(found):
         db.close_connection(connection)
 
 
-def search_instruments(term, limit=8):
+def search_instruments(term, limit=8, kind=None):
     """Symbols matching a fragment, best guess first.
 
     Two questions at once, because people type both. A ticker is a prefix
@@ -225,8 +225,13 @@ def search_instruments(term, limit=8):
         cursor.execute("""
             SELECT ticker, name, exchange, sector, isin, kind
               FROM instruments
-             WHERE ticker LIKE %s ESCAPE '\\'
-                OR name ILIKE %s ESCAPE '\\'
+             WHERE (ticker LIKE %s ESCAPE '\\'
+                OR name ILIKE %s ESCAPE '\\')
+               -- Narrowed to one kind only when a caller has already
+               -- covered the other. StockSaathi's own master is the NSE
+               -- universe and carries no schemes, so a search they answer
+               -- still comes here for the funds.
+               AND (%s::varchar IS NULL OR kind = %s)
              ORDER BY (ticker = %s) DESC,
                       (ticker LIKE %s ESCAPE '\\') DESC,
                       -- A name that STARTS with what was typed, before one
@@ -254,8 +259,8 @@ def search_instruments(term, limit=8):
                       length(ticker),
                       ticker
              LIMIT %s
-        """, (safe + "%", "%" + safe + "%", fragment, safe + "%",
-              safe + "%", limit))
+        """, (safe + "%", "%" + safe + "%", kind, kind,
+              fragment, safe + "%", safe + "%", limit))
         return cursor.fetchall()
     finally:
         db.close_connection(connection)
