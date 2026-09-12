@@ -33,6 +33,10 @@ UNIT = Decimal("0.0001")
 QUANTITY_FIELDS = frozenset({"quantity"})
 
 
+# Eleven integer digits, which is what NUMERIC(14,3) holds. See to_decimal.
+MAX_EXPONENT = 10
+
+
 def to_decimal(raw_value):
     """Parse submitted input into a Decimal, or return None if unusable.
 
@@ -58,11 +62,17 @@ def to_decimal(raw_value):
     # "NaN" and "Infinity" are valid Decimal syntax and parse without error,
     # then blow up the moment anything compares or quantises them -- which is
     # a 500, deep in a query, on input that should have been refused at the
-    # door. is_finite() is false for both, and for sNaN. A 400-digit integer
-    # is finite and legitimate as syntax, but it is not a sum of money; the
-    # scale of the largest real balance is comfortably inside fifteen digits,
-    # so anything past that is a fuzzing payload, not an amount.
-    if not value.is_finite() or abs(value.adjusted()) > 15:
+    # door. is_finite() is false for both, and for sNaN.
+    #
+    # The digit limit is the column's, not a guess. Every money column is
+    # NUMERIC(14,3): fourteen digits with three after the point, so eleven
+    # before it, and the twelfth is a numeric field overflow from Postgres
+    # -- again a 500, on input this function exists to refuse. adjusted() is
+    # the exponent of the leading digit, so ten is eleven digits.
+    #
+    # This used to allow fifteen, which let everything between a hundred
+    # billion and ten quadrillion through the door to fail at the database.
+    if not value.is_finite() or abs(value.adjusted()) > MAX_EXPONENT:
         return None
     return value
 

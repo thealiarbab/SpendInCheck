@@ -75,3 +75,26 @@ def test_a_quantity_keeps_the_four_places_it_is_stored_at():
 def test_an_amount_is_still_rounded_to_paise():
     """The quantity exception must not widen to every Decimal."""
     assert money.row(["amount"], [Decimal("12.3456")]) == {"amount": "12.35"}
+
+
+# --- the door refuses what the column cannot hold ---------------------------
+
+def test_the_largest_amount_the_column_holds_is_accepted():
+    """NUMERIC(14,3) is eleven digits before the point and three after."""
+    assert money.to_decimal("99999999999.999") is not None
+
+
+def test_one_digit_more_is_refused_here_rather_than_by_postgres():
+    """It used to be allowed to fifteen digits, so everything between a
+    hundred billion and ten quadrillion passed validation and then failed
+    at the database with a numeric field overflow -- a 500, on input this
+    function exists to refuse."""
+    assert money.to_decimal("100000000000") is None
+    assert money.to_decimal("1e15") is None
+
+
+def test_the_boundary_holds_for_negatives_too():
+    """Opening balances are the one genuinely signed figure, and a credit
+    card opens owing money."""
+    assert money.to_decimal("-99999999999.999") is not None
+    assert money.to_decimal("-100000000000") is None

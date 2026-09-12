@@ -141,9 +141,16 @@ def test_amount_rejects_an_absurdly_large_number():
 
 
 def test_amount_still_accepts_real_figures():
-    """The guard must not cost legitimate money. Large but real values pass."""
+    """The guard must not cost legitimate money. Large but real values pass.
+
+    The largest case here used to be 999999999999.99 -- twelve digits before
+    the point -- which this asserted was acceptable. It is not: every money
+    column is NUMERIC(14,3), so eleven digits is the ceiling and Postgres
+    answers the twelfth with a numeric field overflow. The test was
+    asserting a 500.
+    """
     for good, expected in [("1250.00", "1250.00"), ("-99", "-99.00"),
-                           ("1e6", "1000000.00"), ("999999999999.99", "999999999999.99")]:
+                           ("1e6", "1000000.00"), ("99999999999.99", "99999999999.99")]:
         validator = Validator({"amount": good})
         result = validator.amount(allow_negative=True)
         validator.raise_if_invalid()
@@ -174,3 +181,25 @@ def test_text_keeps_ordinary_unicode():
     validator = Validator({"name": "\U0001f4b8 Fun Money"})
     assert validator.text("name") == "\U0001f4b8 Fun Money"
     validator.raise_if_invalid()
+
+
+def test_a_json_object_is_not_a_string():
+    """str() renders a dict as its Python repr -- "{'a': 1}" -- which then
+    passes every length and emptiness check below it and is stored as
+    somebody's category name. A structure in a text field is the wrong
+    type, not a value needing trimming."""
+    fields = Validator({"asset_name": {"a": 1}})
+    assert fields.text("asset_name") is None
+    assert "asset_name" in fields.errors
+
+
+def test_a_json_array_is_not_a_string_either():
+    fields = Validator({"asset_name": ["RELIANCE"]})
+    assert fields.text("asset_name") is None
+    assert "asset_name" in fields.errors
+
+
+def test_a_loose_scalar_is_still_accepted():
+    """A number or boolean in a text field is a client being loose rather
+    than sending a structure, and coercing it has always been the point."""
+    assert Validator({"asset_name": 42}).text("asset_name") == "42"

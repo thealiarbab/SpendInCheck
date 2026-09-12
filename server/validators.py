@@ -98,6 +98,15 @@ class Validator:
         article = "an" if name[:1].lower() in takes_an else "a"
         raw = self.payload.get(field)
 
+        # A JSON object or array is not a string that needs trimming, it is
+        # the wrong type. str() renders one as its Python repr -- "{'a': 1}"
+        # -- which then passes every check below and is stored as somebody's
+        # category name. Scalars are still accepted and coerced, because a
+        # number or boolean in a text field is a client being loose rather
+        # than a client sending a structure.
+        if isinstance(raw, (dict, list, tuple, set)):
+            return self.fail(field, f"Enter {article} {name}.")
+
         # NUL is stripped before the empty check, not after, so a value that
         # is only NUL bytes counts as empty rather than slipping past the
         # required gate and reaching the database as "". PostgreSQL cannot
