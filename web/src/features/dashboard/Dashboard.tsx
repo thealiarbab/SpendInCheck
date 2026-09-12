@@ -31,7 +31,10 @@ export function Dashboard() {
       {portfolio.error && <Notice>{(portfolio.error as Error).message}</Notice>}
 
       {portfolio.isPending && !totals ? (
-        <Card><Loading what="your position" /></Card>
+        /* The stat row itself, not a Card around a line of text: the three
+           cells are the shape arriving, so standing in for them keeps the
+           holdings table below from jumping up the page when they land. */
+        <Loading what="your position" shape="stats" rows={3} />
       ) : (
         <StatRow>
           <Stat
@@ -49,7 +52,8 @@ export function Dashboard() {
 
       <Card title="Holdings" flush>
         {dashboard.isPending && !dashboard.data ? (
-          <Loading what="holdings" />
+          <Loading what="holdings" shape="table" rows={3}
+                   columns={["30%", "40%", "#60%", "#60%", "#50%", "#60%"]} />
         ) : dashboard.data?.portfolio.items.length ? (
           <Table
             head={
@@ -83,7 +87,8 @@ export function Dashboard() {
 
       <Card title="Recent transactions" flush>
         {transactions.isPending && !transactions.data ? (
-          <Loading what="transactions" />
+          <Loading what="transactions" shape="table" rows={5}
+                   columns={["70%", "45%", "50%", "#55%", "60%"]} />
         ) : recent.length ? (
           <Table
             head={

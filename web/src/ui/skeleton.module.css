@@ -1,0 +1,81 @@
+/* Placeholders shaped like the thing that is still loading.
+
+   The point is not to entertain somebody during a wait, it is that the page
+   does not jump when the rows arrive: a placeholder occupying the same
+   geometry as the real content means the layout is already settled before
+   the data lands.
+
+   Square-cornered and solid on purpose. This theme sets every --radius token
+   to 0 and uses no gradient fills anywhere, so a rounded shimmering bar --
+   the default skeleton everywhere else on the web -- would read as having
+   been imported from a different application. A shimmer also needs a moving
+   linear-gradient, which is the one visual idiom this design does not own. */
+
+.bar {
+  display: block;
+  height: 0.72em;
+  border-radius: var(--radius-sm);
+  background: var(--line-default);
+  /* Breathing, not sweeping. */
+  animation: pulse 1.5s var(--ease-in-out) infinite;
+}
+
+/* Each bar a beat behind the one above, so a column of them reads as one
+   surface settling rather than a row of lights blinking in unison. */
+.bar:nth-child(2) { animation-delay: 0.12s; }
+.bar:nth-child(3) { animation-delay: 0.24s; }
+.bar:nth-child(4) { animation-delay: 0.36s; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.42; }
+}
+
+/* The tokens zero out --duration-* under reduced motion, but this animation
+   names its own duration, so it needs its own answer. A still placeholder is
+   still a placeholder. */
+@media (prefers-reduced-motion: reduce) {
+  .bar { animation: none; opacity: 0.66; }
+}
+
+/* --- shapes ------------------------------------------------------------- */
+
+.lines {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-5);
+}
+
+/* Ragged on purpose: four bars of identical width read as a barcode, not as
+   text waiting to arrive. */
+.lines .bar:nth-child(1) { width: 62%; }
+.lines .bar:nth-child(2) { width: 91%; }
+.lines .bar:nth-child(3) { width: 78%; }
+.lines .bar:nth-child(4) { width: 44%; }
+
+/* A bar standing in for a figure sits where the figure will: right-aligned
+   under a numeric column heading, so the column edge does not shift. */
+.numeric { margin-left: auto; }
+
+.statBar {
+  height: 1.35rem;
+  width: 68%;
+  margin-top: var(--space-2);
+}
+
+/* --- the announcement ---------------------------------------------------- */
+
+/* The bars are decoration and carry aria-hidden; this is what a screen
+   reader is actually told, and it is the one thing that must not be a
+   picture of text. */
+.announce {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}

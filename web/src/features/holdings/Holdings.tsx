@@ -167,7 +167,7 @@ export function Holdings() {
       <PageHead title="Holdings" subtitle="What you own, against what it cost." />
 
       {portfolio.isPending && !totals ? (
-        <Card><Loading what="your position" /></Card>
+        <Loading what="your position" shape="stats" rows={3} />
       ) : (
         <StatRow>
           <Stat label="Portfolio value"
@@ -311,7 +311,9 @@ export function Holdings() {
         )}
 
         {holdings.isPending && !holdings.data ? (
-          <Loading what="holdings" />
+          <Loading what="holdings" shape="table" rows={4}
+                   columns={["55%", "40%", "60%", "#55%", "#40%", "#60%",
+                             "#50%", "70%", "#55%", "30%"]} />
         ) : holdings.error ? (
           <Notice>{(holdings.error as Error).message}</Notice>
         ) : rows.length ? (

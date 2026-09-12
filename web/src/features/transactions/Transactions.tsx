@@ -328,7 +328,8 @@ export function Transactions() {
         />
 
         {transactions.isPending && !transactions.data ? (
-          <Loading what="transactions" />
+          <Loading what="transactions" shape="table" rows={6}
+                   columns={["70%", "50%", "45%", "40%", "#55%", "60%", "30%"]} />
         ) : transactions.error ? (
           <Notice>{(transactions.error as Error).message}</Notice>
         ) : rows.length ? (

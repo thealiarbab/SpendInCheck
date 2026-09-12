@@ -1,6 +1,7 @@
 import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
 import { formatMoney, formatSigned, toMinor } from "../lib/money";
 import styles from "./ui.module.css";
+import skeleton from "./skeleton.module.css";
 
 /* Shared primitives. Everything here reads its colours from semantic tokens,
    so a screen built out of these is correct in brass and paper at once and no
@@ -178,8 +179,99 @@ export function Empty({ children }: { children: ReactNode }) {
   return <p className={styles.empty}>{children}</p>;
 }
 
-export function Loading({ what }: { what: string }) {
-  return <p className={styles.skeleton}>Loading {what}…</p>;
+/* --- waiting ---------------------------------------------------------------
+   Loading used to be one line of muted text, in all twenty-three places it
+   is used. That reserves none of the room the real content will take, so
+   every screen jumped the moment its rows arrived -- the text sat on one
+   line and was replaced by a six-row table.
+
+   These stand in for the shape instead. The table skeleton is built from the
+   real Table rather than from CSS that imitates it, for the same reason the
+   landing page keeps its feature cards as data: a second copy of the
+   geometry is a second chance for it to drift, and drift here reintroduces
+   exactly the jump the skeleton exists to prevent. */
+
+function Bar({ width, numeric }: { width?: string; numeric?: boolean }) {
+  return (
+    <span
+      className={skeleton.bar + (numeric ? " " + skeleton.numeric : "")}
+      style={width ? { width } : undefined}
+    />
+  );
+}
+
+/** What a screen reader is told while the bars are on screen. */
+function Announce({ what }: { what: string }) {
+  return <span className={skeleton.announce}>Loading {what}…</span>;
+}
+
+interface LoadingProps {
+  what: string;
+  /** The shape being waited for. Text is the safe default for a small slot. */
+  shape?: "text" | "table" | "stats";
+  rows?: number;
+  /** Column widths for a table, as CSS lengths. Prefix "#" to right-align. */
+  columns?: string[];
+}
+
+export function Loading({ what, shape = "text", rows = 4, columns }: LoadingProps) {
+  const heads = columns ?? ["30%", "20%", "#20%", "#20%"];
+
+  if (shape === "stats") {
+    return (
+      <div role="status" aria-busy="true">
+        <Announce what={what} />
+        <div className={styles.statRow} aria-hidden="true">
+          {Array.from({ length: rows > 4 ? 3 : rows }, (_, i) => (
+            <div className={styles.stat} key={i}>
+              <Bar width="52%" />
+              <span className={skeleton.statBar + " " + skeleton.bar} />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (shape === "table") {
+    return (
+      <div role="status" aria-busy="true">
+        <Announce what={what} />
+        <div aria-hidden="true">
+          <Table
+            head={
+              <tr>
+                {heads.map((width, i) => (
+                  <th key={i} className={width.startsWith("#") ? styles.numeric : undefined}>
+                    <Bar width={width.replace("#", "")} numeric={width.startsWith("#")} />
+                  </th>
+                ))}
+              </tr>
+            }
+          >
+            {Array.from({ length: rows }, (_, row) => (
+              <tr key={row}>
+                {heads.map((width, i) => (
+                  <td key={i} className={width.startsWith("#") ? styles.numeric : undefined}>
+                    <Bar width={width.replace("#", "")} numeric={width.startsWith("#")} />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </Table>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div role="status" aria-busy="true">
+      <Announce what={what} />
+      <div className={skeleton.lines} aria-hidden="true">
+        {Array.from({ length: Math.min(rows, 4) }, (_, i) => <Bar key={i} />)}
+      </div>
+    </div>
+  );
 }
 
 export function Notice({ children, ok }: { children: ReactNode; ok?: boolean }) {

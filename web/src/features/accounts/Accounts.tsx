@@ -239,7 +239,8 @@ export function Accounts() {
 
       <Card title="All accounts" flush>
         {accounts.isPending && !accounts.data ? (
-          <Loading what="your accounts" />
+          <Loading what="your accounts" shape="table" rows={3}
+                   columns={["55%", "40%", "#55%", "#35%", "#60%", "30%"]} />
         ) : accounts.error ? (
           <Notice>{(accounts.error as Error).message}</Notice>
         ) : items.length ? (
