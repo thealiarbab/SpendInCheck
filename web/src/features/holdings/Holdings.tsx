@@ -96,11 +96,20 @@ export function Holdings() {
   });
 
   const refresh = () => {
-    client.invalidateQueries({ queryKey: ["investments"] });
     client.invalidateQueries({ queryKey: ["portfolio"] });
     client.invalidateQueries({ queryKey: ["holdings-history"] });
     // The opening screen shows the same holdings and their totals.
     client.invalidateQueries({ queryKey: ["dashboard"] });
+    // Reports reads holdings twice: net worth values them month by month,
+    // and the benchmark chart *is* the portfolio. Neither was invalidated,
+    // so buying or selling left both drawing the position as it was before
+    // the trade until something else happened to refetch them.
+    client.invalidateQueries({ queryKey: ["report"] });
+    client.invalidateQueries({ queryKey: ["benchmark"] });
+    // ["investments"] used to be first in this list. No query has ever used
+    // that key -- the holdings query is ["portfolio"] -- so it invalidated
+    // nothing, which is the quietest way for a cache invalidation to be
+    // wrong: it looks like the line that covers the case it does not.
   };
 
   const add = useMutation({

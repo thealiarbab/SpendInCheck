@@ -75,6 +75,12 @@ export function Accounts() {
   const refresh = () => {
     client.invalidateQueries({ queryKey: ["accounts"] });
     client.invalidateQueries({ queryKey: ["transactions"] });
+    // The delete panel decides which branch to show from this count, so a
+    // stale one offers the wrong choice: reassignment for an account whose
+    // transactions have since moved away, or the plain delete for one that
+    // has since acquired some. It is keyed per account, and everything
+    // above it here can change it.
+    client.invalidateQueries({ queryKey: ["account-usage"] });
     client.invalidateQueries({ queryKey: ["report"] });
     client.invalidateQueries({ queryKey: ["dashboard"] });
   };
@@ -144,6 +150,9 @@ export function Accounts() {
   const transferFailure = send.error instanceof ApiError ? send.error : null;
   const transferFields = transferFailure?.isValidation ? transferFailure.fields : {};
   const removeFailure = remove.error instanceof ApiError ? remove.error : null;
+  // Close and Reopen was the one mutation on this screen whose failure went
+  // nowhere: the button simply did not appear to work.
+  const archiveFailure = archive.error instanceof ApiError ? archive.error : null;
 
   // Everything, across every account. Archived ones are included when they
   // are on screen: a closed account with money still in it is a fact, and
@@ -238,6 +247,10 @@ export function Accounts() {
       <div className={styles.gap} />
 
       <Card title="All accounts" flush>
+        {/* Close and Reopen used to fail in silence. Every other mutation
+            on this screen renders its failure; this one swallowed it, so a
+            refused archive looked exactly like a button that does nothing. */}
+        {archiveFailure && <Notice>{archiveFailure.message}</Notice>}
         {accounts.isPending && !accounts.data ? (
           <Loading what="your accounts" shape="table" rows={3}
                    columns={["55%", "40%", "#55%", "#35%", "#60%", "30%"]} />

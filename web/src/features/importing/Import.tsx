@@ -35,11 +35,6 @@ export function Import() {
     queryFn: () => api.accounts(false),
   });
 
-  const examine = useMutation({
-    mutationFn: () => api.examineImport(text, fallback ? Number(fallback) : undefined),
-    onSuccess: setReading,
-  });
-
   const commit = useMutation({
     mutationFn: (rows: ImportRow[]) =>
       api.commitImport(rows, account ? Number(account) : undefined),
@@ -53,6 +48,18 @@ export function Import() {
       setText("");
       setFilename("");
       if (file.current) file.current.value = "";
+    },
+  });
+
+  const examine = useMutation({
+    mutationFn: () => api.examineImport(text, fallback ? Number(fallback) : undefined),
+    onSuccess: (result) => {
+      setReading(result);
+      // The previous commit's outcome does not describe this one. Without
+      // this, a failed import left its error notice sitting under a fresh
+      // preview of a different file that nobody had tried to import yet --
+      // and a successful one left "Imported 42 transactions" above it.
+      commit.reset();
     },
   });
 
