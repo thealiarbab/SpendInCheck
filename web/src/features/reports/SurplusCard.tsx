@@ -72,7 +72,7 @@ export function SurplusCard(
         <p className={styles.nudgeBody}>
           Money left over is the easiest money to put to work, because nothing else
           was counting on it.{" "}
-          <a href={surplusHref} {...externalLinkProps}>
+          <a className={styles.saathiLink} href={surplusHref} {...externalLinkProps}>
             See where to put it ↗
           </a>
         </p>
