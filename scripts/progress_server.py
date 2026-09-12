@@ -81,6 +81,22 @@ COMMIT_PHASE = {
     # next time anything is added.
     8: ["53e5db0", "84cb033", "7c09108", "f99979e", "727992b", "bda000e",
         "f97eb7c", "ac1f776"],
+    # Phase 9. Two kinds of work, pinned together because they happened
+    # together and the page reports when, not just what.
+    #
+    # 59d89a3 is the phase itself: the symbol search, which the plan called
+    # the highest value per unit of effort in the whole integration.
+    #
+    # The rest is a correctness and latency sweep that belongs to no phase
+    # -- nine reachable 500s, a CSV export that stopped at 200 rows under a
+    # docstring promising every row, a database outage rendering as an empty
+    # ledger, rollover going stale behind the cron, a MySQL rowcount habit
+    # that had spread to ten functions, and the first-paint bundle. Left
+    # unpinned they would have fallen into CURRENT_PHASE anyway; pinned,
+    # the blurb below can say what they actually were.
+    9: ["43ace20", "8d44a25", "8b6a894", "5f73d62", "b17eff2", "7194485",
+        "c661f1e", "9418c85", "b37a840", "c1b7d05", "a1af021", "28fac04",
+        "0634421", "2cf8973", "3303756", "d96d054", "59d89a3"],
 }
 
 PHASES = [
@@ -144,8 +160,7 @@ PHASES = [
               "gets the front page, an account gets its ledger. vercel.json "
               "serves the built bundle from the edge and sends only /api to "
               "Python, where before every asset woke a serverless function.",
-     "open": ["Not deployed. Pushing to main puts this in front of visitors, "
-              "and the new vercel.json has never run -- read the build log."]},
+     "open": []},
     {"n": 9, "name": "StockSaathi prices", "state": "now",
      "blurb": "Migrations 011-012. A holding can be pointed at an NSE symbol and "
               "priced from the market; current_price keeps its meaning and is "
@@ -155,6 +170,15 @@ PHASES = [
               "The browser polls their CORS-open API directly -- at the "
               "upstream's own cache TTL, and not at all while the market is "
               "shut -- which keeps a ticking screen out of the serverless bill. "
+              "Symbol search is served from our own instruments table, seeded "
+              "from NSE's published equity list, rather than from StockSaathi's "
+              "master, which is behind RLS with no anon policy -- so this app "
+              "owns its own universe and waits on no other repository. Most of "
+              "the commits counted here are not pricing work at all: they are a "
+              "correctness and latency sweep that found nine reachable 500s, a "
+              "CSV export silently truncated at 200 rows, a database outage "
+              "rendering as an empty ledger, and a MySQL rowcount habit that had "
+              "spread to ten functions. "
               "quote_history is the piece that cannot be bought later: net "
               "worth is now valued month by month at what things actually "
               "closed at, where before every month was valued at today's price "
@@ -166,11 +190,12 @@ PHASES = [
               "so a screen can show it without making a lookup that takes "
               "three seconds cold. Holdings are charted against NIFTYBEES, the ETF that tracks the NIFTY 50 -- the index itself does not quote -- with the basket held at today's quantities so that buying more does not read as a gain.",
      "open": [
-         "Symbol autocomplete needs one deploy that is not in this repo: "
-         "the search endpoint is written at StockSaathi/app/api/search.py "
-         "and uncommitted there, because that repository is on a kotlin "
-         "branch with app/ untracked. The client half is live and degrades "
-         "to a plain text box until it answers.",
+         "Symbol autocomplete is built and needs its universe. "
+         "`python scripts/sync_instruments.py` seeds the 2,292 NSE "
+         "equities the search reads; instruments holds 3 rows until it "
+         "runs, and 3 rows is not an autocomplete. Also "
+         "`python scripts/migrate.py` to record 014 in the ledger -- it "
+         "was applied through Supabase directly, so the row is missing.",
          "The third nudge -- the goal-reached card -- is left for a "
          "decision. Goals renders inside Budgets, so it would put a link "
          "to a broker on a budgeting screen, which the plan's own rule "
