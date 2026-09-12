@@ -191,14 +191,13 @@ PHASES = [
               "so a screen can show it without making a lookup that takes "
               "three seconds cold. Holdings are charted against NIFTYBEES, the ETF that tracks the NIFTY 50 -- the index itself does not quote -- with the basket held at today's quantities so that buying more does not read as a gain.",
      "open": [
-         "One thing blocks this phase, and it is a deploy in the other "
-         "repository. StockSaathi's /api/search is written at "
-         "app/api/search.py and has never been shipped, so it 404s. "
-         "/api/v1/symbols/search already asks them first and falls back to "
-         "our seeded copy of the same NSE list, and the credit under the "
-         "suggestion box already follows whoever answered -- so deploying "
-         "that one file is the whole switch, and nothing here changes. "
-         "That repository is not ours to commit into.",
+         "Nothing blocks this phase any more. The instrument list really "
+         "is StockSaathi's: they publish their universe as static JSON "
+         "from their own edge -- 4,367 shares and ETFs with sectors, "
+         "13,969 curated schemes with fund houses -- and the seed reads "
+         "that. No deploy in their repository was ever needed. The "
+         "endpoint three sessions waited on reads a table that is empty "
+         "and selects a column that does not exist.",
          "Fund NAVs now come from their /api/mf-history rather than from "
          "api.mfapi.in directly: 186ms against 380ms, 2KB against 132KB, "
          "and one call where there were two. Their master carries no "

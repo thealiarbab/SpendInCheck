@@ -193,52 +193,49 @@ in every month**. Charting the portfolio's real value against an index
 compares two different things -- buying more raises the value without the
 market moving, so a month of heavy saving reads as spectacular returns.
 
-**Symbol autocomplete: live, and asking StockSaathi first.** The search
-genuinely belongs on their side -- the instrument master is
-`dhan_instruments` in their Supabase, behind RLS with no anon policy, which
-is correct and should stay that way.
+**Symbol autocomplete: live, and the list is genuinely StockSaathi's.**
 
-So `/api/v1/symbols/search` asks their `/api/search` and falls back to our
-own seeded copy of the same NSE universe when they cannot answer. Which is
-currently every time: the endpoint is written, at
+Three sessions called this blocked on a deploy in their repository. It
+never was. The reasoning was that their instrument master is
+`dhan_instruments`, behind RLS with no anon policy, so reading it needed a
+new endpoint over there. True, and beside the point:
 
-    G:\StockSaathi\app\api\search.py
+- `dhan_instruments` is **empty**. Their own nightly sync has never
+  filled it.
+- `app/api/search.py`, the endpoint everyone waited on, selects a column
+  called `exchange` when the column is `exchange_segment`. It would have
+  answered 503 to everything.
+- Their product never reads that table. It loads a **published static
+  universe** from its own edge, and so do we now:
 
-and has never been deployed, so it 404s. **Deploying that one file is the
-entire switch.** Nothing here changes, and the credit under the suggestion
-list starts reading "instruments by StockSaathi" by itself, because the
-response carries `source` and the line follows it.
+      https://stocksaathi.co.in/js/data/universeFull.<sha8>.json   4,367
+      https://stocksaathi.co.in/js/data/mfFull.<sha8>.json        13,969
 
-That repository is **not ours to touch** -- Ali has said so twice. Do not
-commit into it. But the thing that made it look hard is a red herring, and
-it is worth writing down so nobody re-derives it:
+  Public, CORS-open, no key. The hash is discovered from an unhashed
+  `<name>.meta.json` sidecar; `services/stocksaathi.py` owns that protocol
+  and `scripts/sync_instruments.py` seeds from it.
 
-`G:\StockSaathi` is not the site. `G:\StockSaathi\app` is, and it is a
-**separate git repository** -- on `main`, in sync with
-`github.com/thealiarbab/StockSaathi`, with its own `.vercel` link and a
-clean tree. The "kotlin branch with `app/` untracked" that earlier notes
-warned about is the *outer* directory, which has no remote at all and is
-not what deploys. Nothing needs checking out.
+So the suggestion box now says "instruments by StockSaathi" and means it,
+and the data is better than what NSE and AMFI gave directly: sectors on
+every share, fund houses on every scheme, ETFs included, and 13,969 funds
+that can actually be bought rather than 37,882 mostly dormant ones.
 
-So from Ali's side it is two commands in `G:\StockSaathi\app`:
+Re-seed with `python scripts/sync_instruments.py`. Add `--prune` to drop
+schemes they no longer carry; it cannot delete anything anybody holds,
+because that is a condition inside the DELETE rather than a check before
+it.
 
-    git add api/search.py && git commit -m "..." && git push
+**The lesson worth keeping** is not about instruments. Every session that
+called this blocked reasoned from a true premise to a false conclusion
+without looking. One `ls js/data/` would have ended it -- the same way one
+`ls app/api/` ended the "they have no mutual fund endpoint" claim.
 
-Vercel deploys on push to `main` (see 0682e3d, "Trigger redeploy after
-Vercel reconnect"). The file needs no install step -- it imports stdlib
-only, which is what their `vercel.json` promises of `api/*.py` -- and
-`SUPABASE_SERVICE_ROLE_KEY` is already set there, since
-`admin-sync-instruments.py` runs nightly on it.
-
-Two things about the fallback that are easy to get wrong. **None and []
-are different**: `[]` is their answer and only `None` means they did not
-answer, so a fallback triggering on both would second-guess a search that
-worked. And **their master has no mutual funds** -- it is the NSE universe
--- so a search they answer is still topped up from our table for the
-37,882 AMFI schemes.
-
-A failure stands their endpoint down for five minutes per process rather
-than costing a round trip on every keystroke.
+For the record, in case it comes up again: the site is
+`G:\StockSaathi\app`, which is **its own git repository** on `main`,
+tracking github.com/thealiarbab/StockSaathi, deploying to Vercel on push.
+The outer `G:\StockSaathi` has no remote and deploys nothing; `app/` shows
+as untracked there only because every nested repo does. Ali has since
+allowed changes and deploys there -- but **never the `kotlin` branch**.
 
 One thing the browser caught that is worth remembering: **a missing
 cross-origin endpoint does not present as a readable 404.** The host
