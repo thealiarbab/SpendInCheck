@@ -107,7 +107,11 @@ def sign_in_route():
     """Exchange a username or email plus password for a session."""
     payload = request.get_json(silent=True) or {}
     fields = Validator(payload)
-    login = fields.text("login", label="username or email")
+    # Capped like the fields it is compared against. Registration limits a
+    # username to 30 and an email to 255; sign-in limited neither, so the
+    # one unauthenticated text input in the app was the only one that
+    # would carry a megabyte into a query. 255, since either may be sent.
+    login = fields.text("login", max_length=255, label="username or email")
     # Same reason as register: a non-string password would reach
     # check_password_hash and raise there, but only for a login that resolves
     # to a real account -- which makes it look like an intermittent fault.

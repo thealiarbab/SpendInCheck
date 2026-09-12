@@ -10,7 +10,7 @@ from server import money, operations
 from server.auth import require_user
 from server.errors import NotFound, ValidationError
 from server.routes.api import api
-from server.validators import Validator, json_object
+from server.validators import MAX_TAGS, Validator, json_object
 
 FIELDS = ["id", "name", "uses"]
 
@@ -80,6 +80,13 @@ def set_transaction_tags(transaction_id):
     raw = payload.get("tag_ids")
     if not isinstance(raw, list):
         raise ValidationError({"tag_ids": "Send a list of tag ids."})
+
+    # The same cap as the transaction write, for the same reason: these ids
+    # become the values of one INSERT. This route was not in the finding,
+    # and had the identical unbounded loop.
+    if len(raw) > MAX_TAGS:
+        raise ValidationError(
+            {"tag_ids": f"Use at most {MAX_TAGS} tags on one transaction."})
 
     tag_ids = []
     for value in raw:

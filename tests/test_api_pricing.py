@@ -600,3 +600,46 @@ def test_an_unreachable_feed_is_not_a_closed_market(make_api_account, feed,
     client = make_api_account()
     body = client.get("/api/v1/quotes?symbols=RELIANCE").get_json()
     assert body["market_open"] is None
+
+
+def test_an_outage_does_not_tell_you_your_symbol_is_wrong(make_api_account,
+                                                          feed, monkeypatch):
+    """The message sends somebody to check the one thing that was fine.
+
+    A symbol the seeded table does not carry -- a listing from this morning
+    -- is asked of the upstream, and an upstream that answers nothing looks
+    exactly like an upstream that has never heard of it. The difference is
+    whether the request reached anything at all.
+    """
+    feed.reachable = False
+    monkeypatch.setattr(stocksaathi, "market_state",
+                        lambda: {"market_open": None, "cache_ttl_ms": None})
+    client = make_api_account()
+    add_holding(client)
+    holding = only_holding(client)
+
+    response = client.patch(f"/api/v1/investments/{holding['id']}/pricing",
+                            headers=client.headers,
+                            json={"ticker": "ZZNEWLISTING", "auto_price": "1"})
+    assert response.status_code == 422
+    message = response.get_json()["error"]["fields"]["ticker"]
+    assert "reach" in message.lower(), message
+    assert "check the symbol" not in message.lower(), message
+
+
+def test_a_wrong_symbol_still_says_so(make_api_account, feed, monkeypatch):
+    """The feed answered; it simply has no such symbol. That is the user's
+    to fix, and saying "we could not reach it" would be a lie that stops
+    them fixing it."""
+    monkeypatch.setattr(stocksaathi, "market_state",
+                        lambda: {"market_open": True, "cache_ttl_ms": 300000})
+    client = make_api_account()
+    add_holding(client)
+    holding = only_holding(client)
+
+    response = client.patch(f"/api/v1/investments/{holding['id']}/pricing",
+                            headers=client.headers,
+                            json={"ticker": "ZZNOSUCHCO", "auto_price": "1"})
+    assert response.status_code == 422
+    assert "check the symbol" in \
+        response.get_json()["error"]["fields"]["ticker"].lower()

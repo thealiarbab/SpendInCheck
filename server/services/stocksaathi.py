@@ -141,7 +141,12 @@ def live_quotes(symbols, timeout=TIMEOUT_SECONDS):
         return {}
 
     found = {}
+    # Cleared per call, so "still None afterwards" means this call reached
+    # nothing -- which is how a caller tells an unknown symbol from an
+    # unreachable feed. Left to accumulate, a previous success would make
+    # an outage look like a confident answer.
     state = {"market_open": None, "cache_ttl_ms": None}
+    _last_state.update(state)
     for batch in _chunks(wanted, MAX_SYMBOLS):
         body = _get("/live-quote", {"symbols": ",".join(batch)}, timeout)
         if not body:

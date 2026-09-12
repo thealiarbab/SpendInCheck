@@ -202,3 +202,15 @@ def test_signing_out_of_a_real_account_deletes_nothing(api_account):
     user_id = api_account["user"]["id"]
     client.post("/api/v1/auth/sign-out", headers=api_account["headers"])
     assert operations.user_exists(user_id)
+
+
+def test_the_login_field_is_length_capped(client):
+    """The only unauthenticated text input in the app, and the only one with
+    no cap: registration limits a username to 30 and an email to 255, and
+    sign-in limited neither."""
+    token = client.get("/api/v1/auth/session").get_json()["csrf_token"]
+    response = client.post("/api/v1/auth/sign-in",
+                           headers={"X-CSRF-Token": token},
+                           json={"login": "a" * 100000, "password": "whatever"})
+    assert response.status_code == 422
+    assert "login" in response.get_json()["error"]["fields"]

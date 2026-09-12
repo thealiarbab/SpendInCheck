@@ -275,3 +275,27 @@ def test_tag_ids_must_be_a_list_of_numbers(make_api_account):
     assert client.put(f"/api/v1/transactions/{transaction}/tags",
                       headers=client.headers,
                       json={"tag_ids": ["nope"]}).status_code == 422
+
+
+def test_a_transaction_cannot_carry_unbounded_tags(make_api_account):
+    """The ids become the values of one INSERT, so an unbounded list is an
+    unbounded statement -- a payload that fits in a text box building a
+    multi-megabyte query. Fifty is far past any real use."""
+    client = make_api_account()
+    response = client.post(
+        "/api/v1/transactions", headers=client.headers,
+        json={"date": "2026-06-05", "category_id": a_category(client),
+              "amount": "100.00", "type": "Expense", "description": "Lunch",
+              "tag_ids": list(range(1, 500))})
+    assert response.status_code == 422
+    assert "tag_ids" in response.get_json()["error"]["fields"]
+
+
+def test_the_other_tag_route_is_capped_too(make_api_account):
+    """PUT /transactions/<id>/tags had the identical unbounded loop and was
+    not in the finding. One limit, enforced at both doors."""
+    client = make_api_account()
+    transaction_id = add_transaction(client)
+    response = set_tags(client, transaction_id, list(range(1, 500)))
+    assert response.status_code == 422
+    assert "tag_ids" in response.get_json()["error"]["fields"]

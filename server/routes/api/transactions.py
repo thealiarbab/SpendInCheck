@@ -16,7 +16,7 @@ from server import money, operations
 from server.auth import current_currency, money_places, require_user
 from server.errors import NotFound, ValidationError
 from server.routes.api import api
-from server.validators import Validator
+from server.validators import MAX_TAGS, Validator
 
 
 def _keep_rollover_honest(user_id, *category_ids):
@@ -64,6 +64,10 @@ def _read_submission(payload):
     if raw is None:
         values["tag_ids"] = None
     elif isinstance(raw, list):
+        # Capped, because nothing else caps it. See MAX_TAGS.
+        if len(raw) > MAX_TAGS:
+            raise ValidationError(
+                {"tag_ids": f"Use at most {MAX_TAGS} tags on one transaction."})
         try:
             values["tag_ids"] = [int(one) for one in raw]
         except (TypeError, ValueError):

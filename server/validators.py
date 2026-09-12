@@ -47,6 +47,17 @@ def json_object(payload):
     return payload
 
 
+# The most tags one transaction may carry.
+#
+# Enforced at both routes that accept a tag list, which is the point of it
+# living here: the sweep that found this named only the transaction write,
+# and PUT /transactions/<id>/tags had the identical unbounded loop. The ids
+# become the values of one INSERT, so an unbounded list is an unbounded
+# statement -- a payload that fits in a text box building a multi-megabyte
+# query. Fifty is far past any real use; a transaction with fifty tags has
+# no tags.
+MAX_TAGS = 50
+
 class Validator:
     """Collects field errors, then raises them together.
 

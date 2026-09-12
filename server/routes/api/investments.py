@@ -137,8 +137,8 @@ def _resolve_symbol(ticker, must_quote):
     # existed, which their own docstring calls "up to three seconds cold",
     # on the path somebody is watching a spinner on. That was the right
     # design when this database knew nothing about symbols. It now holds
-    # every NSE equity and every AMFI scheme -- 40,174 rows, seeded from the
-    # exchange and from AMFI -- so the question "is this a real symbol, and
+    # every share and scheme StockSaathi carries -- 18,489 rows, seeded
+    # from their published universe -- so the question "is this a symbol, and
     # whose is it" is a primary key lookup against a table in the same
     # region, not a round trip to somebody else's server.
     #
@@ -179,6 +179,17 @@ def _resolve_symbol(ticker, must_quote):
     # stop somebody switching on a symbol that works. Asking the quote
     # endpoint is the cheaper second opinion.
     if symbol not in stocksaathi.live_quotes([symbol]):
+        # An outage and a wrong symbol are not the same message. Telling
+        # somebody their correct symbol is wrong, because a server in
+        # another building is down, sends them to check the one thing that
+        # was never the problem. market_state() is cleared at the start of
+        # every live_quotes call, so None here means this call reached
+        # nothing at all rather than that the feed had no such symbol.
+        if stocksaathi.market_state().get("market_open") is None:
+            raise ValidationError(
+                {"ticker": "Could not reach the price feed just now. Try "
+                           "again in a moment, or leave automatic pricing "
+                           "off and set the price yourself."})
         raise ValidationError(
             {"ticker": "No price found for " + symbol + ". Check the symbol, "
                        "or leave automatic pricing off."})
