@@ -33,10 +33,20 @@ def category_wise_spend(user_id, month_year):
     The GROUP BY collapses every transaction row in a category into one row
     so SUM(amount) can add up all of them together.
     """
-    # Split 'YYYY-MM' and match the year and month separately with EXTRACT,
-    # avoiding any date-format string containing '%' that would clash with
-    # the %s placeholders the driver substitutes.
-    year_part, month_part = month_year.split("-")
+    # A half-open range on txn_date, not EXTRACT on it.
+    #
+    # This used to split 'YYYY-MM' and match the year and month separately,
+    # to avoid a date-format string containing '%' clashing with the %s the
+    # driver substitutes. That worry was real but the remedy overshot:
+    # Postgres spells its format 'YYYY-MM', which has no '%' in it at all.
+    #
+    # What it cost was the index. Wrapping a column in a function makes it
+    # unreachable, so EXTRACT(YEAR FROM txn_date) could not use
+    # idx_txn_user_type (user_id, txn_type, txn_date) -- the index migration
+    # 008 added for exactly this shape. EXPLAIN showed only user_id reaching
+    # the index and every one of that account's rows fetched from the heap
+    # to be filtered in memory; with the range it is an Index Only Scan that
+    # never touches the heap.
     connection = None
     try:
         connection = db.get_connection()
@@ -47,12 +57,12 @@ def category_wise_spend(user_id, month_year):
             JOIN categories c ON t.category_id = c.category_id
             WHERE t.user_id = %s AND t.txn_type = 'Expense'
               AND t.transfer_group_id IS NULL
-              AND EXTRACT(YEAR FROM t.txn_date) = %s
-              AND EXTRACT(MONTH FROM t.txn_date) = %s
+              AND t.txn_date >= to_date(%s, 'YYYY-MM')
+              AND t.txn_date <  to_date(%s, 'YYYY-MM') + INTERVAL '1 month'
             GROUP BY c.category_name
             ORDER BY total_spent DESC
         """
-        cursor.execute(query, (user_id, year_part, month_part))
+        cursor.execute(query, (user_id, month_year, month_year))
         return cursor.fetchall()
     finally:
         db.close_connection(connection)
@@ -66,10 +76,10 @@ def budget_vs_actual(user_id, month_year):
     tuples, where difference = budget_limit - actual_spent (positive means
     under budget, negative means over budget).
     """
-    # Same reasoning as category_wise_spend: EXTRACT keeps '%' out of the SQL.
-    # The WHERE clause already pins every budget row to the requested month, so
-    # matching transactions on that same year/month lines the two tables up.
-    year_part, month_part = month_year.split("-")
+    # The WHERE clause already pins every budget row to the requested month,
+    # so matching transactions on that same month lines the two tables up.
+    # Matched as a range rather than with EXTRACT, for the reason given in
+    # category_wise_spend above.
     connection = None
     try:
         connection = db.get_connection()
@@ -89,16 +99,23 @@ def budget_vs_actual(user_id, month_year):
             FROM budgets b
             JOIN categories c ON b.category_id = c.category_id
             LEFT JOIN transactions t
-                ON t.category_id = b.category_id
+                -- user_id first, and not for safety: a category belongs to
+                -- exactly one account, so matching on category_id alone was
+                -- already correct. It is here because every useful index on
+                -- this table starts with user_id, and without it none of
+                -- them could be used at all.
+                ON t.user_id = b.user_id
+                AND t.category_id = b.category_id
                 AND t.txn_type = 'Expense'
                 AND t.transfer_group_id IS NULL
-                AND EXTRACT(YEAR FROM t.txn_date) = %s
-                AND EXTRACT(MONTH FROM t.txn_date) = %s
+                -- A range, not EXTRACT. See category_wise_spend above.
+                AND t.txn_date >= to_date(%s, 'YYYY-MM')
+                AND t.txn_date <  to_date(%s, 'YYYY-MM') + INTERVAL '1 month'
             WHERE b.user_id = %s AND b.month_year = %s
             GROUP BY c.category_name, b.budget_limit, b.rollover_in, b.rollover
             ORDER BY difference ASC
         """
-        cursor.execute(query, (year_part, month_part, user_id, month_year))
+        cursor.execute(query, (month_year, month_year, user_id, month_year))
         return cursor.fetchall()
     finally:
         db.close_connection(connection)
