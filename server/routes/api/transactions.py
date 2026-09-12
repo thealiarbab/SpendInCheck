@@ -22,21 +22,16 @@ from server.validators import Validator
 def _keep_rollover_honest(user_id, *category_ids):
     """Recompute carried-in budget figures after a transaction moved.
 
-    rollover_in is a stored derived value, so every write that changes what
-    it was derived from has to follow it. Most accounts use rollover on
-    nothing, so the set of categories that need it is asked for first and is
-    usually empty.
-
     Both the old and the new category are passed when a row is edited: a
     transaction moved out of Groceries changes what Groceries carried
     forward just as much as it changes the category it moved into.
+
+    The work itself now lives in operations.refresh_rollover_for, beside the
+    column it maintains, because this was not the only place that owed it --
+    the recurring sweep and category reassignment both write spending and
+    neither was recomputing anything.
     """
-    wanted = {one for one in category_ids if one}
-    if not wanted:
-        return
-    affected = operations.categories_with_rollover(user_id)
-    for category_id in wanted & affected:
-        operations.refresh_rollover(user_id, category_id)
+    operations.refresh_rollover_for(user_id, *category_ids)
 
 LIST_FIELDS = ["id", "date", "category", "amount", "type", "description",
                "account", "transfer_group", "tags"]

@@ -88,6 +88,13 @@ def remove_category(category_id):
 
     if not operations.delete_category(user_id, category_id, reassign_to):
         raise NotFound()
+
+    # Reassigning moves spending in and adds the two monthly limits together,
+    # so the target's carried-in figures are derived from something that has
+    # just changed twice over. The category being deleted needs nothing: its
+    # budgets went with it.
+    if reassign_to is not None:
+        operations.refresh_rollover_for(user_id, reassign_to)
     return jsonify({"ok": True})
 
 

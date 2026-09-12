@@ -173,3 +173,27 @@ def categories_with_rollover(user_id):
         return set()
     finally:
         db.close_connection(connection)
+
+
+def refresh_rollover_for(user_id, *category_ids):
+    """Recompute carry-in for whichever of these categories use rollover.
+
+    rollover_in is a stored derived value, so every write that changes what
+    it was derived from has to follow it. That rule was written down in the
+    transactions route and then observed in three places out of five: the
+    recurring sweep and category reassignment both move spending between
+    months and categories and neither recomputed anything, so a budget's
+    carried-in figure silently described a ledger that no longer existed.
+
+    It lives here now, beside the column it maintains, so the next writer
+    has one obvious thing to call rather than a loop to copy.
+
+    Most accounts use rollover on nothing, so the set is asked for once and
+    is usually empty -- which is what keeps this cheap enough to call after
+    every write.
+    """
+    wanted = {one for one in category_ids if one}
+    if not wanted:
+        return
+    for category_id in wanted & categories_with_rollover(user_id):
+        refresh_rollover(user_id, category_id)

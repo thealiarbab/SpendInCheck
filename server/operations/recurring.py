@@ -10,6 +10,7 @@ from datetime import date, timedelta
 
 from psycopg2 import Error
 from .. import db
+from . import budgets
 
 CADENCES = ("weekly", "monthly", "yearly")
 
@@ -278,13 +279,26 @@ def materialise_due(user_id=None, today=None):
         # or advancing without writing -- is exactly the split the unique
         # index exists to make harmless. Both together, or neither.
         with db.transaction(connection):
-            written = _sweep(cursor, user_id, today)
-        return written
+            swept = _sweep(cursor, user_id, today)
     except Error as e:
         print(f"Error materialising recurring rules: {e}")
         return {"rules": 0, "transactions": 0}
     finally:
         db.close_connection(connection)
+
+    # Rent posted by a rule is spending like any other, and a budget with
+    # rollover carries what is left of it into next month. The sweep never
+    # said so, so a rule-posted expense left every later carried-in figure
+    # describing a month that no longer existed -- and unlike a typo, nobody
+    # was looking, because nobody was there when it happened.
+    #
+    # After the connection is back in the pool, not while it is held: each
+    # refresh takes one of its own and the pool is three.
+    touched = swept.pop("touched")
+    for owner in {user for user, _ in touched}:
+        budgets.refresh_rollover_for(
+            owner, *(category for user, category in touched if user == owner))
+    return swept
 
 
 def _sweep(cursor, user_id, today):
@@ -305,7 +319,15 @@ def _sweep(cursor, user_id, today):
     due = cursor.fetchall()
 
     written = 0
+    touched = set()
     for rule in due:
-        written += _materialise_one(cursor, rule, today)
+        count = _materialise_one(cursor, rule, today)
+        written += count
+        # Only rules that actually wrote something. A rule selected as due
+        # can still write nothing -- ON CONFLICT DO NOTHING when a previous
+        # sweep already posted the row -- and recomputing for that would be
+        # work to arrive back where we started.
+        if count:
+            touched.add((rule[1], rule[3]))   # user_id, category_id
 
-    return {"rules": len(due), "transactions": written}
+    return {"rules": len(due), "transactions": written, "touched": touched}

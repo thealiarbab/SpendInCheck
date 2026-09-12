@@ -39,7 +39,7 @@ from .importing import MAX_ROWS as MAX_IMPORT_ROWS
 from .importing import commit as commit_import
 from .importing import examine, map_columns
 from .budgets import (categories_with_rollover, get_all_budgets,
-                      refresh_rollover, set_budget)
+                      refresh_rollover, refresh_rollover_for, set_budget)
 from .reports import (SERIES_MONTHS, budget_vs_actual, cashflow_series,
                       category_wise_spend, dashboard_summary, monthly_trend,
                       net_worth_series, top_merchants)
@@ -81,7 +81,7 @@ __all__ = [
     "update_rule",
     "MAX_IMPORT_ROWS", "commit_import", "examine", "map_columns",
     "categories_with_rollover", "get_all_budgets", "refresh_rollover",
-    "set_budget",
+    "refresh_rollover_for", "set_budget",
     "SERIES_MONTHS", "budget_vs_actual", "cashflow_series",
     "category_wise_spend", "dashboard_summary", "monthly_trend",
     "net_worth_series", "top_merchants",

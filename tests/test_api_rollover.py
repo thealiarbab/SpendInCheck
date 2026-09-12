@@ -10,6 +10,7 @@ scratch" the property worth testing hardest, and the last test in this file
 does exactly that.
 """
 
+from datetime import date
 from decimal import Decimal
 
 from server import operations
@@ -43,6 +44,75 @@ def report(client, month):
 def only(client, month):
     """The one budgeted category's row for that month."""
     return next(iter(report(client, month).values()))
+
+
+# --- every writer owes the recompute -----------------------------------------
+#
+# rollover_in is stored, not derived at read time, so any write that moves
+# what it was derived from has to follow it. The transaction routes and the
+# CSV import always did. These two did not, and nobody was watching when
+# they ran -- which is exactly what made them worth pinning down.
+
+def test_the_recurring_sweep_keeps_rollover_honest(make_api_account, api_user_id):
+    """Rent posted by a rule is spending like any other.
+
+    The sweep wrote the row and stopped. July still carried in the whole of
+    June's limit, as though June had gone unspent, and the figure only
+    corrected itself if somebody happened to edit a transaction in that
+    category afterwards.
+    """
+    client = make_api_account()
+    user_id = api_user_id(client)
+    category = a_category(client)
+
+    budget(client, "2026-06", "20000.00", category_id=category)
+    budget(client, "2026-07", "20000.00", category_id=category)
+    assert only(client, "2026-07")["rollover_in"] == "20000.00", "June unspent"
+
+    client.post("/api/v1/recurring", headers=client.headers,
+                json={"description": "Rent", "category_id": category,
+                      "amount": "15000.00", "type": "Expense",
+                      "cadence": "monthly", "next_run_on": "2026-06-01",
+                      "ends_on": "2026-06-30"})
+
+    swept = operations.materialise_due(user_id, date(2026, 6, 30))
+    assert swept["transactions"] == 1
+
+    assert only(client, "2026-07")["rollover_in"] == "5000.00", \
+        "20,000 budgeted less the 15,000 the rule posted"
+
+
+def test_reassigning_a_category_keeps_rollover_honest(make_api_account):
+    """Reassignment moves spending in and adds the two limits together.
+
+    Both halves feed rollover, and neither was recomputed, so the target's
+    carried-in figure described a category that no longer existed.
+    """
+    client = make_api_account()
+    keep = a_category(client)
+
+    made = client.post("/api/v1/categories", headers=client.headers,
+                       json={"name": "Dining", "type": "Expense"})
+    assert made.status_code == 201, made.get_json()
+    doomed = next(one["id"] for one in
+                  client.get("/api/v1/categories").get_json()["items"]
+                  if one["name"] == "Dining")
+
+    budget(client, "2026-06", "20000.00", category_id=keep)
+    budget(client, "2026-07", "20000.00", category_id=keep)
+    spend(client, "2026-06-05", "3000.00", category_id=doomed)
+
+    before = report(client, "2026-07")
+    assert before["Salary" if "Salary" in before else next(iter(before))]
+
+    removed = client.delete(
+        f"/api/v1/categories/{doomed}?reassign_to={keep}", headers=client.headers)
+    assert removed.status_code == 200, removed.get_json()
+
+    kept = next(row for row in report(client, "2026-07").values()
+                if row["rollover_in"] is not None)
+    assert kept["rollover_in"] == "17000.00", \
+        "20,000 budgeted less the 3,000 that moved in from Dining"
 
 
 # --- carrying forward --------------------------------------------------------

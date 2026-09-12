@@ -119,8 +119,7 @@ def commit_import():
 
     # Rollover is derived from spending, so an import of three hundred rows
     # moves every carried-in figure it touches.
-    for category_id in {row["category_id"] for row in clean} \
-            & operations.categories_with_rollover(user_id):
-        operations.refresh_rollover(user_id, category_id)
+    operations.refresh_rollover_for(
+        user_id, *{row["category_id"] for row in clean})
 
     return jsonify({"ok": True, "written": written}), 201
