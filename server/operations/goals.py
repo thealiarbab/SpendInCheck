@@ -6,7 +6,7 @@ a fact that already exists, and the two disagree the first time a
 contribution is edited or removed.
 """
 
-from psycopg2 import Error
+from psycopg2 import IntegrityError
 from .. import db
 
 # What has been put in, less what has been taken back out. Negative
@@ -57,9 +57,6 @@ def goal_exists(user_id, goal_id):
         cursor.execute("SELECT goal_id FROM goals WHERE goal_id = %s AND user_id = %s",
                        (goal_id, user_id))
         return cursor.fetchone() is not None
-    except Error as e:
-        print(f"Error checking goal: {e}")
-        return False
     finally:
         db.close_connection(connection)
 
@@ -88,11 +85,6 @@ def add_goal(user_id, goal_name, target_amount, target_date=None, account_id=Non
         row = cursor.fetchone()
         connection.commit()
         return row[0] if row else None
-    except Error as e:
-        if connection:
-            connection.rollback()
-        print(f"Error adding goal: {e}")
-        return None
     finally:
         db.close_connection(connection)
 
@@ -124,7 +116,7 @@ def update_goal(user_id, goal_id, goal_name, target_amount, target_date=None,
              account_id, account_id, user_id))
         connection.commit()
         return cursor.rowcount > 0
-    except Error as e:
+    except IntegrityError as e:
         if connection:
             connection.rollback()
         print(f"Error updating goal: {e}")
@@ -148,11 +140,6 @@ def set_goal_archived(user_id, goal_id, archived):
                        (archived, goal_id, user_id))
         connection.commit()
         return cursor.rowcount > 0
-    except Error as e:
-        if connection:
-            connection.rollback()
-        print(f"Error archiving goal: {e}")
-        return False
     finally:
         db.close_connection(connection)
 
@@ -173,11 +160,6 @@ def delete_goal(user_id, goal_id):
         deleted = cursor.rowcount > 0
         connection.commit()
         return deleted
-    except Error as e:
-        if connection:
-            connection.rollback()
-        print(f"Error deleting goal: {e}")
-        return False
     finally:
         db.close_connection(connection)
 
@@ -227,11 +209,6 @@ def add_contribution(user_id, goal_id, amount, contributed_on, note=None):
         row = cursor.fetchone()
         connection.commit()
         return row[0] if row else None
-    except Error as e:
-        if connection:
-            connection.rollback()
-        print(f"Error adding contribution: {e}")
-        return None
     finally:
         db.close_connection(connection)
 
@@ -251,10 +228,5 @@ def delete_contribution(user_id, contribution_id):
         deleted = cursor.rowcount > 0
         connection.commit()
         return deleted
-    except Error as e:
-        if connection:
-            connection.rollback()
-        print(f"Error deleting contribution: {e}")
-        return False
     finally:
         db.close_connection(connection)

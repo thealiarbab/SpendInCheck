@@ -8,7 +8,6 @@ A rule holds a schedule and a template. The sweep writes ordinary rows into
 import calendar
 from datetime import date, timedelta
 
-from psycopg2 import Error
 from .. import db
 from . import budgets
 
@@ -86,9 +85,6 @@ def rule_exists(user_id, rule_id):
         cursor.execute("SELECT rule_id FROM recurring_rules "
                        " WHERE rule_id = %s AND user_id = %s", (rule_id, user_id))
         return cursor.fetchone() is not None
-    except Error as e:
-        print(f"Error checking rule: {e}")
-        return False
     finally:
         db.close_connection(connection)
 
@@ -120,11 +116,6 @@ def add_rule(user_id, description, category_id, amount, txn_type, cadence,
         row = cursor.fetchone()
         connection.commit()
         return row[0] if row else None
-    except Error as e:
-        if connection:
-            connection.rollback()
-        print(f"Error adding recurring rule: {e}")
-        return None
     finally:
         db.close_connection(connection)
 
@@ -156,11 +147,6 @@ def update_rule(user_id, rule_id, description, category_id, amount, txn_type,
              category_id, user_id, account_id, account_id, user_id))
         connection.commit()
         return cursor.rowcount > 0
-    except Error as e:
-        if connection:
-            connection.rollback()
-        print(f"Error updating recurring rule: {e}")
-        return False
     finally:
         db.close_connection(connection)
 
@@ -180,11 +166,6 @@ def set_rule_paused(user_id, rule_id, paused):
                        (paused, rule_id, user_id))
         connection.commit()
         return cursor.rowcount > 0
-    except Error as e:
-        if connection:
-            connection.rollback()
-        print(f"Error pausing rule: {e}")
-        return False
     finally:
         db.close_connection(connection)
 
@@ -204,11 +185,6 @@ def delete_rule(user_id, rule_id):
         deleted = cursor.rowcount > 0
         connection.commit()
         return deleted
-    except Error as e:
-        if connection:
-            connection.rollback()
-        print(f"Error deleting rule: {e}")
-        return False
     finally:
         db.close_connection(connection)
 
@@ -280,9 +256,6 @@ def materialise_due(user_id=None, today=None):
         # index exists to make harmless. Both together, or neither.
         with db.transaction(connection):
             swept = _sweep(cursor, user_id, today)
-    except Error as e:
-        print(f"Error materialising recurring rules: {e}")
-        return {"rules": 0, "transactions": 0}
     finally:
         db.close_connection(connection)
 

@@ -59,6 +59,34 @@ def test_a_failed_read_is_503_not_an_empty_200(api_account, broken_db, path):
     assert response.get_json()["error"]["code"] == "database_unavailable"
 
 
+@pytest.mark.parametrize("method,path", [
+    ("delete", "/api/v1/categories/1"),
+    ("delete", "/api/v1/accounts/1"),
+    ("delete", "/api/v1/goals/1"),
+    ("delete", "/api/v1/tags/1"),
+    ("delete", "/api/v1/investments/1"),
+    ("get", "/api/v1/transactions/1"),
+])
+def test_a_failed_ownership_check_is_503_not_404(api_account, broken_db,
+                                                 method, path):
+    """An existence check answering False because the database was briefly
+    unreachable is not "you do not own that" -- but it reached the route as
+    exactly that, and the route answered 404.
+
+    Which is the same lie as the empty ledger wearing a different hat: the
+    record is there, the request was fine, and the app said otherwise with
+    no indication that anything had gone wrong.
+    """
+    client = api_account["client"]
+    call = getattr(client, method)
+    response = (call(path, headers=api_account["headers"])
+                if method != "get" else call(path))
+
+    assert response.status_code == 503, (
+        f"{method.upper()} {path} answered {response.status_code}")
+    assert response.get_json()["error"]["code"] == "database_unavailable"
+
+
 def test_the_failure_says_to_try_again_rather_than_that_it_is_broken(
         api_account, broken_db):
     """A pool that is momentarily full is not a broken application, and the

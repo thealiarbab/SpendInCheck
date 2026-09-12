@@ -5,7 +5,7 @@ function bodies are unchanged. Import these through the package, which
 re-exports every name.
 """
 
-from psycopg2 import Error
+from psycopg2 import IntegrityError
 from .. import db
 
 def add_category(user_id, category_name, category_type):
@@ -22,7 +22,7 @@ def add_category(user_id, category_name, category_type):
         cursor.execute(query, (user_id, category_name, category_type))
         connection.commit()
         return True
-    except Error as e:
+    except IntegrityError as e:
         if connection:
             connection.rollback()
         print(f"Error adding category: {e}")
@@ -68,9 +68,6 @@ def category_exists(user_id, category_id):
                        "WHERE category_id = %s AND user_id = %s AND NOT is_system",
                        (category_id, user_id))
         return cursor.fetchone() is not None
-    except Error as e:
-        print(f"Error checking category: {e}")
-        return False
     finally:
         db.close_connection(connection)
 
@@ -94,7 +91,7 @@ def rename_category(user_id, category_id, category_name, category_type):
                        (category_name, category_type, category_id, user_id))
         connection.commit()
         return cursor.rowcount > 0
-    except Error as e:
+    except IntegrityError as e:
         if connection:
             connection.rollback()
         print(f"Error renaming category: {e}")
@@ -120,9 +117,6 @@ def count_category_use(user_id, category_id):
                        (user_id, category_id, user_id, category_id))
         transactions, budgets = cursor.fetchone()
         return {"transactions": transactions, "budgets": budgets}
-    except Error as e:
-        print(f"Error counting category use: {e}")
-        return {"transactions": 0, "budgets": 0}
     finally:
         db.close_connection(connection)
 
@@ -167,7 +161,7 @@ def delete_category(user_id, category_id, reassign_to=None):
                            (category_id, user_id))
             deleted = cursor.rowcount > 0
         return deleted
-    except Error as e:
+    except IntegrityError as e:
         print(f"Error deleting category: {e}")
         return False
     finally:

@@ -5,7 +5,6 @@ function bodies are unchanged. Import these through the package, which
 re-exports every name.
 """
 
-from psycopg2 import Error
 from .. import db
 
 def add_investment(user_id, asset_name, asset_type, buy_date, buy_price,
@@ -32,11 +31,6 @@ def add_investment(user_id, asset_name, asset_type, buy_date, buy_price,
                                auto_price))
         connection.commit()
         return True
-    except Error as e:
-        if connection:
-            connection.rollback()
-        print(f"Error adding investment: {e}")
-        return False
     finally:
         db.close_connection(connection)
 
@@ -88,11 +82,6 @@ def update_investment_price(user_id, investment_id, new_current_price):
         cursor.execute(query, (new_current_price, investment_id, user_id))
         connection.commit()
         return cursor.rowcount > 0
-    except Error as e:
-        if connection:
-            connection.rollback()
-        print(f"Error updating investment price: {e}")
-        return False
     finally:
         db.close_connection(connection)
 
@@ -111,9 +100,6 @@ def investment_exists(user_id, investment_id):
         cursor.execute("SELECT investment_id FROM investments "
                        "WHERE investment_id = %s AND user_id = %s", (investment_id, user_id))
         return cursor.fetchone() is not None
-    except Error as e:
-        print(f"Error checking investment: {e}")
-        return False
     finally:
         db.close_connection(connection)
 
@@ -180,11 +166,6 @@ def delete_investment(user_id, investment_id):
                        (investment_id, user_id))
         connection.commit()
         return cursor.rowcount > 0
-    except Error as e:
-        if connection:
-            connection.rollback()
-        print(f"Error deleting investment: {e}")
-        return False
     finally:
         db.close_connection(connection)
 
@@ -228,11 +209,6 @@ def set_investment_pricing(user_id, investment_id, ticker, exchange, isin,
         # of 0. Values already equal to what was asked for still match, and
         # Postgres counts matched rows.
         return cursor.rowcount > 0
-    except Error as e:
-        if connection:
-            connection.rollback()
-        print(f"Error setting investment pricing: {e}")
-        return False
     finally:
         db.close_connection(connection)
 
@@ -325,10 +301,5 @@ def apply_prices(prices, user_id=None):
               user_id, user_id))
         connection.commit()
         return cursor.rowcount
-    except Error as e:
-        if connection:
-            connection.rollback()
-        print(f"Error applying prices: {e}")
-        return 0
     finally:
         db.close_connection(connection)

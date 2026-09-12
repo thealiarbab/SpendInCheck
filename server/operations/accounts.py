@@ -5,7 +5,7 @@ the account's opening balance and the rows filed against it, so the figure
 cannot drift away from the transactions that produced it.
 """
 
-from psycopg2 import Error
+from psycopg2 import IntegrityError
 from .. import db
 
 # What an account can be. Kept short on purpose: the kind only changes how
@@ -65,9 +65,6 @@ def account_exists(user_id, account_id):
                        " WHERE account_id = %s AND user_id = %s",
                        (account_id, user_id))
         return cursor.fetchone() is not None
-    except Error as e:
-        print(f"Error checking account: {e}")
-        return False
     finally:
         db.close_connection(connection)
 
@@ -89,9 +86,6 @@ def default_account_id(user_id):
                        " ORDER BY account_id LIMIT 1", (user_id,))
         row = cursor.fetchone()
         return row[0] if row else None
-    except Error as e:
-        print(f"Error finding the default account: {e}")
-        return None
     finally:
         db.close_connection(connection)
 
@@ -111,7 +105,7 @@ def add_account(user_id, account_name, account_kind, opening_balance=0):
         row = cursor.fetchone()
         connection.commit()
         return row[0] if row else None
-    except Error as e:
+    except IntegrityError as e:
         if connection:
             connection.rollback()
         print(f"Error adding account: {e}")
@@ -141,7 +135,7 @@ def update_account(user_id, account_id, account_name, account_kind, opening_bala
                         account_id, user_id))
         connection.commit()
         return cursor.rowcount > 0
-    except Error as e:
+    except IntegrityError as e:
         if connection:
             connection.rollback()
         print(f"Error updating account: {e}")
@@ -165,11 +159,6 @@ def set_archived(user_id, account_id, archived):
                        (archived, account_id, user_id))
         connection.commit()
         return cursor.rowcount > 0
-    except Error as e:
-        if connection:
-            connection.rollback()
-        print(f"Error archiving account: {e}")
-        return False
     finally:
         db.close_connection(connection)
 
@@ -192,9 +181,6 @@ def count_account_use(user_id, account_id):
                        (user_id, account_id))
         transactions, transfers = cursor.fetchone()
         return {"transactions": transactions, "transfers": transfers}
-    except Error as e:
-        print(f"Error counting account use: {e}")
-        return {"transactions": 0, "transfers": 0}
     finally:
         db.close_connection(connection)
 
@@ -237,7 +223,7 @@ def delete_account(user_id, account_id, reassign_to=None):
                            (account_id, user_id))
             deleted = cursor.rowcount > 0
         return deleted
-    except Error as e:
+    except IntegrityError as e:
         print(f"Error deleting account: {e}")
         return False
     finally:
@@ -338,9 +324,6 @@ def transfer(user_id, from_account_id, to_account_id, amount, txn_date,
         return str(rows[0][0])
     except _NoTransferCategory:
         return None
-    except Error as e:
-        print(f"Error transferring between accounts: {e}")
-        return None
     finally:
         db.close_connection(connection)
 
@@ -364,10 +347,5 @@ def delete_transfer(user_id, transfer_group_id):
         removed = cursor.rowcount
         connection.commit()
         return removed
-    except Error as e:
-        if connection:
-            connection.rollback()
-        print(f"Error deleting transfer: {e}")
-        return 0
     finally:
         db.close_connection(connection)

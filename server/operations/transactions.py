@@ -7,7 +7,6 @@ re-exports every name.
 
 from decimal import Decimal
 
-from psycopg2 import Error
 from .. import db
 from .accounts import default_account_id
 
@@ -56,11 +55,6 @@ def add_transaction(user_id, txn_date, category_id, amount, txn_type, descriptio
         row = cursor.fetchone()
         connection.commit()
         return row[0] if row else None
-    except Error as e:
-        if connection:
-            connection.rollback()
-        print(f"Error adding transaction: {e}")
-        return None
     finally:
         db.close_connection(connection)
 
@@ -350,9 +344,6 @@ def get_transaction_by_id(user_id, transaction_id):
         """
         cursor.execute(query, (transaction_id, user_id))
         return cursor.fetchone()
-    except Error as e:
-        print(f"Error fetching transaction: {e}")
-        return None
     finally:
         db.close_connection(connection)
 
@@ -404,11 +395,6 @@ def update_transaction(user_id, transaction_id, txn_date, category_id, amount,
                                account_id, account_id, user_id))
         connection.commit()
         return cursor.rowcount > 0
-    except Error as e:
-        if connection:
-            connection.rollback()
-        print(f"Error updating transaction: {e}")
-        return False
     finally:
         db.close_connection(connection)
 
@@ -423,10 +409,5 @@ def delete_transaction(user_id, transaction_id):
                        "WHERE transaction_id = %s AND user_id = %s", (transaction_id, user_id))
         connection.commit()
         return cursor.rowcount > 0
-    except Error as e:
-        if connection:
-            connection.rollback()
-        print(f"Error deleting transaction: {e}")
-        return False
     finally:
         db.close_connection(connection)

@@ -11,7 +11,6 @@ Nothing here is reachable without an account -- the endpoints that call it
 still require one -- but what comes back is public information either way.
 """
 
-from psycopg2 import Error
 
 from .. import db
 
@@ -51,11 +50,6 @@ def record_closes(ticker, closes):
               [close for _, _, close in rows]))
         connection.commit()
         return cursor.rowcount
-    except Error as e:
-        if connection:
-            connection.rollback()
-        print(f"Error recording closes for {ticker}: {e}")
-        return 0
     finally:
         db.close_connection(connection)
 
@@ -75,9 +69,6 @@ def symbols_with_history():
         cursor = connection.cursor()
         cursor.execute("SELECT DISTINCT ticker FROM quote_history")
         return {row[0] for row in cursor.fetchall()}
-    except Error as e:
-        print(f"Error listing symbols with history: {e}")
-        return set()
     finally:
         db.close_connection(connection)
 
@@ -100,9 +91,6 @@ def close_on(ticker, on_date):
         """, (ticker, on_date))
         row = cursor.fetchone()
         return row[0] if row else None
-    except Error as e:
-        print(f"Error reading close for {ticker}: {e}")
-        return None
     finally:
         db.close_connection(connection)
 
@@ -179,11 +167,6 @@ def record_instrument(found):
               found.get("high_52w")))
         connection.commit()
         return True
-    except Error as e:
-        if connection:
-            connection.rollback()
-        print(f"Error recording instrument {found.get('symbol')}: {e}")
-        return False
     finally:
         db.close_connection(connection)
 

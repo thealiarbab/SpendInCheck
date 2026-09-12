@@ -5,7 +5,7 @@ function bodies are unchanged. Import these through the package, which
 re-exports every name.
 """
 
-from psycopg2 import Error
+from psycopg2 import IntegrityError
 from .. import db
 
 def set_budget(user_id, category_id, month_year, budget_limit, rollover=False):
@@ -42,7 +42,7 @@ def set_budget(user_id, category_id, month_year, budget_limit, rollover=False):
                                rollover, category_id, user_id))
         connection.commit()
         written = cursor.rowcount > 0
-    except Error as e:
+    except IntegrityError as e:
         if connection:
             connection.rollback()
         print(f"Error setting budget: {e}")
@@ -145,11 +145,6 @@ def refresh_rollover(user_id, category_id):
         """, (user_id, category_id, user_id, category_id))
         connection.commit()
         return cursor.rowcount
-    except Error as e:
-        if connection:
-            connection.rollback()
-        print(f"Error refreshing rollover: {e}")
-        return 0
     finally:
         db.close_connection(connection)
 
@@ -168,9 +163,6 @@ def categories_with_rollover(user_id):
         cursor.execute("SELECT DISTINCT category_id FROM budgets "
                        " WHERE user_id = %s AND rollover", (user_id,))
         return {row[0] for row in cursor.fetchall()}
-    except Error as e:
-        print(f"Error checking rollover categories: {e}")
-        return set()
     finally:
         db.close_connection(connection)
 

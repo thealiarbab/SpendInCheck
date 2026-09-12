@@ -5,7 +5,7 @@ function bodies are unchanged. Import these through the package, which
 re-exports every name.
 """
 
-from psycopg2 import Error
+from psycopg2 import Error, IntegrityError
 from psycopg2.extras import execute_values
 from .. import db
 
@@ -44,7 +44,7 @@ def create_user(username, email, password_hash):
             cursor = connection.cursor()
             user_id = _create_user_rows(cursor, username, email, password_hash)
         return user_id
-    except Error as e:
+    except IntegrityError as e:
         print(f"Error creating user: {e}")
         return None
     finally:
@@ -133,9 +133,6 @@ def get_currency(user_id):
         cursor.execute("SELECT currency FROM users WHERE user_id = %s", (user_id,))
         found = cursor.fetchone()
         return found[0] if found else None
-    except Error as e:
-        print(f"Error reading currency: {e}")
-        return None
     finally:
         db.close_connection(connection)
 
@@ -157,11 +154,6 @@ def set_currency(user_id, code):
                        (code, user_id))
         connection.commit()
         return cursor.rowcount > 0
-    except Error as e:
-        if connection:
-            connection.rollback()
-        print(f"Error setting currency: {e}")
-        return False
     finally:
         db.close_connection(connection)
 

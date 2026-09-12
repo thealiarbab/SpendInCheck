@@ -5,7 +5,7 @@ Every query here reaches user scope through `transactions`, because
 004 for why.
 """
 
-from psycopg2 import Error
+from psycopg2 import IntegrityError
 from .. import db
 
 # Long enough for "reimbursed by work", short enough that a tag stays a
@@ -48,9 +48,6 @@ def tag_exists(user_id, tag_id):
         cursor.execute("SELECT tag_id FROM tags WHERE tag_id = %s AND user_id = %s",
                        (tag_id, user_id))
         return cursor.fetchone() is not None
-    except Error as e:
-        print(f"Error checking tag: {e}")
-        return False
     finally:
         db.close_connection(connection)
 
@@ -73,11 +70,6 @@ def add_tag(user_id, tag_name):
         row = cursor.fetchone()
         connection.commit()
         return row[0] if row else None
-    except Error as e:
-        if connection:
-            connection.rollback()
-        print(f"Error adding tag: {e}")
-        return None
     finally:
         db.close_connection(connection)
 
@@ -101,7 +93,7 @@ def rename_tag(user_id, tag_id, tag_name):
                        (tag_name, tag_id, user_id))
         connection.commit()
         return cursor.rowcount > 0
-    except Error as e:
+    except IntegrityError as e:
         if connection:
             connection.rollback()
         print(f"Error renaming tag: {e}")
@@ -126,11 +118,6 @@ def delete_tag(user_id, tag_id):
         deleted = cursor.rowcount > 0
         connection.commit()
         return deleted
-    except Error as e:
-        if connection:
-            connection.rollback()
-        print(f"Error deleting tag: {e}")
-        return False
     finally:
         db.close_connection(connection)
 
@@ -209,8 +196,5 @@ def set_transaction_tags(user_id, transaction_id, tag_ids):
                     " WHERE user_id = %s AND tag_id = ANY(%s)",
                     (transaction_id, user_id, list(tag_ids)))
         return True
-    except Error as e:
-        print(f"Error setting transaction tags: {e}")
-        return False
     finally:
         db.close_connection(connection)
