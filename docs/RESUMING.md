@@ -1,5 +1,25 @@
 # Picking this up again
 
+## Start a new session. Do not reopen an old one.
+
+Paste this into a **fresh** session:
+
+```
+SpendInCheck. Read docs/RESUMING.md and check memory first.
+Phase 9 is done. Phase 10 needs its spec rewritten before it is built.
+```
+
+That is the whole handoff, and it is deliberate. Every message in a resumed
+session re-reads the entire transcript above it, and after a few hours idle
+it re-reads it *uncached* -- so the first message back to a long
+conversation can cost more than a day of actual work. A new session with
+three lines costs three lines.
+
+Nothing is lost by starting fresh, because nothing important lives in the
+transcript. It lives in git, in this file, in `scripts/progress_server.py`,
+and in memory. That is what they are for.
+
+
 Read this first after a `/compact`, a `/clear`, or a power cut. It says
 where the truth lives, so nothing has to be remembered.
 
