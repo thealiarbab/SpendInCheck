@@ -6,7 +6,8 @@ Paste this into a **fresh** session:
 
 ```
 SpendInCheck. Read docs/RESUMING.md and check memory first.
-Phase 9 is done. Phase 10 needs its spec rewritten before it is built.
+Phase 9 is done. Phase 10's spec is rewritten and ready; it needs asking
+before it is built.
 ```
 
 That is the whole handoff, and it is deliberate. Every message in a resumed
@@ -180,8 +181,8 @@ spendincheck.com is still serving `templates/` from an older commit.
 > Pushing to `main` deploys. This is the first phase a visitor sees, so it
 > needs asking first.
 
-**Phase 9 is most of the way there.** What works, verified against the
-live database and the real API:
+**Phase 9 is done.** What works, verified against the live database and
+the real API:
 
 - Migration 011 puts `ticker`, `exchange`, `isin`, `auto_price`,
   `price_source` and `price_updated_at` on `investments`. `auto_price`
@@ -264,47 +265,94 @@ answers its own 404 page, that page carries no
 status -- `fetch` simply rejects. The hook counts consecutive failures and
 gives up after three rather than trusting a status it can never read.
 
-### Phase 10 needs rewriting before it is built
+### Phase 10 has been rewritten, and is ready to build
 
-Phase 10 is "opt-in account linking", and its headline deliverable is
-importing StockSaathi holdings into this ledger. **That should not be
-built as written**, and the reason is not a technical blocker.
+The spec is the last section of the plan,
+`C:\Users\Alig\.claude\plans\hello-bubbly-lecun.md` -> **"Phase 10,
+rewritten"**. It replaces the phase-table row, the `009 stocksaathi_link`
+schema row and risk 4, all three of which now point at it. What follows is
+the short version.
 
-StockSaathi is a **paper trading simulator**. Its own description: "a free
-paper trading simulator for Indian teens 13-18 ... virtual money, real
-NSE prices, no broker, no risk. SEBI-disclaimed." Every account starts
-with `STARTING_CASH_PAISE`, which is a lakh of play money, and its FAQ
-says plainly that teens "cannot lose, deposit, or withdraw real money.
-There is no broker connection, no payment processor, and no real trades."
+**The original was "opt-in account linking", importing StockSaathi holdings
+into this ledger. That is cancelled, not deferred.** StockSaathi is a paper
+trading simulator: teens 13-18, virtual money, SEBI-disclaimed, every
+account opening with a lakh of play cash. Importing its positions would
+file imaginary shares as net worth, and the figure would look entirely
+plausible -- a wrong net worth looks exactly like a right one. SpendInCheck
+exists to answer "am I over or under, and by how much", so that is not a
+smaller version of the promise, it is the opposite of it.
 
-So the holdings in a StockSaathi account are not holdings. Importing them
-here would put simulated positions into a real personal-finance ledger,
-where they would be counted in net worth, in the portfolio total, and in
-the benchmark chart -- and SpendInCheck's entire claim is that its figures
-answer "am I over or under, and by how much". A net worth inflated by
-imaginary shares is not a smaller version of that promise; it is the
-opposite of it.
+**What gets built instead is a watchlist of this app's own**, on
+Investments beneath the holdings: the things being considered rather than
+the things owned. Search the universe already seeded from StockSaathi's
+published file, add a symbol, remove it, price it with the same
+`useLiveQuotes` hook the holdings use. Migration 018 gives it a table with
+**no quantity column and no value column**, and that is the whole safety
+property -- a row that cannot enter a total because it holds nothing to add
+up.
 
-Two smaller points in the same direction. The audience is 13-18, which
-makes "link your identity across two products" a heavier ask than the plan
-treats it. And there is no authorisation flow to link *to*: their API has
-no OAuth, no token issuance, and no endpoint that reads one user's
-portfolio -- that data lives behind their own auth in their Supabase. The
-phase would need an authorisation server built in the other product
-first.
+**The import is a shortcut into that watchlist, not the reason for it.**
+Symbols only. Build and commit the watchlist first; the phase is worth
+having even if the import is never approved.
 
-What could be built instead, if the cross-product tie is still wanted:
+### The blocker three sessions reported does not exist
 
-- **A watchlist import** -- symbols only, no quantities and no values.
-  Bringing over "the things I have been practising with" as candidate
-  tickers is useful and cannot inflate anything.
-- **Nothing else**, until StockSaathi has an authorisation flow. The
-  `Invest` link, the instrument search and the price feed already give the
-  integration everything it has actually delivered so far, and none of
-  them needed an account link.
+Every previous session called this blocked on StockSaathi shipping OAuth.
+The premise was true and checkable -- their `app/api/` has no OAuth, no
+token issuance, and no endpoint that reads one user's portfolio. The
+conclusion did not follow. **Their Supabase is itself the authorisation
+server**, it is public, and `watchlist` already carries a policy scoped to
+`auth.uid()`.
 
-This is a decision, not a task, which is why it is written here rather
-than done.
+Probed live on 2026-09-13, not inferred:
+
+- `/api/config` publishes their Supabase URL and anon key -- meant to ship
+  in client code.
+- `/auth/v1/settings` reports `email: true` and **every** OAuth provider
+  `false`, so a one-time email code is the flow, and `disable_signup` is
+  `false`, which is exactly why `shouldCreateUser: false` is mandatory.
+- `POST /auth/v1/otp` with `create_user: false` for an unknown address
+  answers `422 otp_disabled` and sends no mail.
+- The anon key reads `[]` from both `watchlist` and `holdings`. Their row
+  level security is what scopes the import -- their enforcement, not our
+  promise.
+
+So: the user types their StockSaathi **email** (never their password) into
+Settings, gets a six-digit code, and the browser holds a StockSaathi
+session in a variable for one `SELECT` and then throws it away. It is never
+written to `localStorage`, never sent to Flask, never stored anywhere.
+**There is no link row, no stored token and no unlink** -- migration 009
+and its Fernet-encrypted columns are cancelled outright, which deletes the
+old risk 4 rather than mitigating it.
+
+Nothing in StockSaathi's repository has to change. No deploy, no endpoint,
+no migration. That is what makes this buildable now.
+
+**The lesson, for the third time.** This is the same failure as the
+instrument list and the "they have no mutual fund endpoint" claim: a true
+premise, a conclusion that did not follow, and nobody looked. One
+`curl /auth/v1/settings` ended it. When a StockSaathi feature looks
+blocked, probe their live surface before concluding anything.
+
+### The verify that decides the phase
+
+Not that the import works. **That every total in the app is unchanged to
+the paisa afterwards** -- net worth, net worth over time, the portfolio
+total, the dashboard summary, every report. Record the numbers before,
+diff them after. A watchlist that can move a number has failed the phase
+however well the rest of it works.
+
+### The one risk worth stating rather than hiding
+
+A GoTrue session is a *whole* session, not a watchlist-scoped grant: RLS
+stops it reaching anybody else's rows, not other tables of the user's own.
+For the few seconds it is live it could in principle write to that
+StockSaathi account. Held in memory only, never persisted, one `SELECT`,
+then `signOut()`. The narrower fix is a scoped `GET /api/my-watchlist` in
+their repository, and this deliberately does not wait for it.
+
+> Still needs asking before it is built, like every phase a visitor sees.
+> The product decision above is made; the go-ahead is not.
 
 ### Deployment notes worth having before the push
 

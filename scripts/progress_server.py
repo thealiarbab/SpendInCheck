@@ -245,20 +245,59 @@ PHASES = [
          "not quietly remove it as a containment violation.",
      ]},
     {"n": 10, "name": "A watchlist, and what can be imported into it", "state": "now",
-     "blurb": "Planned last because it is the only feature that can damage a "
-              "different product's data. On investigation the risk runs the "
-              "other way: StockSaathi is a paper trading simulator for teens "
-              "13-18, virtual money, SEBI-disclaimed, every account starting "
-              "with a lakh of play cash. Importing its holdings would put "
-              "simulated positions into a real ledger and count them in net "
-              "worth -- the opposite of what this app claims to answer.",
+     "blurb": "Rewritten before building, and it is a different phase now. It "
+              "was an account link that imported holdings, planned last as "
+              "the only feature that could damage another product's data. "
+              "The risk ran the other way: StockSaathi is a paper trading "
+              "simulator for teens 13-18, virtual money, SEBI-disclaimed, "
+              "every account opening with a lakh of play cash -- so "
+              "importing its positions would file imaginary shares as net "
+              "worth, and a wrong net worth looks exactly like a right one. "
+              "What is built instead is a watchlist of this app's own, on "
+              "Investments, beside the holdings: the things being considered "
+              "rather than the things owned, priced by the same hook and "
+              "searched against the universe already seeded from "
+              "StockSaathi's published file. Migration 018 gives it a table "
+              "with no quantity column and no value column, which is the "
+              "whole safety property -- a row that cannot enter a total "
+              "because it holds nothing to add up. The import is a shortcut "
+              "into that watchlist, not the reason for it: symbols only, "
+              "authorised by StockSaathi's own one-time email code, the "
+              "borrowed session held in a variable for one SELECT and thrown "
+              "away. No link row, no stored token, no unlink -- migration "
+              "009 and its Fernet-encrypted columns are cancelled rather "
+              "than deferred.",
      "open": [
-         "Needs rewriting before it is built. A watchlist import -- symbols "
-         "only, no quantities, no values -- is the version that cannot "
-         "inflate anything.",
-         "There is also nothing to link to yet: StockSaathi has no OAuth, no "
-         "token issuance and no endpoint that reads a user's portfolio. That "
-         "authorisation flow would have to exist in the other product first.",
+         "The authorisation flow was never missing. Three sessions called "
+         "this blocked on StockSaathi shipping OAuth, from a premise that "
+         "was true -- their app/api/ has no OAuth, no token issuance and no "
+         "endpoint reading a user's portfolio -- and a conclusion that did "
+         "not follow: their Supabase is itself the authorisation server, it "
+         "is public, and watchlist already carries a policy scoped to "
+         "auth.uid(). The same mistake as the instrument list, for the "
+         "third time: reasoning from a true premise instead of looking.",
+         "Probed live 2026-09-13, not inferred. /api/config publishes their "
+         "URL and anon key; /auth/v1/settings reports email true and every "
+         "OAuth provider false; an OTP for an unknown address with "
+         "create_user false answers 422 otp_disabled and sends no mail; and "
+         "the anon key reads [] from both watchlist and holdings, so their "
+         "row level security is what scopes the import rather than any "
+         "promise of ours.",
+         "Nothing in StockSaathi's repository has to change. No deploy, no "
+         "endpoint, no migration -- which is what makes this buildable now.",
+         "Build the watchlist first and commit it before the import. It is "
+         "worth having on its own, and the phase then survives the import "
+         "never being approved.",
+         "The verify that matters is not that the import works. It is that "
+         "every total in the app is unchanged to the paisa afterwards -- "
+         "net worth, net worth over time, portfolio, dashboard, reports. A "
+         "watchlist that can move a number has failed the phase.",
+         "Residual risk, stated rather than mitigated away: a GoTrue "
+         "session is a whole session, not a watchlist-scoped grant, so for "
+         "the seconds it is live it could in principle write to that "
+         "StockSaathi account. In memory only, never persisted, never sent "
+         "to Flask, one SELECT, then signOut. The narrower fix is a scoped "
+         "endpoint in their repository, and this does not wait for it.",
      ]},
 ]
 
