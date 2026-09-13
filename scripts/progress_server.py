@@ -32,7 +32,7 @@ BASELINE = "b2c9a7c"
 # mapping rather than a range. Any commit not listed is treated as part of
 # CURRENT_PHASE, which is what keeps this accurate as new work lands without
 # anyone editing the file.
-CURRENT_PHASE = 9
+CURRENT_PHASE = 10
 
 COMMIT_PHASE = {
     0: ["5e3ab5e", "6308244", "931dabe", "490f434", "c030a97", "e166bb4", "efb70ab"],
@@ -97,7 +97,27 @@ COMMIT_PHASE = {
     9: ["43ace20", "8d44a25", "8b6a894", "5f73d62", "b17eff2", "7194485",
         "c661f1e", "9418c85", "b37a840", "c1b7d05", "a1af021", "28fac04",
         "0634421", "2cf8973", "3303756", "d96d054", "59d89a3",
-        "4f2df58", "95488b9", "70c301a", "e6592fb", "9b50a71", "a0bab29", "d0b1dbd", "5f41677", "071927d", "2229a4b", "c7f1f72", "c0df2de"],
+        "4f2df58", "95488b9", "70c301a", "e6592fb", "9b50a71", "a0bab29",
+        "d0b1dbd", "5f41677", "071927d", "2229a4b", "c7f1f72", "c0df2de",
+    # Everything below closed phase 9, and is pinned rather than left to
+    # fall through because CURRENT_PHASE has moved to 10. Unlisted, these
+    # would now read as phase 10 work -- 62 commits claiming a phase whose
+    # first line has not been written. The same rule as 6501316 in phase 6
+    # and the note against phase 8, applied before it could go wrong rather
+    # than after.
+        "289b958", "ddada31", "b202750", "b82fda7", "58707ae",
+        "28d4cbb", "f006bde", "d13a811", "7a4d53f", "53b23c7",
+        "14b8a2c", "be776d5", "e90b964", "6c93518", "b8acfba",
+        "4ad5165", "f178298", "eb672f7", "f55e544", "4146605",
+        "be9bd49", "833579a", "766257f", "63cdbb5", "4b02995",
+        "f4898a3", "2c1088d", "b454370", "8387db4", "ff73815",
+        "0f28a9d", "c128462", "a38810d", "312a9d8", "4d34c96",
+        "601c534", "b1bc72e", "84d62e8", "831fc1e", "d739415",
+        "e279bae", "e24f598", "9854a8a", "4265769", "d86a436",
+        "910bd5c", "e727427", "f150721", "2bfb4ce", "35af011",
+        "c04023d", "b6e132c", "bf78785", "c4dfbca", "690439d",
+        "42f7dde", "f60968a", "8867419", "db68192", "5b8521a",
+        "733f187", "2d4829b"],
 }
 
 PHASES = [
@@ -162,7 +182,7 @@ PHASES = [
               "serves the built bundle from the edge and sends only /api to "
               "Python, where before every asset woke a serverless function.",
      "open": []},
-    {"n": 9, "name": "StockSaathi prices", "state": "now",
+    {"n": 9, "name": "StockSaathi prices", "state": "done",
      "blurb": "Migrations 011-012. A holding can be pointed at an NSE symbol and "
               "priced from the market; current_price keeps its meaning and is "
               "simply written by the feed instead of by a person, so no report "
@@ -224,7 +244,7 @@ PHASES = [
          "The plan contradicts itself there; his instruction settles it. Do "
          "not quietly remove it as a containment violation.",
      ]},
-    {"n": 10, "name": "Opt-in account linking", "state": "next",
+    {"n": 10, "name": "A watchlist, and what can be imported into it", "state": "now",
      "blurb": "Planned last because it is the only feature that can damage a "
               "different product's data. On investigation the risk runs the "
               "other way: StockSaathi is a paper trading simulator for teens "
