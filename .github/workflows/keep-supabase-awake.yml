@@ -1,6 +1,15 @@
 # Supabase pauses free projects after 7 days without activity, and a paused
-# project has to be restored by hand. This runs a trivial query twice a week
-# so the project never goes idle long enough to be paused.
+# project has to be restored by hand. The three daily Vercel crons already
+# query the database; this is the backstop in case they stop, twice a week.
+#
+# It calls the app's own /api/v1/cron/recurring job instead of connecting to
+# Postgres directly. The first version of this workflow opened a psycopg2
+# connection using DB_* repo secrets that were never set, so it failed with
+# `int('')` on every run it ever made. Going through the app needs one secret
+# (CRON_SECRET, the same value as the Vercel env var) instead of five, and it
+# also proves the deployed API can reach the database, which is the thing
+# that actually matters. The job is idempotent: a unique index on
+# (rule_id, txn_date) makes a repeat run a no-op.
 name: Keep Supabase awake
 
 on:
@@ -12,29 +21,21 @@ jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - run: pip install psycopg2-binary
-
-      - name: Run a keep-alive query
+      - name: Guard — secret must be configured
         env:
-          DB_HOST: ${{ secrets.DB_HOST }}
-          DB_PORT: ${{ secrets.DB_PORT }}
-          DB_USER: ${{ secrets.DB_USER }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          DB_NAME: ${{ secrets.DB_NAME }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          python - <<'PY'
-          import os, psycopg2
-          conn = psycopg2.connect(
-              host=os.environ["DB_HOST"], port=int(os.environ["DB_PORT"]),
-              user=os.environ["DB_USER"], password=os.environ["DB_PASSWORD"],
-              dbname=os.environ["DB_NAME"], sslmode="require", connect_timeout=20,
-          )
-          cur = conn.cursor()
-          cur.execute("SELECT COUNT(*) FROM categories")
-          print("keep-alive ok, categories:", cur.fetchone()[0])
-          conn.close()
-          PY
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::CRON_SECRET repo secret is not set (must match the Vercel env var)."
+            exit 1
+          fi
+
+      - name: Run a job that touches the database
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          code=$(curl -sS -o /tmp/out.json -w '%{http_code}' --max-time 60 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            https://spendincheck.com/api/v1/cron/recurring) || code=000
+          echo "HTTP $code: $(head -c 300 /tmp/out.json)"
+          [ "$code" = "200" ] || { echo "::error::keep-alive request failed (HTTP $code)"; exit 1; }

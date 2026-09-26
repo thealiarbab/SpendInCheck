@@ -21,6 +21,13 @@ from server.services import quote_snapshot
 BEARER_PREFIX = "Bearer "
 CRON_HEADER = "X-Cron-Secret"
 
+# GET as well as POST. Vercel's scheduler invokes cron paths with GET. These
+# were POST-only, so every scheduled run since launch got a 405 from Flask
+# before reaching the secret check: no recurring transaction ever posted
+# itself, no closing price was ever snapshotted, no stale demo was swept
+# (found 2026-09-26). The secret, not the verb, is what guards these.
+CRON_METHODS = ["GET", "POST"]
+
 # Demonstration accounts are per visitor and short-lived. A day is long enough
 # that nobody loses a session they are still using, and short enough that
 # abandoned ones do not accumulate.
@@ -53,7 +60,7 @@ def _require_cron_secret():
         raise ApiError("Not found.", code="not_found", status=404)
 
 
-@api.post("/cron/clear-demos")
+@api.route("/cron/clear-demos", methods=CRON_METHODS)
 def clear_demos():
     """Delete demonstration accounts nobody signed out of.
 
@@ -66,7 +73,7 @@ def clear_demos():
     return jsonify({"removed": removed, "older_than_hours": DEMO_MAX_AGE_HOURS})
 
 
-@api.post("/cron/recurring")
+@api.route("/cron/recurring", methods=CRON_METHODS)
 def post_recurring():
     """Write the transactions every due recurring rule owes.
 
@@ -79,7 +86,7 @@ def post_recurring():
     return jsonify(operations.materialise_due())
 
 
-@api.post("/cron/snapshot-prices")
+@api.route("/cron/snapshot-prices", methods=CRON_METHODS)
 def post_snapshot_prices():
     """Write down what every tracked symbol closed at today.
 

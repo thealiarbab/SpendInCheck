@@ -121,3 +121,19 @@ def test_a_real_account_cannot_be_deleted_through_the_demo_path(make_user):
     real_user = make_user()
     assert operations.delete_demo_user(real_user) is False
     assert operations.get_all_categories(real_user)
+
+
+@pytest.mark.parametrize("job", ["clear-demos", "recurring", "snapshot-prices"])
+def test_every_job_answers_the_schedulers_get(client, cron_secret, job):
+    """Vercel's scheduler calls cron paths with GET. POST-only routes turned
+    every scheduled run into a 405 that never reached the job."""
+    response = client.get(f"/api/v1/cron/{job}")
+    assert response.status_code != 405, f"/cron/{job} rejects the scheduler's GET"
+    assert response.status_code == 404  # no secret: guarded, not missing
+
+
+def test_the_schedulers_get_with_its_bearer_runs_the_job(client, cron_secret):
+    response = client.get("/api/v1/cron/clear-demos",
+                          headers={"Authorization": "Bearer " + cron_secret})
+    assert response.status_code == 200
+    assert "removed" in response.get_json()
