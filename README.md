@@ -1,8 +1,10 @@
-# SpendInCheck
+<div align="center">
 
-**Know whether you're on budget — not just what you spent.**
+<picture><source media="(max-width: 640px) and (prefers-color-scheme: dark)" srcset=".github/readme/header-phone-dark.svg"><source media="(max-width: 640px)" srcset=".github/readme/header-phone-light.svg"><source media="(prefers-color-scheme: dark)" srcset=".github/readme/header-dark.svg"><img src=".github/readme/header-light.svg" width="100%" alt="SpendInCheck. Know whether you're on budget. A personal finance tracker that puts planned against actual, category by category."></picture>
 
-### [**spendincheck.com**](https://spendincheck.com) — try the demo, no signup
+</div>
+
+**[spendincheck.com](https://spendincheck.com)**: try the demo, no signup.
 
 SpendInCheck is a personal finance tracker that ties three things most trackers keep
 apart: where your money goes, what you planned to spend, and what your investments are
@@ -84,6 +86,12 @@ as income or spending.
 | Where it goes | Which payees take the most, and how often? |
 
 ## How it's built
+
+<div align="center">
+
+<picture><source media="(max-width: 640px) and (prefers-color-scheme: dark)" srcset=".github/readme/architecture-phone-dark.svg"><source media="(max-width: 640px)" srcset=".github/readme/architecture-phone-light.svg"><source media="(prefers-color-scheme: dark)" srcset=".github/readme/architecture-dark.svg"><img src=".github/readme/architecture-light.svg" width="100%" alt="Architecture, left to right: Client (React app), then API (Flask, /api/v1), then Operations (server/operations), then Data (PostgreSQL, Scheduled jobs)."></picture>
+
+</div>
 
 The design rule is that **all SQL lives in one place**. `server/operations/` holds every
 query as a single function that returns plain Python data and never prints anything.
@@ -175,6 +183,4 @@ real one** rather than serving sessions anyone could forge.
 The schema ships with seed data — categories, three months of transactions, budgets and
 a mixed portfolio — so every report returns real output immediately.
 
-## About
-
-Built by [Ali Arbab](https://github.com/thealiarbab).
+Built by [Ali Arbab](https://github.com/thealiarbab), Founder of StockSaathi.
